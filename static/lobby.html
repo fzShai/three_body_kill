@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🌌 三体杀 - 大厅</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at center, #0a0e1a 0%, #050810 100%);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+        }
+        h1 {
+            font-size: 48px;
+            background: linear-gradient(135deg, #00e5ff, #0077ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+        }
+        .sub {
+            color: rgba(255,255,255,0.3);
+            letter-spacing: 4px;
+            font-size: 14px;
+            margin-bottom: 40px;
+        }
+        .user-info {
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .user-info span {
+            color: #00e5ff;
+        }
+        .btn {
+            display: inline-block;
+            padding: 16px 48px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #00e5ff, #0077ff);
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 8px;
+            text-decoration: none;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 229, 255, 0.2);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.5);
+        }
+        .btn-outline:hover {
+            border-color: #00e5ff;
+            color: #00e5ff;
+            box-shadow: none;
+        }
+        .placeholder {
+            color: rgba(255,255,255,0.1);
+            font-size: 14px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌌 三体杀</h1>
+        <div class="sub">✦ 等待 · 集结 ✦</div>
+
+        <div class="user-info">
+            👤 欢迎，<span id="usernameDisplay"></span>
+        </div>
+
+        <div>
+            <button class="btn" id="createRoomBtn">🚀 创建房间</button>
+            <button class="btn btn-outline" id="logoutBtn">退出登录</button>
+        </div>
+
+        <div class="placeholder">
+            ⚡ 房间功能开发中 · 敬请期待 ⚡
+        </div>
+    </div>
+
+    <script>
+        const username = localStorage.getItem('username');
+        if (!username) {
+            window.location.href = '/';
+        }
+        document.getElementById('usernameDisplay').textContent = username;
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        });
+
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            alert('房间功能即将上线！🚀');
+        });
+    </script>
+</body>
+</html>

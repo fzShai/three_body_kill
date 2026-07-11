@@ -103,6 +103,25 @@
         .form-panel input::placeholder {
             color: rgba(255, 255, 255, 0.15);
         }
+        .password-row {
+            position: relative;
+        }
+        .password-row input {
+            width: 100%;
+            padding-right: 46px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+        }
         .form-panel button {
             padding: 14px;
             border-radius: 12px;
@@ -180,7 +199,10 @@
             <label>用户名</label>
             <input type="text" id="loginUsername" placeholder="输入用户名" />
             <label>密码</label>
-            <input type="password" id="loginPassword" placeholder="输入密码" />
+            <div class="password-row">
+                <input type="password" id="loginPassword" placeholder="输入密码" />
+                <button type="button" class="password-toggle" data-target="loginPassword" aria-label="显示密码">👁️</button>
+            </div>
             <button id="loginBtn">登录</button>
             <div class="hint-text">还没有账号？点击「注册」加入</div>
         </div>
@@ -190,9 +212,15 @@
             <label>用户名</label>
             <input type="text" id="regUsername" placeholder="设置用户名" />
             <label>密码</label>
-            <input type="password" id="regPassword" placeholder="设置密码（至少3位）" />
+            <div class="password-row">
+                <input type="password" id="regPassword" placeholder="设置密码（至少3位）" />
+                <button type="button" class="password-toggle" data-target="regPassword" aria-label="显示密码">👁️</button>
+            </div>
             <label>确认密码</label>
-            <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" />
+            <div class="password-row">
+                <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" />
+                <button type="button" class="password-toggle" data-target="regPasswordConfirm" aria-label="显示密码">👁️</button>
+            </div>
             <button id="registerBtn">注册</button>
             <div class="hint-text">已有账号？点击「登录」返回</div>
         </div>
@@ -268,8 +296,10 @@
                 if (res.ok && data.success) {
                     showMessage(data.message || successMsg, 'success');
                     if (url === '/api/login') {
-                        // ✅ 登录成功：保存用户名，跳转到大厅
-                        localStorage.setItem('username', username);
+                        // ✅ 登录成功：优先使用服务端返回的 username，确保和后端保持一致
+                        const loginUsername = data.username || username;
+                        localStorage.setItem('username', loginUsername);
+                        setAuthCookie(loginUsername);
                         setTimeout(() => {
                             window.location.href = '/lobby';
                         }, 500);
@@ -292,6 +322,24 @@
             }
         }
 
+        function setAuthCookie(username) {
+            // 说明：当前使用前端 JS 设置 Cookie，适合演示和开发调试。
+            // 若后续要提升安全性，建议改为由后端在登录成功时通过 Set-Cookie 响应头设置 HttpOnly Cookie。
+            document.cookie = `username=${encodeURIComponent(username)}; path=/; max-age=3600; SameSite=Lax`;
+        }
+
+        document.querySelectorAll('.password-toggle').forEach((button) => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                button.textContent = isPassword ? '🙈' : '👁️';
+                button.setAttribute('aria-label', isPassword ? '隐藏密码' : '显示密码');
+            });
+        });
+
         function showMessage(msg, type) {
             messageEl.textContent = msg;
             messageEl.className = 'message' + (type ? ' ' + type : '');
@@ -307,8 +355,24 @@
 
         // ✅ 如果已经登录过，自动跳转到大厅
         const savedUser = localStorage.getItem('username');
-        if (savedUser) {
+        const cookieUser = document.cookie
+            .split(';')
+            .map(c => c.trim())
+            .find(c => c.startsWith('username='));
+
+        let cookieUsername = '';
+        if (cookieUser) {
+            try {
+                cookieUsername = decodeURIComponent(cookieUser.split('=').slice(1).join('='));
+            } catch (err) {
+                cookieUsername = '';
+            }
+        }
+
+        if (savedUser && savedUser === cookieUsername) {
             window.location.href = '/lobby';
+        } else if (savedUser && savedUser !== cookieUsername) {
+            localStorage.removeItem('username');
         }
     </script>
 </body>

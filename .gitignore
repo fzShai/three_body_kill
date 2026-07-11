@@ -1,15 +1,28 @@
-# Conda 环境
-.env/
-*.pyc
+# Python 缓存
 __pycache__/
+*.pyc
+*.pyo
 
-# IDE
+# 虚拟环境（如果以后用）
+venv/
+env/
+
+# 用户数据（含密码哈希，绝对不能上传！）
+users.json
+
+# IDE 配置
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # 系统文件
 .DS_Store
+Thumbs.db
+
+# 日志
 *.log
-EOF
-#
-users.json
+
+# 本地配置文件（如果有）
+.env
+.local.env

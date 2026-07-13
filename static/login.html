@@ -162,23 +162,23 @@
             0%,100% { transform: translate(-50%, 0%) scale(1); filter: blur(0.4px); box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5); }
             50% { transform: translate(-50%, 0%) scale(1.05); filter: blur(0.6px); box-shadow: 0 0 72px rgba(255, 174, 51, 0.5), inset 0 0 24px rgba(255, 230, 160, 0.55); }
         }
-        body.scene-transition-active{
+        body.scene-transition-start .drift-star{
+            animation-play-state: paused;
+            transition: filter 0.4s ease, opacity 2s ease;
+        }
+        body.scene-transition-start .container{ opacity: 0; transition: opacity 1s ease; }
+        body.scene-transition-sky{
             background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
             transition: background 3s ease-in-out;
         }
-        body.scene-transition-active .drift-star{
-            animation-play-state: paused;
-            transition: filter 2s ease, opacity 2s ease;
-        }
-        body.scene-transition-active .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
-        body.scene-transition-active .container{ opacity: 0; transition: opacity 1s ease; }
+        body.scene-transition-sky .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
         .forest svg path,
         .forest svg g path{
             transition: fill 4.5s ease-in-out;
         }
-        body.scene-transition-active .layer-far{ fill: #ff7b30; }
-        body.scene-transition-active .layer-mid{ fill: #d84a1e; }
-        body.scene-transition-active .layer-near{ fill: #7f1204; }
+        body.scene-transition-sky .layer-far{ fill: #ff7b30; }
+        body.scene-transition-sky .layer-mid{ fill: #d84a1e; }
+        body.scene-transition-sky .layer-near{ fill: #7f1204; }
         .forest-burning-active #fireCanvas{ opacity: 1; }
 
         /* 登录框：右侧，硬边科幻风格 + 激光边框 */
@@ -470,7 +470,7 @@
         }
 
         function startSceneTransition(username) {
-            document.body.classList.add('scene-transition-active');
+            document.body.classList.add('scene-transition-start');
             document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
             setTimeout(() => {
                 if (window.startStarDrop) window.startStarDrop();
@@ -478,6 +478,9 @@
             setTimeout(() => {
                 document.getElementById('solarRise')?.classList.add('sun-rise-active');
             }, 3000);
+            setTimeout(() => {
+                document.body.classList.add('scene-transition-sky');
+            }, 4200);
             setTimeout(() => {
                 document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
             }, 7000);
@@ -543,8 +546,7 @@
                 el.style.position = 'fixed';
                 // 随机亮度（进一步提高上限以显著增强中心光）
                 const brightness = rand(1.8, 4.0);
-                el.style.filter = `brightness(${brightness})`;
-                // 随机透明度（更高的基础可见度）
+                el.style.filter = `brightness(${brightness})`;                el.dataset.baseBrightness = brightness;                // 随机透明度（更高的基础可见度）
                 el.style.opacity = String(rand(0.75, 1));
                 // 根据亮度放大发光效果（更强的冷白光晕）
                 const glowFactor = Math.max(1, brightness);
@@ -644,6 +646,8 @@
                     walker.duration = 2200;
                     walker.startTime = 0;
                     walker.dropMode = true;
+                    const base = parseFloat(walker.el.dataset.baseBrightness) || 1;
+                    walker.el.style.filter = `brightness(${base * 2})`;
                 });
             }
             window.startStarDrop = startStarDrop;

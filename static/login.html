@@ -5,187 +5,212 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>🌌 三体杀 - 登录</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        /* 重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* 页面整体：夜幕向下渐变，右侧放置登录框 */
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: radial-gradient(ellipse at center, #0a0e1a 0%, #050810 100%);
-            color: #fff;
-        }
-        .container {
-            background: rgba(26, 31, 53, 0.85);
-            backdrop-filter: blur(12px);
-            padding: 48px 40px 40px;
-            border-radius: 20px;
-            width: 100%;
-            max-width: 400px;
-            border: 1px solid rgba(0, 229, 255, 0.2);
-            box-shadow: 0 0 60px rgba(0, 229, 255, 0.05);
-        }
-        .title {
-            text-align: center;
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 6px;
-            background: linear-gradient(135deg, #00e5ff, #0077ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .subtitle {
-            text-align: center;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-bottom: 28px;
-            letter-spacing: 4px;
-        }
-        .tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 24px;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .tabs button {
-            flex: 1;
-            padding: 12px 0;
-            background: rgba(255, 255, 255, 0.03);
-            border: none;
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 15px;
-            cursor: pointer;
-            transition: 0.3s;
-            font-weight: 600;
-        }
-        .tabs button.active {
-            background: rgba(0, 229, 255, 0.12);
-            color: #00e5ff;
-        }
-        .tabs button:hover {
-            background: rgba(0, 229, 255, 0.06);
-        }
-        .form-panel {
-            display: none;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .form-panel.active {
-            display: flex;
-        }
-        .form-panel label {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.5);
-            letter-spacing: 0.5px;
-        }
-        .form-panel input {
-            padding: 14px 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(255, 255, 255, 0.04);
-            color: #fff;
-            font-size: 15px;
-            outline: none;
-            transition: 0.3s;
-        }
-        .form-panel input:focus {
-            border-color: rgba(0, 229, 255, 0.4);
-            background: rgba(255, 255, 255, 0.06);
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.04);
-        }
-        .form-panel input::placeholder {
-            color: rgba(255, 255, 255, 0.15);
-        }
-        .password-row {
             position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 6vh 8vw;
+            color: #e6f7ff;
+            background: linear-gradient(to bottom, #071428 0%, #04151a 48%, #021012 100%);
         }
-        .password-row input {
-            width: 100%;
-            padding-right: 46px;
-        }
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: transparent;
-            border: none;
-            color: rgba(255, 255, 255, 0.6);
-            cursor: pointer;
-            font-size: 16px;
-            padding: 4px;
-        }
-        .form-panel button {
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            background: linear-gradient(135deg, #00e5ff, #0077ff);
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-top: 4px;
-        }
-        .form-panel button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 30px rgba(0, 229, 255, 0.2);
-        }
-        .form-panel button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .message {
-            text-align: center;
-            font-size: 14px;
-            margin-top: 16px;
-            min-height: 24px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-        .message.success {
-            color: #00e5ff;
-        }
-        .message.error {
-            color: #ff4757;
-        }
-        .hint-text {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.2);
-            text-align: center;
-            margin-top: 4px;
-        }
-        .stars {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
+
+        /* 微小星星（铺满背景，左侧会有三颗独立闪烁的星）*/
+        .stars{
+            position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
             background-image:
-                radial-gradient(2px 2px at 20px 30px, #eee, transparent),
-                radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.8), transparent),
-                radial-gradient(2px 2px at 50px 160px, #ddd, transparent),
-                radial-gradient(2px 2px at 90px 40px, rgba(255, 255, 255, 0.6), transparent),
-                radial-gradient(2px 2px at 130px 80px, #fff, transparent),
-                radial-gradient(2px 2px at 160px 30px, rgba(255, 255, 255, 0.7), transparent);
-            background-size: 200px 200px;
-            background-repeat: repeat;
-            opacity: 0.3;
+                radial-gradient(circle at 10px 20px, rgba(255,255,255,0.9) 0 1px, transparent 2px),
+                radial-gradient(circle at 40px 70px, rgba(255,255,255,0.8) 0 1px, transparent 2px),
+                radial-gradient(circle at 50px 160px, rgba(255,255,255,0.7) 0 1px, transparent 2px),
+                radial-gradient(circle at 90px 40px, rgba(255,255,255,0.6) 0 1px, transparent 2px),
+                radial-gradient(circle at 130px 80px, rgba(255,255,255,0.9) 0 1px, transparent 2px);
+            background-size: 220px 220px; opacity: 0.45; mix-blend-mode: screen;
+        }
+
+        /* 三颗可控漂移星（左侧），使用实际 DOM 元素，颜色为亮银色，中心更亮 */
+        .drift-star{
+            position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; display:block;
+            transform: translate(-50%, -50%) scale(1);
+            /* 进一步增强：更集中的白色核心、更大更亮的光晕 */
+            background: radial-gradient(circle at 50% 45%, #ffffff 0%, #ffffff 34%, #f8fbff 46%, rgba(245,248,252,0.95) 60%, transparent 100%);
+            box-shadow: 0 0 36px rgba(255,255,255,1), 0 0 86px rgba(220,235,245,0.36) inset, 0 0 160px rgba(210,230,245,0.2);
+            opacity: 0.95; will-change: left, top, transform, opacity, filter;
+            animation-name: flicker-yellow; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
+        }
+        .drift-star:nth-of-type(1){ width:10px; height:10px; animation-duration: 2.6s; animation-delay: 0.2s; }
+        .drift-star:nth-of-type(2){ width:7px; height:7px; animation-duration: 3.6s; animation-delay: 0.6s; }
+        .drift-star:nth-of-type(3){ width:12px; height:12px; animation-duration: 4.2s; animation-delay: 1s; }
+
+        @keyframes flicker-yellow {
+            0% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.9); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(2.0); }
+            60% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.12); }
+            100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* 拖尾粒子 */
+        .star-trail{
+            position: fixed; pointer-events: none; z-index: 0;
+            /* 长条渐变，尾部逐渐透明，制造彗尾感 */
+            background: linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(230,235,245,0.75) 30%, rgba(200,210,225,0.35) 60%, transparent 100%);
+            border-radius: 999px;
+            mix-blend-mode: screen; filter: blur(6px);
+            opacity: 0.85; transform-origin: center left;
+            transition: transform 720ms cubic-bezier(.2,.8,.2,1), opacity 720ms linear;
+            will-change: transform, opacity;
+        }
+
+        /* 保持原有 .drift-star 视觉与行为（使用脚本控制移动与亮度） */
+
+        /* 过渡雾气层：淡淡光晕，放在星空与森林之间，增加层次感 */
+        .mist{
+            position: fixed; left: 0; right: 0; bottom: 0; height: 52vh; width: 100%; z-index: 1; pointer-events: none;
+            background: radial-gradient(60% 40% at 20% 30%, rgba(2,40,50,0.28), rgba(2,20,30,0.12) 30%, transparent 70%),
+                        radial-gradient(40% 30% at 60% 60%, rgba(6,30,40,0.18), transparent 60%);
+            filter: blur(18px) saturate(120%);
+            opacity: 0.85; mix-blend-mode: screen;
+            animation: drift 18s linear infinite;
+        }
+
+        @keyframes drift{
+            0%{ transform: translateX(-6%); }
+            50%{ transform: translateX(6%); }
+            100%{ transform: translateX(-6%); }
+        }
+
+        /* 森林剪影：改为内联 SVG（更尖锐的松树轮廓），放置在页面底部 */
+        .forest{
+            position: fixed; left: 0; right: 0; bottom: 0; height: 44vh; width: 100%; z-index: 2; pointer-events: none;
+            display: block; transform: translateZ(0);
+        }
+        .forest svg{ width:100%; height:100%; display:block; }
+        /* 近景更深，远景更淡，保持夜色氛围 */
+        .forest .layer-far{ fill: rgba(6,12,10,0.55); }
+        .forest .layer-mid{ fill: rgba(3,6,5,0.75); }
+        .forest .layer-near{ fill: rgba(0,0,0,0.95); }
+
+        /* 登录框：右侧，半透明毛玻璃，科技感发光边框 */
+        .container{
+            position: relative;
+            z-index: 3;
+            width: 100%; max-width: 420px;
+            margin-right: 6vw;
+            padding: 40px 36px;
+            border-radius: 16px;
+            background: rgba(8, 14, 20, 0.36);
+            backdrop-filter: blur(10px) saturate(120%);
+            -webkit-backdrop-filter: blur(10px) saturate(120%);
+            border: 1px solid rgba(0,230,255,0.08);
+            box-shadow: 0 8px 30px rgba(0,30,40,0.6), inset 0 0 30px rgba(0,230,255,0.02);
+            overflow: visible;
+        }
+        /* 发光线条（科技感边框） */
+        .container::before{
+            content: '';
+            position: absolute; inset: -1px; border-radius: 18px; z-index: -1;
+            background: linear-gradient(120deg, rgba(0,230,255,0.12), rgba(0,120,255,0.06));
+            filter: blur(8px);
+            opacity: 0.9;
+        }
+
+        .title{ font-size: 30px; font-weight: 800; text-align: left; background: linear-gradient(90deg,#7ee7ff,#9bd0ff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+        .subtitle{ font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 20px; text-align: left; }
+
+        .tabs{ display:flex; gap:8px; margin-bottom:18px; }
+        .tabs button{ flex: none; padding:8px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.6); cursor:pointer; font-weight:700; }
+        .tabs button.active{ background: linear-gradient(90deg, rgba(0,230,255,0.12), rgba(0,120,255,0.08)); color: #bff5ff; }
+
+        .form-panel{ display: none; flex-direction: column; gap:14px; }
+        .form-panel.active{ display:flex; }
+        .form-panel label{ font-size:13px; color: rgba(255,255,255,0.55); }
+        /* 输入框：保留原视觉，并添加底部发光下划线（科幻控制台风格） */
+        .form-panel input{
+            padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.04);
+            background: rgba(255,255,255,0.02); color:#eafcff; font-size:15px; outline:none;
+            background-image: linear-gradient(90deg, rgba(0,200,255,0.0), rgba(0,230,255,0.95), rgba(0,170,220,0.0));
+            background-repeat: no-repeat;
+            background-position: left calc(100% - 8px);
+            background-size: 0% 2px;
+            transition: background-size 0.36s cubic-bezier(.2,.9,.3,1), box-shadow 0.28s;
+        }
+        .form-panel input:focus{
+            box-shadow: 0 8px 28px rgba(0,160,230,0.06), 0 0 18px rgba(0,200,255,0.04);
+            border-color: rgba(0,200,255,0.18);
+            background-size: 100% 2px;
+        }
+        .form-panel input::placeholder{ color: rgba(255,255,255,0.12); }
+
+        .password-row{ position: relative; }
+        .password-row input{ width:100%; padding-right:46px; }
+        .password-toggle{ position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; color: rgba(255,255,255,0.65); cursor:pointer; font-size:16px; }
+
+        .form-panel button{ padding:12px; border-radius:10px; border:none; background: linear-gradient(90deg,#00e5ff,#0077ff); color:#04212a; font-weight:800; cursor:pointer; }
+        .form-panel button:hover{ transform: translateY(-2px); box-shadow: 0 10px 40px rgba(0,140,220,0.16); }
+
+        .message{ text-align:left; font-size:14px; margin-top:8px; min-height:20px; color: rgba(255,255,255,0.65); }
+        .message.success{ color:#7ff0ff; }
+        .message.error{ color:#ff6b6b; }
+
+        .hint-text{ font-size:13px; color: rgba(255,255,255,0.22); text-align:left; margin-top:6px; }
+
+        /* 面板角标：小装饰线条，增加科幻感 */
+        .panel-badge{
+            position: absolute; top: 12px; left: 12px; width: 44px; height: 20px; z-index: 6; pointer-events: none;
+            display: flex; gap:6px; align-items:center;
+        }
+        .panel-badge .bar{ height:2px; background: linear-gradient(90deg,#00e5ff,#6ad0ff); box-shadow: 0 4px 12px rgba(0,170,255,0.12); border-radius:2px; }
+        .panel-badge .bar.short{ width:12px; opacity:0.95; }
+        .panel-badge .bar.long{ width:28px; opacity:0.75; }
+        /* 小角标右下：微小矩形装饰线 */
+        .panel-badge::after{ content: ''; position: absolute; right:-8px; bottom:-6px; width:8px; height:8px; border-radius:2px; background: linear-gradient(180deg, rgba(0,230,255,0.12), rgba(0,120,255,0.06)); box-shadow: 0 4px 10px rgba(0,120,255,0.06); }
+
+        /* 响应式：窄屏居中显示，调整星星位置避免重叠 */
+        @media (max-width: 900px){
+            body{ justify-content:center; padding:6vh 6vw; }
+            .container{ margin:0; max-width:460px; }
+            /* 在窄屏上分别调整三颗漂移星的位置并略微缩小，避免挤在一起 */
+            .drift-star:nth-of-type(1){ left: 10vw !important; top: 18vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
+            .drift-star:nth-of-type(2){ left: 6vw  !important; top: 30vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
+            .drift-star:nth-of-type(3){ left: 14vw !important; top: 40vh !important; transform: translate(-50%,-50%) scale(0.9) !important; }
         }
     </style>
 </head>
 <body>
-    <div class="stars"></div>
+    <div class="stars">
+        <div class="drift-star" data-l="8vw" data-t="20vh" aria-hidden="true"></div>
+        <div class="drift-star" data-l="6vw" data-t="34vh" aria-hidden="true"></div>
+        <div class="drift-star" data-l="11vw" data-t="46vh" aria-hidden="true"></div>
+    </div>
+    <!-- 过渡雾气层，位于星空与森林之间 -->
+    <div class="mist" aria-hidden="true"></div>
+    <!-- 内联 SVG 森林剪影（AI 生成） -->
+    <div class="forest" aria-hidden="true">
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- 远景山丘 -->
+            <path class="layer-far" d="M0,200 C80,160 160,180 240,152 C320,124 400,160 480,148 C560,136 640,176 720,152 C800,128 880,156 960,140 C1040,124 1120,160 1200,148 C1280,136 1360,160 1440,140 L1440,320 L0,320 Z" />
+            <!-- 中景：稀疏的松树轮廓 -->
+            <g class="layer-mid">
+                <path d="M40 220 L70 170 L88 188 L76 166 L100 166 L86 142 L110 160 L128 130 L146 166 L160 150 L174 186 L200 160 L220 190 L240 168 L260 202 L280 180 L300 206 L330 170 L360 200 L390 166 L420 198 L450 170 L480 200 L500 180 L520 208 L560 180 L600 210 L640 180 L680 210 L720 182 L760 210 L800 180 L840 212 L880 178 L920 210 L960 182 L1000 212 L1040 180 L1080 208 L1120 178 L1160 210 L1200 182 L1240 210 L1280 184 L1320 212 L1360 188 L1400 216 L1440 190 L1440 320 L0 320 Z"/>
+            </g>
+            <!-- 近景：尖锐松树群，形成剪影边缘 -->
+            <g class="layer-near">
+                <path d="M0 260 L28 220 L48 240 L44 210 L68 240 L82 204 L108 238 L122 200 L150 238 L168 204 L196 244 L220 200 L244 246 L268 206 L296 252 L320 200 L344 254 L372 210 L400 260 L428 210 L452 258 L480 208 L508 260 L540 212 L572 266 L600 214 L632 272 L660 212 L692 276 L720 216 L752 280 L780 220 L812 284 L840 224 L872 288 L900 228 L932 292 L960 234 L992 298 L1020 236 L1052 300 L1080 240 L1112 304 L1140 244 L1172 308 L1200 248 L1232 312 L1260 256 L1292 316 L1320 260 L1352 320 L0 320 Z"/>
+            </g>
+        </svg>
+    </div>
     <div class="container">
+        <div class="panel-badge" aria-hidden="true">
+            <div class="bar short"></div>
+            <div class="bar long"></div>
+        </div>
         <div class="title">🌌 三体杀</div>
         <div class="subtitle">✦ 黑暗森林 · 在线对决 ✦</div>
 
@@ -374,6 +399,122 @@
         } else if (savedUser && savedUser !== cookieUsername) {
             localStorage.removeItem('username');
         }
+    </script>
+    <script>
+        /* Star drift: 改为在登录框左侧区域内移动，速度与亮度随机化 */
+        (function(){
+            const stars = Array.from(document.querySelectorAll('.drift-star'));
+            if(!stars.length) return;
+
+            const container = document.querySelector('.container');
+            const vw = ()=> window.innerWidth / 100;
+            const vh = ()=> window.innerHeight / 100;
+            function rand(min,max){ return Math.random()*(max-min)+min; }
+
+            // 初始化位置并设置随机亮度与初始速度相关参数
+            stars.forEach((el)=>{
+                const l = el.getAttribute('data-l') || '8vw';
+                const t = el.getAttribute('data-t') || '20vh';
+                el.style.left = l;
+                el.style.top = t;
+                el.style.position = 'fixed';
+                // 随机亮度（进一步提高上限以显著增强中心光）
+                const brightness = rand(1.8, 4.0);
+                el.style.filter = `brightness(${brightness})`;
+                // 随机透明度（更高的基础可见度）
+                el.style.opacity = String(rand(0.75, 1));
+                // 根据亮度放大发光效果（更强的冷白光晕）
+                const glowFactor = Math.max(1, brightness);
+                el.style.boxShadow = `0 0 ${18 * glowFactor}px rgba(255,255,255,1), 0 0 ${64 * glowFactor}px rgba(220,235,245,0.4), 0 0 ${160 * glowFactor}px rgba(210,230,245,0.22) inset`;
+            });
+
+            class Walker{
+                constructor(el){
+                    this.el = el;
+                    // 计算水平移动边界：从页面左侧约 2vw 到登录框左侧 - 60px
+                    this.minX = Math.max(2 * vw(), 8);
+                    const containerLeft = container ? container.getBoundingClientRect().left : window.innerWidth - 140;
+                    this.maxX = Math.max(this.minX + 20, containerLeft - 60);
+                    // 垂直范围在视口内自由移动
+                    this.minY = 6 * vh();
+                    this.maxY = 88 * vh();
+
+                    this.resetBase();
+                    // 每颗星随机化速度区间（ms）
+                    this.durationMin = rand(2000, 4500);
+                    this.durationMax = rand(5000, 14000);
+                    this.lastTrail = 0;
+                    this.trailInterval = rand(60, 140);
+                    this.setNewTarget();
+                }
+                resetBase(){
+                    const cs = getComputedStyle(this.el);
+                    this.baseX = parseFloat(cs.left);
+                    this.baseY = parseFloat(cs.top);
+                    // 保证基础位置在边界内
+                    if(this.baseX < this.minX) this.baseX = this.minX + rand(0, 10);
+                    if(this.baseX > this.maxX) this.baseX = this.maxX - rand(0, 10);
+                    if(this.baseY < this.minY) this.baseY = this.minY + rand(0, 10);
+                    if(this.baseY > this.maxY) this.baseY = this.maxY - rand(0, 10);
+                }
+                setNewTarget(){
+                    this.startX = this.baseX;
+                    this.startY = this.baseY;
+                    this.targetX = rand(this.minX, this.maxX);
+                    this.targetY = rand(this.minY, this.maxY);
+                    this.duration = rand(this.durationMin, this.durationMax);
+                    this.startTime = 0;
+                }
+                step(ts){
+                    if(!this.startTime) this.startTime = ts;
+                    const t = Math.min((ts - this.startTime) / this.duration, 1);
+                    const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
+                    const curX = this.startX + (this.targetX - this.startX) * ease;
+                    const curY = this.startY + (this.targetY - this.startY) * ease;
+                    this.el.style.left = curX + 'px';
+                    this.el.style.top = curY + 'px';
+                    const now = performance.now();
+                    // 拖尾已禁用（按用户要求移除）
+
+                    if(t >= 1){
+                        // 每次完成一次移动后微调亮度和速度区间，制造更随机的视觉效果
+                        const brightness = rand(2.2, 5.0);
+                        this.el.style.filter = `brightness(${brightness})`;
+                        this.el.style.opacity = String(rand(0.8, 1));
+                        const glowFactor = Math.max(1, brightness);
+                        this.el.style.boxShadow = `0 0 ${24 * glowFactor}px rgba(255,255,255,1), 0 0 ${96 * glowFactor}px rgba(220,235,245,0.44), 0 0 ${192 * glowFactor}px rgba(210,230,245,0.24) inset`;
+                        this.durationMin = rand(1800, 5000);
+                        this.durationMax = rand(4000, 16000);
+                        this.baseX = curX;
+                        this.baseY = curY;
+                        this.setNewTarget();
+                    }
+                }
+            }
+
+            let walkers = stars.map(s => new Walker(s));
+
+            function onResize(){
+                // 重新从 data 属性重置位置，并重建 walkers（以重新计算 container 的位置）
+                stars.forEach(s=>{
+                    const l = s.getAttribute('data-l') || '8vw';
+                    const t = s.getAttribute('data-t') || '20vh';
+                    s.style.left = l; s.style.top = t;
+                });
+                walkers = stars.map(s => new Walker(s));
+            }
+
+            // 拖尾函数已移除（用户请求取消拖尾）
+
+            window.addEventListener('resize', onResize);
+
+            function loop(ts){
+                walkers.forEach(w => w.step(ts));
+                requestAnimationFrame(loop);
+            }
+
+            requestAnimationFrame(loop);
+        })();
     </script>
 </body>
 </html>

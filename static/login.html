@@ -99,6 +99,88 @@
         .forest .layer-mid{ fill: rgba(3,6,5,0.75); }
         .forest .layer-near{ fill: rgba(0,0,0,0.95); }
 
+        /* 转场层：太阳与火焰覆盖层 */
+        .transition-layer{
+            position: fixed;
+            inset: 0;
+            z-index: 2.5;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        #fireCanvas{
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 44vh;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .solar-rise{
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .sun{
+            position: absolute;
+            bottom: 0;
+            width: 30vh;
+            height: 30vh;
+            border-radius: 50%;
+            transform: translate(-50%, 100%) scale(0.2);
+            opacity: 0;
+            background: radial-gradient(circle at 30% 30%, rgba(255,238,176,0.95) 0%, #ffcc44 18%, #ff8833 45%, #ff5a05 85%, transparent 100%);
+            box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5);
+            filter: blur(0.4px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .sun-1{ left: 28%; width: 26vh; height: 26vh; }
+        .sun-2{ left: 72%; width: 28vh; height: 28vh; }
+        .sun-3{ left: 50%; width: 34vh; height: 34vh; }
+        .sun-rise-active .sun{
+            animation-name: sun-rise;
+            animation-duration: 3.5s;
+            animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+            animation-fill-mode: forwards;
+        }
+        .sun-rise-active .sun-1{ animation-delay: 0.2s; }
+        .sun-rise-active .sun-2{ animation-delay: 0.4s; }
+        .sun-rise-active .sun-3{ animation-delay: 0.6s; }
+        .sun.pulse{
+            animation: sun-pulse 4.5s ease-in-out infinite;
+        }
+        @keyframes sun-rise {
+            0% { transform: translate(-50%, 100%) scale(0.2); opacity: 0; }
+            65% { transform: translate(-50%, 0%) scale(1.08); opacity: 1; }
+            100% { transform: translate(-50%, 0%) scale(1); opacity: 1; }
+        }
+        @keyframes sun-pulse {
+            0%,100% { transform: translate(-50%, 0%) scale(1); filter: blur(0.4px); box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5); }
+            50% { transform: translate(-50%, 0%) scale(1.05); filter: blur(0.6px); box-shadow: 0 0 72px rgba(255, 174, 51, 0.5), inset 0 0 24px rgba(255, 230, 160, 0.55); }
+        }
+        body.scene-transition-active{
+            background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
+            transition: background 3s ease-in-out;
+        }
+        body.scene-transition-active .drift-star{
+            animation-play-state: paused;
+            transition: filter 2s ease, opacity 2s ease;
+        }
+        body.scene-transition-active .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
+        body.scene-transition-active .container{ opacity: 0; transition: opacity 1s ease; }
+        .forest svg path,
+        .forest svg g path{
+            transition: fill 4.5s ease-in-out;
+        }
+        body.scene-transition-active .layer-far{ fill: #ff7b30; }
+        body.scene-transition-active .layer-mid{ fill: #d84a1e; }
+        body.scene-transition-active .layer-near{ fill: #7f1204; }
+        .forest-burning-active #fireCanvas{ opacity: 1; }
+
         /* 登录框：右侧，硬边科幻风格 + 激光边框 */
         .container{
             position: relative;
@@ -211,6 +293,14 @@
                 <path d="M0 260 L28 220 L48 240 L44 210 L68 240 L82 204 L108 238 L122 200 L150 238 L168 204 L196 244 L220 200 L244 246 L268 206 L296 252 L320 200 L344 254 L372 210 L400 260 L428 210 L452 258 L480 208 L508 260 L540 212 L572 266 L600 214 L632 272 L660 212 L692 276 L720 216 L752 280 L780 220 L812 284 L840 224 L872 288 L900 228 L932 292 L960 234 L992 298 L1020 236 L1052 300 L1080 240 L1112 304 L1140 244 L1172 308 L1200 248 L1232 312 L1260 256 L1292 316 L1320 260 L1352 320 L0 320 Z"/>
             </g>
         </svg>
+    </div>
+    <div class="transition-layer" aria-hidden="true">
+        <canvas id="fireCanvas"></canvas>
+        <div class="solar-rise" id="solarRise">
+            <div class="sun sun-1"></div>
+            <div class="sun sun-2"></div>
+            <div class="sun sun-3"></div>
+        </div>
     </div>
     <div class="container">
         <div class="panel-badge" aria-hidden="true">
@@ -331,9 +421,7 @@
                         const loginUsername = data.username || username;
                         localStorage.setItem('username', loginUsername);
                         setAuthCookie(loginUsername);
-                        setTimeout(() => {
-                            window.location.href = '/lobby';
-                        }, 500);
+                        startSceneTransition(loginUsername);
                     } else {
                         // ✅ 注册成功：清空注册表单，切到登录面板
                         document.getElementById('regUsername').value = '';
@@ -379,6 +467,30 @@
         function showMessage(msg, type) {
             messageEl.textContent = msg;
             messageEl.className = 'message' + (type ? ' ' + type : '');
+        }
+
+        function startSceneTransition(username) {
+            document.body.classList.add('scene-transition-active');
+            document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
+            setTimeout(() => {
+                if (window.startStarDrop) window.startStarDrop();
+            }, 0);
+            setTimeout(() => {
+                document.getElementById('solarRise')?.classList.add('sun-rise-active');
+            }, 3000);
+            setTimeout(() => {
+                document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
+            }, 7000);
+            setTimeout(() => {
+                document.body.classList.add('forest-burning-active');
+                if (window.startFire) window.startFire();
+            }, 5000);
+            setTimeout(() => {
+                if (window.stopFire) window.stopFire();
+            }, 11000);
+            setTimeout(() => {
+                window.location.href = '/lobby';
+            }, 11500);
         }
 
         // 按回车键触发登录/注册
@@ -478,6 +590,18 @@
                 }
                 step(ts){
                     if(!this.startTime) this.startTime = ts;
+                    if(this.dropMode){
+                        const t = Math.min((ts - this.startTime) / this.duration, 1);
+                        const ease = t * t;
+                        const curY = this.startY + (this.targetY - this.startY) * ease;
+                        this.el.style.left = this.startX + 'px';
+                        this.el.style.top = curY + 'px';
+                        this.el.style.opacity = String(Math.max(0, 1 - t));
+                        if(t >= 1){
+                            this.el.style.opacity = '0';
+                        }
+                        return;
+                    }
                     const t = Math.min((ts - this.startTime) / this.duration, 1);
                     const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
                     const curX = this.startX + (this.targetX - this.startX) * ease;
@@ -504,6 +628,25 @@
             }
 
             let walkers = stars.map(s => new Walker(s));
+            let starDropStarted = false;
+
+            function startStarDrop() {
+                if (starDropStarted) return;
+                starDropStarted = true;
+                walkers.forEach((walker) => {
+                    const cs = getComputedStyle(walker.el);
+                    const currentX = parseFloat(cs.left);
+                    const currentY = parseFloat(cs.top);
+                    walker.startX = currentX;
+                    walker.startY = currentY;
+                    walker.targetX = currentX;
+                    walker.targetY = window.innerHeight + 100;
+                    walker.duration = 2200;
+                    walker.startTime = 0;
+                    walker.dropMode = true;
+                });
+            }
+            window.startStarDrop = startStarDrop;
 
             function onResize(){
                 // 重新从 data 属性重置位置，并重建 walkers（以重新计算 container 的位置）
@@ -525,6 +668,129 @@
             }
 
             requestAnimationFrame(loop);
+        })();
+    </script>
+    <script>
+        (function(){
+            const canvas = document.getElementById('fireCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let width = 0;
+            let height = 0;
+            let rafId = null;
+            let lastTime = 0;
+            let running = false;
+            const particles = [];
+            const pool = [];
+            let fireIntensity = 0;
+
+            function rand(min, max){ return Math.random() * (max - min) + min; }
+
+            function resizeCanvas(){
+                const rect = canvas.getBoundingClientRect();
+                width = rect.width;
+                height = rect.height;
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = Math.round(width * dpr);
+                canvas.height = Math.round(height * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+
+            function createParticle(){
+                if (particles.length >= 220) return null;
+                const p = pool.pop() || {};
+                p.x = rand(0, width);
+                p.y = height - rand(6, 18);
+                p.vx = rand(-0.3, 0.3);
+                p.vy = -rand(0.7, 2.1);
+                p.size = rand(4, 16);
+                p.age = 0;
+                p.life = rand(1.8, 2.8);
+                p.alpha = 1;
+                p.drift = rand(-0.25, 0.25);
+                return p;
+            }
+
+            function updateParticles(dt){
+                const rate = 45 + fireIntensity * 20;
+                const spawn = Math.round(rate * dt);
+                for (let i = 0; i < spawn; i++) {
+                    const particle = createParticle();
+                    if (particle) particles.push(particle);
+                }
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.age += dt;
+                    p.vy += 0.08 * dt;
+                    p.x += (p.vx + p.drift * (0.6 + fireIntensity * 0.8)) * 12;
+                    p.y += p.vy * 12;
+                    p.alpha = Math.max(0, 1 - p.age / p.life);
+                    if (p.age >= p.life || p.y < -40 || p.alpha <= 0) {
+                        particles.splice(i, 1);
+                        pool.push(p);
+                    }
+                }
+            }
+
+            function drawParticle(p){
+                const progress = p.age / p.life;
+                const radius = p.size * (0.8 + progress * 1.4);
+                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+                grad.addColorStop(0, `rgba(255, 236, 128, ${p.alpha})`);
+                grad.addColorStop(0.3, `rgba(255, 136, 0, ${p.alpha * 0.8})`);
+                grad.addColorStop(0.6, `rgba(255, 68, 0, ${p.alpha * 0.35})`);
+                grad.addColorStop(1, `rgba(255, 68, 0, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            function render(){
+                ctx.clearRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'lighter';
+                particles.forEach(drawParticle);
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            function loopFire(ts){
+                if (!running) return;
+                if (!lastTime) lastTime = ts;
+                const dt = Math.min((ts - lastTime) / 1000, 0.033);
+                lastTime = ts;
+                updateParticles(dt);
+                render();
+                rafId = requestAnimationFrame(loopFire);
+            }
+
+            function startFire(){
+                if (running) return;
+                running = true;
+                fireIntensity = 0;
+                resizeCanvas();
+                lastTime = 0;
+                const start = performance.now();
+                const ramp = (time) => {
+                    const elapsed = time - start;
+                    fireIntensity = Math.min(1, elapsed / 3000);
+                    if (fireIntensity < 1) requestAnimationFrame(ramp);
+                };
+                requestAnimationFrame(ramp);
+                rafId = requestAnimationFrame(loopFire);
+            }
+
+            function stopFire(){
+                running = false;
+                if (rafId) cancelAnimationFrame(rafId);
+                ctx.clearRect(0, 0, width, height);
+                particles.length = 0;
+                pool.length = 0;
+            }
+
+            window.startFire = startFire;
+            window.stopFire = stopFire;
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
         })();
     </script>
 </body>

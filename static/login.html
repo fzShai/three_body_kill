@@ -35,42 +35,22 @@
             background-size: 220px 220px; opacity: 0.45; mix-blend-mode: screen;
         }
 
-        /* 三颗可控漂移星（左侧），使用实际 DOM 元素，颜色为亮银色，中心更亮 */
+        /* 三颗可控漂移星：位置由 JS transform 驱动，CSS 仅负责闪烁 */
         .drift-star{
-            position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; display:block;
-            transform: translate(-50%, -50%) scale(1);
-            /* 进一步增强：更集中的白色核心、更大更亮的光晕 */
+            position: fixed; left: 0; top: 0; border-radius: 50%; pointer-events: none; z-index: 0; display: block;
             background: radial-gradient(circle at 50% 45%, #ffffff 0%, #ffffff 34%, #f8fbff 46%, rgba(245,248,252,0.95) 60%, transparent 100%);
-            box-shadow: 0 0 36px rgba(255,255,255,1), 0 0 86px rgba(220,235,245,0.36) inset, 0 0 160px rgba(210,230,245,0.2);
-            opacity: 0.95; will-change: left, top, transform, opacity, filter;
-            animation-name: flicker-yellow; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
+            box-shadow: 0 0 24px rgba(255,255,255,0.9), 0 0 48px rgba(220,235,245,0.25);
+            opacity: 0.9; will-change: transform, opacity;
+            animation: flicker-opacity 2.8s ease-in-out infinite;
         }
         .drift-star:nth-of-type(1){ width:10px; height:10px; animation-duration: 2.6s; animation-delay: 0.2s; }
         .drift-star:nth-of-type(2){ width:7px; height:7px; animation-duration: 3.6s; animation-delay: 0.6s; }
         .drift-star:nth-of-type(3){ width:12px; height:12px; animation-duration: 4.2s; animation-delay: 1s; }
 
-        @keyframes flicker-yellow {
-            0% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.9); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(2.0); }
-            60% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.12); }
-            100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+        @keyframes flicker-opacity {
+            0%, 100% { opacity: 0.65; }
+            50% { opacity: 1; }
         }
-
-        /* 拖尾粒子 */
-        .star-trail{
-            position: fixed; pointer-events: none; z-index: 0;
-            /* 长条渐变，尾部逐渐透明，制造彗尾感 */
-            background: linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(230,235,245,0.75) 30%, rgba(200,210,225,0.35) 60%, transparent 100%);
-            border-radius: 999px;
-            mix-blend-mode: screen; filter: blur(6px);
-            opacity: 0.85; transform-origin: center left;
-            transition: transform 720ms cubic-bezier(.2,.8,.2,1), opacity 720ms linear;
-            will-change: transform, opacity;
-
-        }
-
-        /* 保持原有 .drift-star 视觉与行为（使用脚本控制移动与亮度） */
 
         /* 过渡雾气层：淡淡光晕，放在星空与森林之间，增加层次感 */
         .mist{
@@ -117,7 +97,26 @@
             z-index: 0;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.5s ease;
+            transition: opacity 1.2s ease;
+        }
+        .heat-haze{
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(ellipse 80% 60% at 50% 80%, rgba(255, 120, 40, 0.35), transparent 70%);
+            transition: opacity 2.5s ease;
+        }
+        .smoke-overlay{
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 50vh;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(to top, rgba(40, 10, 0, 0.55) 0%, rgba(80, 30, 10, 0.2) 40%, transparent 100%);
+            transition: opacity 2s ease;
         }
         .solar-rise{
             position: absolute;
@@ -128,39 +127,33 @@
         .sun{
             position: absolute;
             bottom: 0;
-            width: 30vh;
-            height: 30vh;
+            width: min(30vh, 28vw);
+            height: min(30vh, 28vw);
             border-radius: 50%;
-            transform: translate(-50%, 100%) scale(0.2);
+            transform: translate(-50%, 100%) scale(0.15);
             opacity: 0;
-            background: radial-gradient(circle at 30% 30%, rgba(255,238,176,0.95) 0%, #ffcc44 18%, #ff8833 45%, #ff5a05 85%, transparent 100%);
-            box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5);
-            filter: blur(0.4px);
-            transition: opacity 0.5s ease, transform 0.5s ease;
+            background: radial-gradient(circle at 32% 28%, #ffffff 0%, #ffe066 12%, #ff7700 38%, #cc2200 68%, transparent 100%);
+            box-shadow: 0 0 90px rgba(255, 90, 0, 0.55), 0 0 160px rgba(255, 50, 0, 0.25), inset 0 0 24px rgba(255, 220, 120, 0.6);
+            filter: blur(0.3px);
         }
-        .sun-1{ left: 28%; width: 26vh; height: 26vh; }
-        .sun-2{ left: 72%; width: 28vh; height: 28vh; }
-        .sun-3{ left: 50%; width: 34vh; height: 34vh; }
+        .sun-1{ left: 22%; width: min(24vh, 22vw); height: min(24vh, 22vw); }
+        .sun-2{ left: 78%; width: min(27vh, 24vw); height: min(27vh, 24vw); }
+        .sun-3{ left: 50%; width: min(36vh, 32vw); height: min(36vh, 32vw); }
         .sun-rise-active .sun{
-            animation-name: sun-rise;
-            animation-duration: 3.5s;
-            animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
-            animation-fill-mode: forwards;
+            animation: sun-rise-pulse 9s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
         }
-        .sun-rise-active .sun-1{ animation-delay: 0.2s; }
-        .sun-rise-active .sun-2{ animation-delay: 0.4s; }
-        .sun-rise-active .sun-3{ animation-delay: 0.6s; }
-        .sun.pulse{
-            animation: sun-pulse 4.5s ease-in-out infinite;
-        }
-        @keyframes sun-rise {
-            0% { transform: translate(-50%, 100%) scale(0.2); opacity: 0; }
-            65% { transform: translate(-50%, -35%) scale(1.08); opacity: 1; }
+        .sun-rise-active .sun-1{ animation-delay: 0.15s; }
+        .sun-rise-active .sun-2{ animation-delay: 0.35s; }
+        .sun-rise-active .sun-3{ animation-delay: 0.55s; }
+        @keyframes sun-rise-pulse {
+            0% { transform: translate(-50%, 100%) scale(0.15); opacity: 0; filter: blur(0.3px); }
+            30% { transform: translate(-50%, -28%) scale(1.15); opacity: 1; filter: blur(0.5px); }
+            38% { transform: translate(-50%, -35%) scale(1); opacity: 1; }
+            48% { transform: translate(-50%, -35%) scale(1.1); box-shadow: 0 0 110px rgba(255, 100, 0, 0.7), 0 0 200px rgba(255, 40, 0, 0.35); }
+            58% { transform: translate(-50%, -35%) scale(1); }
+            68% { transform: translate(-50%, -35%) scale(1.08); }
+            78% { transform: translate(-50%, -35%) scale(1); }
             100% { transform: translate(-50%, -35%) scale(1); opacity: 1; }
-        }
-        @keyframes sun-pulse {
-            0%,100% { transform: translate(-50%, -35%) scale(1); filter: blur(0.4px); box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5); }
-            50% { transform: translate(-50%, -35%) scale(1.05); filter: blur(0.6px); box-shadow: 0 0 72px rgba(255, 174, 51, 0.5), inset 0 0 24px rgba(255, 230, 160, 0.55); }
         }
         body.scene-transition-start .drift-star{
             animation-play-state: paused;
@@ -168,10 +161,12 @@
         }
         body.scene-transition-start .container{ opacity: 0; transition: opacity 1s ease; }
         body.scene-transition-sky{
-            background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
-            transition: background 3s ease-in-out;
+            background: linear-gradient(to bottom, #ffd4a0 0%, #ff9955 42%, #e85a20 100%);
+            transition: background 2.5s ease-in-out;
         }
-        body.scene-transition-sky .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
+        body.scene-transition-sky .stars{ opacity: 0; transition: opacity 2.5s ease-in-out 0.1s; }
+        body.scene-transition-sky .heat-haze{ opacity: 0.55; }
+        body.scene-transition-sky .smoke-overlay{ opacity: 1; }
         .forest svg path,
         .forest svg g path{
             transition: fill 4.5s ease-in-out;
@@ -180,6 +175,47 @@
         body.scene-transition-sky .layer-mid{ fill: #d84a1e; }
         body.scene-transition-sky .layer-near{ fill: #7f1204; }
         .forest-burning-active #fireCanvas{ opacity: 1; }
+        .forest-burning-fade #fireCanvas{ opacity: 0; }
+
+        /* 转场叙事与跳过 */
+        .transition-ui{
+            position: fixed;
+            left: 50%;
+            bottom: 8vh;
+            transform: translateX(-50%);
+            z-index: 10;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+        }
+        .transition-ui.visible{
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .transition-caption{
+            font-size: 15px;
+            letter-spacing: 3px;
+            color: rgba(255, 240, 210, 0.85);
+            text-shadow: 0 0 20px rgba(255, 120, 0, 0.4);
+            margin-bottom: 14px;
+            min-height: 22px;
+        }
+        .transition-skip{
+            padding: 8px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            background: rgba(0, 0, 0, 0.35);
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .transition-skip:hover{
+            border-color: rgba(255, 200, 120, 0.6);
+            color: rgba(255, 230, 180, 0.95);
+        }
 
         /* 登录框：右侧，硬边科幻风格 + 激光边框 */
         .container{
@@ -260,14 +296,18 @@
         /* 小角标右下：微小矩形装饰线 */
         .panel-badge::after{ content: ''; position: absolute; right:-8px; bottom:-6px; width:8px; height:8px; border-radius:0; background: rgba(0,180,220,0.16); box-shadow: 0 0 6px rgba(0,150,200,0.08); }
 
-        /* 响应式：窄屏居中显示，调整星星位置避免重叠 */
+        /* 响应式：窄屏居中显示 */
         @media (max-width: 900px){
             body{ justify-content:center; padding:6vh 6vw; }
             .container{ margin:0; max-width:460px; }
-            /* 在窄屏上分别调整三颗漂移星的位置并略微缩小，避免挤在一起 */
-            .drift-star:nth-of-type(1){ left: 10vw !important; top: 18vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
-            .drift-star:nth-of-type(2){ left: 6vw  !important; top: 30vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
-            .drift-star:nth-of-type(3){ left: 14vw !important; top: 40vh !important; transform: translate(-50%,-50%) scale(0.9) !important; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .drift-star, .mist, .container::before { animation: none !important; }
+            .sun-rise-active .sun { animation-duration: 0.01ms !important; animation-delay: 0s !important; }
+            body, .stars, .forest svg path, .forest svg g path, #fireCanvas, .heat-haze, .smoke-overlay {
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>
@@ -295,13 +335,18 @@
         </svg>
     </div>
     <div class="transition-layer" aria-hidden="true">
+        <div class="heat-haze"></div>
         <canvas id="fireCanvas"></canvas>
+        <div class="smoke-overlay"></div>
         <div class="solar-rise" id="solarRise">
             <div class="sun sun-1"></div>
             <div class="sun sun-2"></div>
             <div class="sun sun-3"></div>
-            
         </div>
+    </div>
+    <div class="transition-ui" id="transitionUi" aria-live="polite">
+        <div class="transition-caption" id="transitionCaption"></div>
+        <button type="button" class="transition-skip" id="transitionSkip">跳过动画</button>
     </div>
     <div class="container">
         <div class="panel-badge" aria-hidden="true">
@@ -422,7 +467,7 @@
                         const loginUsername = data.username || username;
                         localStorage.setItem('username', loginUsername);
                         setAuthCookie(loginUsername);
-                        startSceneTransition(loginUsername);
+                        startSceneTransition();
                     } else {
                         // ✅ 注册成功：清空注册表单，切到登录面板
                         document.getElementById('regUsername').value = '';
@@ -470,31 +515,106 @@
             messageEl.className = 'message' + (type ? ' ' + type : '');
         }
 
-        function startSceneTransition(username) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let activeTimeline = null;
+
+        class SceneTimeline {
+            constructor() {
+                this.timeouts = [];
+                this.cancelled = false;
+            }
+
+            schedule(ms, fn) {
+                const id = setTimeout(() => {
+                    if (!this.cancelled) fn();
+                }, ms);
+                this.timeouts.push(id);
+            }
+
+            cancel() {
+                this.cancelled = true;
+                this.timeouts.forEach(clearTimeout);
+                this.timeouts = [];
+            }
+        }
+
+        function finishTransition() {
+            sessionStorage.setItem('fromSceneTransition', '1');
+            window.location.href = '/lobby';
+        }
+
+        function cleanupTransition() {
+            if (activeTimeline) activeTimeline.cancel();
+            if (window.stopStarLoop) window.stopStarLoop();
+            if (window.stopFire) window.stopFire(true);
+        }
+
+        function showTransitionUi(caption) {
+            const ui = document.getElementById('transitionUi');
+            const cap = document.getElementById('transitionCaption');
+            if (cap && caption) cap.textContent = caption;
+            ui?.classList.add('visible');
+        }
+
+        function setTransitionCaption(text) {
+            const cap = document.getElementById('transitionCaption');
+            if (cap) cap.textContent = text;
+        }
+
+        function skipTransition() {
+            cleanupTransition();
+            finishTransition();
+        }
+
+        document.getElementById('transitionSkip')?.addEventListener('click', skipTransition);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.body.classList.contains('scene-transition-start')) {
+                skipTransition();
+            }
+        });
+
+        function startSceneTransition() {
+            if (prefersReducedMotion) {
+                finishTransition();
+                return;
+            }
+
+            cleanupTransition();
+            activeTimeline = new SceneTimeline();
+            const tl = activeTimeline;
+
             document.body.classList.add('scene-transition-start');
             document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
-            setTimeout(() => {
+            showTransitionUi('星轨偏移……');
+
+            tl.schedule(0, () => {
                 if (window.startStarDrop) window.startStarDrop();
-            }, 0);
-            setTimeout(() => {
+            });
+
+            tl.schedule(2200, () => {
+                setTransitionCaption('三日凌空');
                 document.getElementById('solarRise')?.classList.add('sun-rise-active');
-            }, 3000);
-            setTimeout(() => {
+            });
+
+            tl.schedule(3000, () => {
                 document.body.classList.add('scene-transition-sky');
-            }, 4200);
-            setTimeout(() => {
-                document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
-            }, 7000);
-            setTimeout(() => {
+            });
+
+            tl.schedule(4200, () => {
+                setTransitionCaption('森林在燃烧');
                 document.body.classList.add('forest-burning-active');
                 if (window.startFire) window.startFire();
-            }, 5000);
-            setTimeout(() => {
-                if (window.stopFire) window.stopFire();
-            }, 11000);
-            setTimeout(() => {
-                window.location.href = '/lobby';
-            }, 11500);
+            });
+
+            tl.schedule(9800, () => {
+                document.body.classList.add('forest-burning-fade');
+                if (window.stopFire) window.stopFire(false);
+            });
+
+            tl.schedule(10200, () => {
+                if (window.stopStarLoop) window.stopStarLoop();
+                finishTransition();
+            });
         }
 
         // 按回车键触发登录/注册
@@ -528,155 +648,130 @@
         }
     </script>
     <script>
-        /* Star drift: 改为在登录框左侧区域内移动，速度与亮度随机化 */
-        (function(){
+        (function () {
             const stars = Array.from(document.querySelectorAll('.drift-star'));
-            if(!stars.length) return;
+            if (!stars.length) return;
 
             const container = document.querySelector('.container');
-            const vw = ()=> window.innerWidth / 100;
-            const vh = ()=> window.innerHeight / 100;
-            function rand(min,max){ return Math.random()*(max-min)+min; }
+            const vw = () => window.innerWidth / 100;
+            const vh = () => window.innerHeight / 100;
+            function rand(min, max) { return Math.random() * (max - min) + min; }
 
-            // 初始化位置并设置随机亮度与初始速度相关参数
-            stars.forEach((el)=>{
-                const l = el.getAttribute('data-l') || '8vw';
-                const t = el.getAttribute('data-t') || '20vh';
-                el.style.left = l;
-                el.style.top = t;
-                el.style.position = 'fixed';
-                // 随机亮度（进一步提高上限以显著增强中心光）
-                const brightness = rand(1.8, 4.0);
-                el.style.filter = `brightness(${brightness})`;                el.dataset.baseBrightness = brightness;                // 随机透明度（更高的基础可见度）
-                el.style.opacity = String(rand(0.75, 1));
-                // 根据亮度放大发光效果（更强的冷白光晕）
-                const glowFactor = Math.max(1, brightness);
-                el.style.boxShadow = `0 0 ${18 * glowFactor}px rgba(255,255,255,1), 0 0 ${64 * glowFactor}px rgba(220,235,245,0.4), 0 0 ${160 * glowFactor}px rgba(210,230,245,0.22) inset`;
-            });
+            function parseAnchor(el) {
+                const lRaw = el.getAttribute('data-l') || '8vw';
+                const tRaw = el.getAttribute('data-t') || '20vh';
+                const x = lRaw.endsWith('vw') ? parseFloat(lRaw) * vw() : parseFloat(lRaw);
+                const y = tRaw.endsWith('vh') ? parseFloat(tRaw) * vh() : parseFloat(tRaw);
+                return { x, y };
+            }
 
-            class Walker{
-                constructor(el){
+            function applyTransform(el, x, y, scale, opacity) {
+                el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(${scale})`;
+                if (opacity !== undefined) el.style.opacity = String(opacity);
+            }
+
+            class Walker {
+                constructor(el) {
                     this.el = el;
-                    // 计算水平移动边界：从页面左侧约 2vw 到登录框左侧 - 60px
                     this.minX = Math.max(2 * vw(), 8);
                     const containerLeft = container ? container.getBoundingClientRect().left : window.innerWidth - 140;
                     this.maxX = Math.max(this.minX + 20, containerLeft - 60);
-                    // 垂直范围在视口内自由移动
                     this.minY = 6 * vh();
                     this.maxY = 88 * vh();
-
-                    this.resetBase();
-                    // 每颗星随机化速度区间（ms）
                     this.durationMin = rand(2000, 4500);
                     this.durationMax = rand(5000, 14000);
-                    this.lastTrail = 0;
-                    this.trailInterval = rand(60, 140);
+                    this.dropMode = false;
+                    this.frozen = false;
+                    const anchor = parseAnchor(el);
+                    this.x = anchor.x;
+                    this.y = anchor.y;
+                    applyTransform(el, this.x, this.y, 1);
                     this.setNewTarget();
                 }
-                resetBase(){
-                    const cs = getComputedStyle(this.el);
-                    this.baseX = parseFloat(cs.left);
-                    this.baseY = parseFloat(cs.top);
-                    // 保证基础位置在边界内
-                    if(this.baseX < this.minX) this.baseX = this.minX + rand(0, 10);
-                    if(this.baseX > this.maxX) this.baseX = this.maxX - rand(0, 10);
-                    if(this.baseY < this.minY) this.baseY = this.minY + rand(0, 10);
-                    if(this.baseY > this.maxY) this.baseY = this.maxY - rand(0, 10);
-                }
-                setNewTarget(){
-                    this.startX = this.baseX;
-                    this.startY = this.baseY;
+
+                setNewTarget() {
+                    this.startX = this.x;
+                    this.startY = this.y;
                     this.targetX = rand(this.minX, this.maxX);
                     this.targetY = rand(this.minY, this.maxY);
                     this.duration = rand(this.durationMin, this.durationMax);
                     this.startTime = 0;
                 }
-                step(ts){
-                    if(!this.startTime) this.startTime = ts;
-                    if(this.dropMode){
+
+                step(ts) {
+                    if (this.frozen) return;
+                    if (!this.startTime) this.startTime = ts;
+
+                    if (this.dropMode) {
                         const t = Math.min((ts - this.startTime) / this.duration, 1);
                         const ease = t * t;
                         const curY = this.startY + (this.targetY - this.startY) * ease;
-                        this.el.style.left = this.startX + 'px';
-                        this.el.style.top = curY + 'px';
-                        this.el.style.opacity = String(Math.max(0, 1 - t));
-                        if(t >= 1){
-                            this.el.style.opacity = '0';
-                        }
+                        const scale = 1 + t * 0.6;
+                        applyTransform(this.el, this.startX, curY, scale, Math.max(0, 1 - t * 0.9));
+                        if (t >= 1) this.frozen = true;
                         return;
                     }
-                    const t = Math.min((ts - this.startTime) / this.duration, 1);
-                    const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
-                    const curX = this.startX + (this.targetX - this.startX) * ease;
-                    const curY = this.startY + (this.targetY - this.startY) * ease;
-                    this.el.style.left = curX + 'px';
-                    this.el.style.top = curY + 'px';
-                    const now = performance.now();
-                    // 拖尾已禁用（按用户要求移除）
 
-                    if(t >= 1){
-                        // 每次完成一次移动后微调亮度和速度区间，制造更随机的视觉效果
-                        const brightness = rand(2.2, 5.0);
-                        this.el.style.filter = `brightness(${brightness})`;
-                        this.el.style.opacity = String(rand(0.8, 1));
-                        const glowFactor = Math.max(1, brightness);
-                        this.el.style.boxShadow = `0 0 ${24 * glowFactor}px rgba(255,255,255,1), 0 0 ${96 * glowFactor}px rgba(220,235,245,0.44), 0 0 ${192 * glowFactor}px rgba(210,230,245,0.24) inset`;
+                    const t = Math.min((ts - this.startTime) / this.duration, 1);
+                    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+                    this.x = this.startX + (this.targetX - this.startX) * ease;
+                    this.y = this.startY + (this.targetY - this.startY) * ease;
+                    applyTransform(this.el, this.x, this.y, 1);
+
+                    if (t >= 1) {
                         this.durationMin = rand(1800, 5000);
                         this.durationMax = rand(4000, 16000);
-                        this.baseX = curX;
-                        this.baseY = curY;
                         this.setNewTarget();
                     }
                 }
             }
 
-            let walkers = stars.map(s => new Walker(s));
+            let walkers = stars.map((s) => new Walker(s));
+            let loopActive = true;
             let starDropStarted = false;
+            let transitionActive = false;
 
             function startStarDrop() {
                 if (starDropStarted) return;
                 starDropStarted = true;
-                walkers.forEach((walker) => {
-                    const cs = getComputedStyle(walker.el);
-                    const currentX = parseFloat(cs.left);
-                    const currentY = parseFloat(cs.top);
-                    walker.startX = currentX;
-                    walker.startY = currentY;
-                    walker.targetX = currentX;
-                    walker.targetY = window.innerHeight + 100;
-                    walker.duration = 2200;
-                    walker.startTime = 0;
+                transitionActive = true;
+                walkers.forEach((walker, i) => {
                     walker.dropMode = true;
-                    const base = parseFloat(walker.el.dataset.baseBrightness) || 1;
-                    walker.el.style.filter = `brightness(${base * 2})`;
+                    walker.startX = walker.x;
+                    walker.startY = walker.y;
+                    walker.targetX = walker.x;
+                    walker.targetY = window.innerHeight + 120;
+                    walker.duration = 2200 + i * 180;
+                    walker.startTime = 0;
                 });
             }
+
+            function stopStarLoop() {
+                loopActive = false;
+                walkers.forEach((w) => { w.frozen = true; });
+            }
+
+            function onResize() {
+                if (transitionActive) return;
+                walkers = stars.map((s) => new Walker(s));
+            }
+
             window.startStarDrop = startStarDrop;
-
-            function onResize(){
-                // 重新从 data 属性重置位置，并重建 walkers（以重新计算 container 的位置）
-                stars.forEach(s=>{
-                    const l = s.getAttribute('data-l') || '8vw';
-                    const t = s.getAttribute('data-t') || '20vh';
-                    s.style.left = l; s.style.top = t;
-                });
-                walkers = stars.map(s => new Walker(s));
-            }
-
-            // 拖尾函数已移除（用户请求取消拖尾）
-
+            window.stopStarLoop = stopStarLoop;
             window.addEventListener('resize', onResize);
 
-            function loop(ts){
-                walkers.forEach(w => w.step(ts));
-                requestAnimationFrame(loop);
+            function loop(ts) {
+                if (loopActive) {
+                    walkers.forEach((w) => w.step(ts));
+                    requestAnimationFrame(loop);
+                }
             }
 
             requestAnimationFrame(loop);
         })();
     </script>
     <script>
-        (function(){
+        (function () {
             const canvas = document.getElementById('fireCanvas');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
@@ -689,35 +784,35 @@
             const pool = [];
             let fireIntensity = 0;
 
-            function rand(min, max){ return Math.random() * (max - min) + min; }
+            function rand(min, max) { return Math.random() * (max - min) + min; }
 
-            function resizeCanvas(){
+            function resizeCanvas() {
                 const rect = canvas.getBoundingClientRect();
                 width = rect.width;
                 height = rect.height;
-                const dpr = window.devicePixelRatio || 1;
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
                 canvas.width = Math.round(width * dpr);
                 canvas.height = Math.round(height * dpr);
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             }
 
-            function createParticle(){
-                if (particles.length >= 220) return null;
+            function createParticle() {
+                if (particles.length >= 160) return null;
                 const p = pool.pop() || {};
-                p.x = rand(0, width);
-                p.y = height - rand(6, 18);
-                p.vx = rand(-0.3, 0.3);
-                p.vy = -rand(0.7, 2.1);
-                p.size = rand(4, 16);
+                p.x = width * rand(0.12, 0.88);
+                p.y = height - rand(4, 22);
+                p.vx = rand(-0.4, 0.4);
+                p.vy = -rand(0.8, 2.4);
+                p.size = rand(5, 18);
                 p.age = 0;
-                p.life = rand(1.8, 2.8);
-                p.alpha = 1;
-                p.drift = rand(-0.25, 0.25);
+                p.life = rand(1.4, 2.6);
+                p.drift = rand(-0.3, 0.3);
+                p.hot = Math.random() > 0.6;
                 return p;
             }
 
-            function updateParticles(dt){
-                const rate = 45 + fireIntensity * 20;
+            function updateParticles(dt) {
+                const rate = 38 + fireIntensity * 18;
                 const spawn = Math.round(rate * dt);
                 for (let i = 0; i < spawn; i++) {
                     const particle = createParticle();
@@ -726,39 +821,37 @@
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.age += dt;
-                    p.vy += 0.08 * dt;
-                    p.x += (p.vx + p.drift * (0.6 + fireIntensity * 0.8)) * 12;
-                    p.y += p.vy * 12;
-                    p.alpha = Math.max(0, 1 - p.age / p.life);
-                    if (p.age >= p.life || p.y < -40 || p.alpha <= 0) {
+                    p.vy += 0.1 * dt;
+                    p.x += (p.vx + p.drift * (0.5 + fireIntensity)) * 14;
+                    p.y += p.vy * 14;
+                    const alpha = Math.max(0, 1 - p.age / p.life);
+                    if (p.age >= p.life || p.y < -50 || alpha <= 0) {
                         particles.splice(i, 1);
                         pool.push(p);
                     }
                 }
             }
 
-            function drawParticle(p){
+            function drawParticle(p) {
                 const progress = p.age / p.life;
-                const radius = p.size * (0.8 + progress * 1.4);
-                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
-                grad.addColorStop(0, `rgba(255, 236, 128, ${p.alpha})`);
-                grad.addColorStop(0.3, `rgba(255, 136, 0, ${p.alpha * 0.8})`);
-                grad.addColorStop(0.6, `rgba(255, 68, 0, ${p.alpha * 0.35})`);
-                grad.addColorStop(1, `rgba(255, 68, 0, 0)`);
-                ctx.fillStyle = grad;
+                const radius = p.size * (0.7 + progress * 1.5);
+                const alpha = Math.max(0, 1 - progress) * fireIntensity;
+                ctx.globalAlpha = alpha * (p.hot ? 0.95 : 0.75);
+                ctx.fillStyle = p.hot ? '#ffcc55' : '#ff5500';
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            function render(){
+            function render() {
                 ctx.clearRect(0, 0, width, height);
                 ctx.globalCompositeOperation = 'lighter';
                 particles.forEach(drawParticle);
                 ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 1;
             }
 
-            function loopFire(ts){
+            function loopFire(ts) {
                 if (!running) return;
                 if (!lastTime) lastTime = ts;
                 const dt = Math.min((ts - lastTime) / 1000, 0.033);
@@ -768,7 +861,7 @@
                 rafId = requestAnimationFrame(loopFire);
             }
 
-            function startFire(){
+            function startFire() {
                 if (running) return;
                 running = true;
                 fireIntensity = 0;
@@ -776,20 +869,22 @@
                 lastTime = 0;
                 const start = performance.now();
                 const ramp = (time) => {
-                    const elapsed = time - start;
-                    fireIntensity = Math.min(1, elapsed / 3000);
+                    if (!running) return;
+                    fireIntensity = Math.min(1, (time - start) / 2500);
                     if (fireIntensity < 1) requestAnimationFrame(ramp);
                 };
                 requestAnimationFrame(ramp);
                 rafId = requestAnimationFrame(loopFire);
             }
 
-            function stopFire(){
+            function stopFire(immediate) {
                 running = false;
                 if (rafId) cancelAnimationFrame(rafId);
-                ctx.clearRect(0, 0, width, height);
-                particles.length = 0;
-                pool.length = 0;
+                rafId = null;
+                if (immediate) {
+                    ctx.clearRect(0, 0, width, height);
+                    particles.length = 0;
+                }
             }
 
             window.startFire = startFire;

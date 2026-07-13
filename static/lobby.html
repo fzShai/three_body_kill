@@ -11,12 +11,19 @@
             min-height: 100vh;
             position: relative;
             overflow: hidden;
-            background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
+            background: linear-gradient(to bottom, #ffd4a0 0%, #ff9955 42%, #e85a20 100%);
             color: #fff;
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
+        }
+        body.from-login-transition {
+            animation: lobby-fade-in 0.8s ease;
+        }
+        @keyframes lobby-fade-in {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
         }
         body::before {
             content: '';
@@ -183,8 +190,14 @@
         }
         document.getElementById('usernameDisplay').textContent = username;
 
+        if (sessionStorage.getItem('fromSceneTransition') === '1') {
+            document.body.classList.add('from-login-transition');
+            sessionStorage.removeItem('fromSceneTransition');
+        }
+
         document.getElementById('logoutBtn').addEventListener('click', () => {
             localStorage.removeItem('username');
+            document.cookie = 'username=; path=/; max-age=0';
             window.location.href = '/';
         });
 

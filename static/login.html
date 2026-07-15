@@ -167,7 +167,11 @@
                     animation-play-state: paused;
                     transition: filter 0.4s ease, opacity 2s ease;
                 }
-                body[data-scene="start"] .container{ opacity: 0; transition: opacity 1s ease; }
+                /* 一旦进入任何转场阶段，登录容器永久隐藏（防止在后续阶段回闪） */
+                body[data-scene] .container {
+                    opacity: 0;
+                    pointer-events: none;
+                }
                 /* 转场阶段 2&3：天空变亮 */
                 body[data-scene="sky"], body[data-scene="sunrise"]{
                     background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
@@ -185,20 +189,21 @@
                 body[data-scene="burning"] #fireCanvas{ opacity: 1; }
 
         /* 登录框：右侧，硬边科幻风格 + 激光边框 */
-        .container{
-            position: relative;
-            z-index: 3;
-            width: 100%; max-width: 420px;
-            margin-right: 6vw;
-            padding: 40px 36px;
-            border-radius: 0;
-            background: rgba(8, 14, 20, 0.08);
-            backdrop-filter: blur(10px) saturate(120%);
-            -webkit-backdrop-filter: blur(10px) saturate(120%);
-            border: 1px solid rgba(0,200,255,0.32);
-            box-shadow: 0 0 30px rgba(0,180,220,0.16), inset 0 0 1px rgba(0,230,255,0.12), inset 0 0 20px rgba(0,150,200,0.04);
-            overflow: visible;
-        }
+                .container{
+                    position: relative;
+                    z-index: 3;
+                    width: 100%; max-width: 420px;
+                    margin-right: 6vw;
+                    padding: 40px 36px;
+                    border-radius: 0;
+                    background: rgba(8, 14, 20, 0.08);
+                    backdrop-filter: blur(10px) saturate(120%);
+                    -webkit-backdrop-filter: blur(10px) saturate(120%);
+                    border: 1px solid rgba(0,200,255,0.32);
+                    box-shadow: 0 0 30px rgba(0,180,220,0.16), inset 0 0 1px rgba(0,230,255,0.12), inset 0 0 20px rgba(0,150,200,0.04);
+                    overflow: visible;
+                    transition: opacity 1s ease;
+                }
         /* 激光边框发光效果 */
         .container::before{
             content: '';

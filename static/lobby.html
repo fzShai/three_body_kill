@@ -177,16 +177,37 @@
     </div>
 
     <script>
-        const username = localStorage.getItem('username');
-        if (!username) {
-            window.location.href = '/';
-        }
-        document.getElementById('usernameDisplay').textContent = username;
+        // ✅ 同时校验 localStorage 和 Cookie，防止不一致导致 401
+                const storedUser = localStorage.getItem('username');
+                const cookieMatch = document.cookie
+                    .split(';')
+                    .map(c => c.trim())
+                    .find(c => c.startsWith('username='));
 
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            localStorage.removeItem('username');
-            window.location.href = '/';
-        });
+                let cookieUser = '';
+                if (cookieMatch) {
+                    try {
+                        cookieUser = decodeURIComponent(cookieMatch.split('=').slice(1).join('='));
+                    } catch (e) {
+                        cookieUser = '';
+                    }
+                }
+
+                // 两者都存在且一致才放行
+                if (!storedUser || !cookieUser || storedUser !== cookieUser) {
+                    // 清理不一致的残留数据
+                    localStorage.removeItem('username');
+                    document.cookie = 'username=; path=/; max-age=0';
+                    window.location.href = '/';
+                }
+
+                document.getElementById('usernameDisplay').textContent = storedUser || cookieUser;
+
+                document.getElementById('logoutBtn').addEventListener('click', () => {
+                    localStorage.removeItem('username');
+                    document.cookie = 'username=; path=/; max-age=0';
+                    window.location.href = '/';
+                });
 
         document.getElementById('createRoomBtn').addEventListener('click', () => {
             alert('房间功能即将上线！🚀');

@@ -162,24 +162,27 @@
             0%,100% { transform: translate(-50%, -35%) scale(1); filter: blur(0.4px); box-shadow: 0 0 60px rgba(255, 154, 33, 0.35), inset 0 0 18px rgba(255, 215, 128, 0.5); }
             50% { transform: translate(-50%, -35%) scale(1.05); filter: blur(0.6px); box-shadow: 0 0 72px rgba(255, 174, 51, 0.5), inset 0 0 24px rgba(255, 230, 160, 0.55); }
         }
-        body.scene-transition-start .drift-star{
-            animation-play-state: paused;
-            transition: filter 0.4s ease, opacity 2s ease;
-        }
-        body.scene-transition-start .container{ opacity: 0; transition: opacity 1s ease; }
-        body.scene-transition-sky{
-            background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
-            transition: background 3s ease-in-out;
-        }
-        body.scene-transition-sky .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
-        .forest svg path,
-        .forest svg g path{
-            transition: fill 4.5s ease-in-out;
-        }
-        body.scene-transition-sky .layer-far{ fill: #ff7b30; }
-        body.scene-transition-sky .layer-mid{ fill: #d84a1e; }
-        body.scene-transition-sky .layer-near{ fill: #7f1204; }
-        .forest-burning-active #fireCanvas{ opacity: 1; }
+        /* 转场阶段 1：星星暂停 + 容器淡出 */
+                body[data-scene="start"] .drift-star{
+                    animation-play-state: paused;
+                    transition: filter 0.4s ease, opacity 2s ease;
+                }
+                body[data-scene="start"] .container{ opacity: 0; transition: opacity 1s ease; }
+                /* 转场阶段 2&3：天空变亮 */
+                body[data-scene="sky"], body[data-scene="sunrise"]{
+                    background: linear-gradient(to bottom, #f5d6b3 0%, #f3c689 48%, #e9b16d 100%);
+                    transition: background 3s ease-in-out;
+                }
+                body[data-scene="sky"] .stars, body[data-scene="sunrise"] .stars{ opacity: 0; transition: opacity 3s ease-in-out 0.2s; }
+                .forest svg path,
+                .forest svg g path{
+                    transition: fill 4.5s ease-in-out;
+                }
+                body[data-scene="sky"] .layer-far, body[data-scene="sunrise"] .layer-far{ fill: #ff7b30; }
+                body[data-scene="sky"] .layer-mid, body[data-scene="sunrise"] .layer-mid{ fill: #d84a1e; }
+                body[data-scene="sky"] .layer-near, body[data-scene="sunrise"] .layer-near{ fill: #7f1204; }
+                /* 转场阶段 4：森林燃烧，显示火焰 Canvas */
+                body[data-scene="burning"] #fireCanvas{ opacity: 1; }
 
         /* 登录框：右侧，硬边科幻风格 + 激光边框 */
         .container{
@@ -261,14 +264,17 @@
         .panel-badge::after{ content: ''; position: absolute; right:-8px; bottom:-6px; width:8px; height:8px; border-radius:0; background: rgba(0,180,220,0.16); box-shadow: 0 0 6px rgba(0,150,200,0.08); }
 
         /* 响应式：窄屏居中显示，调整星星位置避免重叠 */
-        @media (max-width: 900px){
-            body{ justify-content:center; padding:6vh 6vw; }
-            .container{ margin:0; max-width:460px; }
-            /* 在窄屏上分别调整三颗漂移星的位置并略微缩小，避免挤在一起 */
-            .drift-star:nth-of-type(1){ left: 10vw !important; top: 18vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
-            .drift-star:nth-of-type(2){ left: 6vw  !important; top: 30vh !important; transform: translate(-50%,-50%) scale(0.8) !important; }
-            .drift-star:nth-of-type(3){ left: 14vw !important; top: 40vh !important; transform: translate(-50%,-50%) scale(0.9) !important; }
-        }
+        @media (max-width: 900px) {
+                    body { justify-content: center; padding: 6vh 6vw; }
+                    .container { margin: 0; max-width: 460px; }
+                    /* 在窄屏上通过缩小和分散星星来避免重叠，不覆盖 JS 动画位置 */
+                    .drift-star:nth-of-type(1) { left: 10vw; top: 18vh; transform: translate(-50%, -50%) scale(0.8); }
+                    .drift-star:nth-of-type(2) { left: 6vw;  top: 32vh; transform: translate(-50%, -50%) scale(0.8); }
+                    .drift-star:nth-of-type(3) { left: 14vw; top: 44vh; transform: translate(-50%, -50%) scale(0.9); }
+
+                    /* 为 Stars 脚本提供响应式数据 */
+                    .drift-star:nth-of-type(1)::before { content: attr(data-l); display: none; }
+                }
     </style>
 </head>
 <body>
@@ -281,7 +287,7 @@
     <div class="mist" aria-hidden="true"></div>
     <!-- 内联 SVG 森林剪影（AI 生成） -->
     <div class="forest" aria-hidden="true">
-        <svg viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
             <!-- 远景山丘 -->
             <path class="layer-far" d="M0,200 C80,160 160,180 240,152 C320,124 400,160 480,148 C560,136 640,176 720,152 C800,128 880,156 960,140 C1040,124 1120,160 1200,148 C1280,136 1360,160 1440,140 L1440,320 L0,320 Z" />
             <!-- 中景：稀疏的松树轮廓 -->
@@ -371,76 +377,86 @@
         }
 
         // 登录
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-            await doRequest('/api/login', username, password, '登录成功！');
-        });
-
-        // 注册
-        document.getElementById('registerBtn').addEventListener('click', async () => {
-            const username = document.getElementById('regUsername').value.trim();
-            const password = document.getElementById('regPassword').value.trim();
-            const confirm = document.getElementById('regPasswordConfirm').value.trim();
-
-            if (password !== confirm) {
-                showMessage('两次密码输入不一致', 'error');
-                return;
-            }
-            if (password.length < 3) {
-                showMessage('密码至少3位', 'error');
-                return;
-            }
-            await doRequest('/api/register', username, password, '注册成功！请登录');
-        });
-
-        async function doRequest(url, username, password, successMsg) {
-            if (!username || !password) {
-                showMessage('请填写用户名和密码', 'error');
-                return;
-            }
-
-            const btn = url === '/api/login' ?
-                document.getElementById('loginBtn') :
-                document.getElementById('registerBtn');
-            btn.disabled = true;
-            btn.textContent = '处理中...';
-            showMessage('', '');
-
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                document.getElementById('loginBtn').addEventListener('click', async () => {
+                    const username = document.getElementById('loginUsername').value.trim();
+                    const password = document.getElementById('loginPassword').value.trim();
+                    await doRequest('/api/login', username, password, '登录成功！');
                 });
-                const data = await res.json();
 
-                if (res.ok && data.success) {
-                    showMessage(data.message || successMsg, 'success');
-                    if (url === '/api/login') {
-                        // ✅ 登录成功：优先使用服务端返回的 username，确保和后端保持一致
-                        const loginUsername = data.username || username;
-                        localStorage.setItem('username', loginUsername);
-                        setAuthCookie(loginUsername);
-                        startSceneTransition(loginUsername);
-                    } else {
-                        // ✅ 注册成功：清空注册表单，切到登录面板
-                        document.getElementById('regUsername').value = '';
-                        document.getElementById('regPassword').value = '';
-                        document.getElementById('regPasswordConfirm').value = '';
-                        document.getElementById('loginUsername').value = username;
-                        setTab('login');
+                // 注册
+                document.getElementById('registerBtn').addEventListener('click', async () => {
+                    const username = document.getElementById('regUsername').value.trim();
+                    const password = document.getElementById('regPassword').value.trim();
+                    const confirm = document.getElementById('regPasswordConfirm').value.trim();
+
+                    if (password !== confirm) {
+                        showMessage('两次密码输入不一致', 'error');
+                        return;
                     }
-                } else {
-                    showMessage(data.message || '操作失败', 'error');
+                    if (password.length < 3) {
+                        showMessage('密码至少3位', 'error');
+                        return;
+                    }
+                    await doRequest('/api/register', username, password, '注册成功！请登录');
+                });
+
+                async function doRequest(url, username, password, successMsg) {
+                    if (!username || !password) {
+                        showMessage('请填写用户名和密码', 'error');
+                        return;
+                    }
+
+                    const btn = url === '/api/login' ?
+                        document.getElementById('loginBtn') :
+                        document.getElementById('registerBtn');
+                    btn.disabled = true;
+                    btn.textContent = '处理中...';
+                    showMessage('', '');
+
+                    // ✅ 添加超时控制（10 秒），避免请求卡死
+                    const ctrl = new AbortController();
+                    const timer = setTimeout(() => ctrl.abort(), 10000);
+
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username, password }),
+                            signal: ctrl.signal
+                        });
+                        const data = await res.json();
+
+                        if (res.ok && data.success) {
+                            showMessage(data.message || successMsg, 'success');
+                            if (url === '/api/login') {
+                                // ✅ 登录成功：优先使用服务端返回的 username，确保和后端保持一致
+                                const loginUsername = data.username || username;
+                                localStorage.setItem('username', loginUsername);
+                                setAuthCookie(loginUsername);
+                                startSceneTransition(loginUsername);
+                            } else {
+                                // ✅ 注册成功：清空注册表单，切到登录面板
+                                document.getElementById('regUsername').value = '';
+                                document.getElementById('regPassword').value = '';
+                                document.getElementById('regPasswordConfirm').value = '';
+                                document.getElementById('loginUsername').value = username;
+                                setTab('login');
+                            }
+                        } else {
+                            showMessage(data.message || '操作失败', 'error');
+                        }
+                    } catch (err) {
+                        if (err.name === 'AbortError') {
+                            showMessage('请求超时，请检查网络后重试', 'error');
+                        } else {
+                            showMessage('网络错误，请稍后重试', 'error');
+                        }
+                    } finally {
+                        clearTimeout(timer);
+                        btn.disabled = false;
+                        btn.textContent = url === '/api/login' ? '登录' : '注册';
+                    }
                 }
-            } catch (err) {
-                showMessage('网络错误，请稍后重试', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = url === '/api/login' ? '登录' : '注册';
-            }
-        }
 
         function setAuthCookie(username) {
             // 说明：当前使用前端 JS 设置 Cookie，适合演示和开发调试。
@@ -448,22 +464,31 @@
             document.cookie = `username=${encodeURIComponent(username)}; path=/; max-age=3600; SameSite=Lax`;
         }
 
-        document.querySelectorAll('.password-toggle').forEach((button) => {
-            button.addEventListener('click', () => {
-                const targetId = button.getAttribute('data-target');
-                const input = document.getElementById(targetId);
-                if (!input) return;
-                const isPassword = input.type === 'password';
-                input.type = isPassword ? 'text' : 'password';
-                if (isPassword) {
-                    button.classList.remove('hidden');
-                    button.setAttribute('aria-label', '隐藏密码');
-                } else {
-                    button.classList.add('hidden');
-                    button.setAttribute('aria-label', '显示密码');
+        // ✅ 初始化密码切换按钮：确保 DOM class/aria-label 与实际 input.type 同步
+                function syncPasswordToggle(button) {
+                    const targetId = button.getAttribute('data-target');
+                    const input = document.getElementById(targetId);
+                    if (!input) return;
+                    const isPassword = input.type === 'password';
+                    if (isPassword) {
+                        button.classList.add('hidden');
+                        button.setAttribute('aria-label', '显示密码');
+                    } else {
+                        button.classList.remove('hidden');
+                        button.setAttribute('aria-label', '隐藏密码');
+                    }
                 }
-            });
-        });
+                document.querySelectorAll('.password-toggle').forEach((button) => {
+                    syncPasswordToggle(button);
+                    button.addEventListener('click', () => {
+                        const targetId = button.getAttribute('data-target');
+                        const input = document.getElementById(targetId);
+                        if (!input) return;
+                        const isPassword = input.type === 'password';
+                        input.type = isPassword ? 'text' : 'password';
+                        syncPasswordToggle(button);
+                    });
+                });
 
         function showMessage(msg, type) {
             messageEl.textContent = msg;
@@ -526,43 +551,59 @@
         }
 
         function startSceneTransition(username) {
-                    document.body.classList.add('scene-transition-start');
-                    document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
+                            // ✅ 使用 data-scene 属性统一管理转场阶段，替代分散的 body class
+                            document.body.dataset.scene = 'start';
 
-                    // 启动星星坠落（微任务确保 CSS 类已应用）
-                    setTimeout(() => {
-                        if (window.startStarDrop) window.startStarDrop();
-                    }, 0);
+                            // 为屏幕阅读器提供转场提示，而非粗暴移除内容
+                            const container = document.querySelector('.container');
+                            if (container) {
+                                container.setAttribute('aria-hidden', 'true');
+                                let liveRegion = document.getElementById('transition-announcer');
+                                if (!liveRegion) {
+                                    liveRegion = document.createElement('div');
+                                    liveRegion.id = 'transition-announcer';
+                                    liveRegion.setAttribute('aria-live', 'assertive');
+                                    liveRegion.setAttribute('role', 'status');
+                                    liveRegion.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;z-index:9999;';
+                                    document.body.appendChild(liveRegion);
+                                }
+                                liveRegion.textContent = '登录成功，正在前往大厅...';
+                            }
 
-                    // 创建统一时间轴，集中管理所有转场事件
-                    const timeline = createTimeline();
+                            // 统一时间轴，集中管理所有转场事件（包括星星坠落）
+                            const timeline = createTimeline();
 
-                    timeline
-                        .at(3000, () => {
-                            document.getElementById('solarRise')?.classList.add('sun-rise-active');
-                        })
-                        .at(4200, () => {
-                            document.body.classList.add('scene-transition-sky');
-                        })
-                        .at(5000, () => {
-                            document.body.classList.add('forest-burning-active');
-                            if (window.startFire) window.startFire();
-                        })
-                        .at(7000, () => {
-                            document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
-                        })
-                        .at(11000, () => {
-                            if (window.stopFire) window.stopFire();
-                        })
-                        .at(11500, () => {
-                            window.location.href = '/lobby';
-                        });
+                            // 0ms：立即启动星星坠落（替代分散的 setTimeout）
+                            timeline.at(0, () => {
+                                if (window.startStarDrop) window.startStarDrop();
+                            })
+                            .at(3000, () => {
+                                document.body.dataset.scene = 'sunrise';
+                                document.getElementById('solarRise')?.classList.add('sun-rise-active');
+                            })
+                            .at(4200, () => {
+                                document.body.dataset.scene = 'sky';
+                            })
+                            .at(5000, () => {
+                                document.body.dataset.scene = 'burning';
+                                if (window.startFire) window.startFire();
+                            })
+                            .at(7000, () => {
+                                document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
+                            })
+                            .at(11000, () => {
+                                if (window.stopFire) window.stopFire();
+                                const announcer = document.getElementById('transition-announcer');
+                                if (announcer) announcer.remove();
+                            })
+                            .at(11500, () => {
+                                window.location.href = '/lobby';
+                            });
 
-                    timeline.start();
+                            timeline.start();
 
-                    // 挂到 window 上，便于 beforeunload 时取消
-                    window._sceneTimeline = timeline;
-                }
+                            window._sceneTimeline = timeline;
+                        }
 
         // 按回车键触发登录/注册
         document.getElementById('loginPassword').addEventListener('keydown', (e) => {
@@ -588,16 +629,22 @@
             }
         }
 
-        if (savedUser && cookieUsername && savedUser === cookieUsername) {
-                    window.location.href = '/lobby';
-                } else if (savedUser && !cookieUsername) {
-                    // Cookie 已过期但 localStorage 仍有用户名，一并清理
-                    localStorage.removeItem('username');
-                } else if (savedUser && savedUser !== cookieUsername) {
-                    localStorage.removeItem('username');
-                    // 同时清除过期/不匹配的 Cookie
-                    document.cookie = 'username=; path=/; max-age=0';
-                }
+        // ✅ 页面卸载前清理转场资源，避免内存泄漏
+                window.addEventListener('beforeunload', () => {
+                    if (window._sceneTimeline) window._sceneTimeline.cancel();
+                    if (window.stopFire) window.stopFire();
+                });
+
+                if (savedUser && cookieUsername && savedUser === cookieUsername) {
+                            window.location.href = '/lobby';
+                        } else if (savedUser && !cookieUsername) {
+                            // Cookie 已过期但 localStorage 仍有用户名，一并清理
+                            localStorage.removeItem('username');
+                        } else if (savedUser && savedUser !== cookieUsername) {
+                            localStorage.removeItem('username');
+                            // 同时清除过期/不匹配的 Cookie
+                            document.cookie = 'username=; path=/; max-age=0';
+                        }
     </script>
     <script>
         /* Star drift: 改为在登录框左侧区域内移动，速度与亮度随机化 */
@@ -769,14 +816,19 @@
             function rand(min, max){ return Math.random() * (max - min) + min; }
 
             function resizeCanvas(){
-                const rect = canvas.getBoundingClientRect();
-                width = rect.width;
-                height = rect.height;
-                const dpr = window.devicePixelRatio || 1;
-                canvas.width = Math.round(width * dpr);
-                canvas.height = Math.round(height * dpr);
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            }
+                            const rect = canvas.getBoundingClientRect();
+                            width = rect.width;
+                            height = rect.height;
+                            // ✅ 降级：若元素不可见导致尺寸为 0，使用 CSS 推算尺寸（44vh 高度 × 100vw 宽度）
+                            if (width < 1 || height < 1) {
+                                width = window.innerWidth;
+                                height = window.innerHeight * 0.44;
+                            }
+                            const dpr = window.devicePixelRatio || 1;
+                            canvas.width = Math.round(width * dpr);
+                            canvas.height = Math.round(height * dpr);
+                            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                        }
 
             function createParticle(){
                 if (particles.length >= 220) return null;

@@ -26,6 +26,31 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
 
+# #region agent log
+_DEBUG_LOG = BASE_DIR / "debug-2b39ab.log"
+
+
+def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
+    try:
+        import time
+
+        payload = {
+            "sessionId": "2b39ab",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# #endregion
+
 
 def _unauthorized_html() -> HTMLResponse:
     return HTMLResponse(
@@ -68,8 +93,40 @@ def _path_needs_auth(path: str) -> bool:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     if _path_needs_auth(request.url.path):
+        cookie_keys = list(request.cookies.keys())
+        has_session = bool(request.cookies.get("session"))
+        has_username_cookie = bool(request.cookies.get("username"))
+        token = auth.get_session_token_from_request(request)
         username = auth.get_username_from_request(request)
+        # #region agent log
+        _agent_log(
+            "B",
+            "server.py:auth_middleware",
+            "auth check for protected path",
+            {
+                "path": request.url.path,
+                "cookie_keys": cookie_keys,
+                "has_session": has_session,
+                "has_username_cookie": has_username_cookie,
+                "token_prefix": (token[:8] if token else None),
+                "username_resolved": username,
+                "session_store_size": len(auth._sessions),
+            },
+        )
+        # #endregion
         if not username:
+            # #region agent log
+            _agent_log(
+                "D",
+                "server.py:auth_middleware",
+                "auth failed -> 401",
+                {
+                    "path": request.url.path,
+                    "reason": "no_session" if not has_session else "token_not_in_store",
+                    "has_username_cookie": has_username_cookie,
+                },
+            )
+            # #endregion
             if request.url.path.startswith("/api/"):
                 return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
             return _unauthorized_html()
@@ -124,12 +181,28 @@ async def login(request: Request):
     data = await request.json()
     ok, message, token, code = auth.login_user(str(data.get("username", "")), str(data.get("password", "")))
     if not ok or not token:
+        # #region agent log
+        _agent_log("A", "server.py:login", "login failed", {"ok": ok, "code": code})
+        # #endregion
         return JSONResponse({"success": False, "message": message}, status_code=code)
     username = str(data.get("username", "")).strip()
     resp = JSONResponse({"success": True, "message": message, "username": username})
     resp.set_cookie(**_session_cookie_kwargs(token))
     # Display name cookie (non-sensitive); session cookie is authoritative
     resp.set_cookie(key="username", value=username, httponly=False, samesite="lax", max_age=60 * 60 * 24, path="/")
+    # #region agent log
+    _agent_log(
+        "A",
+        "server.py:login",
+        "login success, cookies set",
+        {
+            "username": username,
+            "token_prefix": token[:8],
+            "session_store_size": len(auth._sessions),
+            "token_in_store": token in auth._sessions,
+        },
+    )
+    # #endregion
     return resp
 
 

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三体杀 - 房间</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0a1220 0%, #152436 100%);
+            color: #e8f4ff;
+            padding: 28px 16px;
+        }
+        .wrap { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 28px; color: #7fd9ff; margin-bottom: 8px; }
+        .meta { color: rgba(255,255,255,0.4); margin-bottom: 20px; font-size: 14px; }
+        .meta strong { color: #00e5ff; letter-spacing: 2px; }
+        .panel {
+            background: rgba(12, 22, 36, 0.75);
+            border: 1px solid rgba(0, 200, 255, 0.18);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 14px;
+        }
+        .seats { display: grid; gap: 10px; }
+        .seat {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 14px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            background: rgba(0,30,50,0.35);
+        }
+        .seat.host { border-color: rgba(0,229,255,0.35); }
+        .seat .name { font-weight: 700; }
+        .badge {
+            font-size: 12px; padding: 4px 8px; border-radius: 4px;
+            background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.55);
+        }
+        .badge.ready { background: rgba(61,255,168,0.15); color: #3dffa8; }
+        .badge.off { color: #ff8a8a; background: rgba(255,80,80,0.12); }
+        .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        .btn {
+            padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer;
+            background: linear-gradient(135deg, #00e5ff, #0077ff); color: #fff; font-weight: 700;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-outline {
+            background: transparent; border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.7);
+        }
+        .btn-danger { background: transparent; border: 1px solid rgba(255,100,100,0.4); color: #ff9a9a; }
+        .status { margin-top: 12px; font-size: 13px; color: rgba(180,210,230,0.7); min-height: 18px; }
+        .status.error { color: #ff8a8a; }
+        .kick { font-size: 12px; padding: 4px 8px; margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>等候室</h1>
+        <div class="meta">房号 <strong id="roomIdDisplay">—</strong> · 你是 <span id="youName"></span></div>
+
+        <div class="panel">
+            <div class="seats" id="seats"></div>
+            <div class="row">
+                <button class="btn" id="readyBtn">准备</button>
+                <button class="btn" id="startBtn" style="display:none;">开始游戏</button>
+                <button class="btn btn-outline" id="leaveBtn">离开房间</button>
+                <a class="btn btn-outline" href="/lobby" style="text-decoration:none;display:inline-block;">回大厅</a>
+            </div>
+            <div class="status" id="statusMsg"></div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+    <script>
+        const username = TBK.requireLogin();
+        const roomId = TBK.roomIdFromPathOrQuery();
+        if (!username) { /* redirect */ }
+        else if (!roomId) {
+            window.location.href = '/lobby';
+        } else {
+            document.getElementById('roomIdDisplay').textContent = roomId;
+            document.getElementById('youName').textContent = username;
+            const seatsEl = document.getElementById('seats');
+            const statusMsg = document.getElementById('statusMsg');
+            const readyBtn = document.getElementById('readyBtn');
+            const startBtn = document.getElementById('startBtn');
+            let roomState = null;
+            let myReady = false;
+
+            function setStatus(text, kind) {
+                statusMsg.textContent = text || '';
+                statusMsg.className = 'status' + (kind ? ' ' + kind : '');
+            }
+
+            function render(room) {
+                roomState = room;
+                const players = room.players || [];
+                const me = players.find((p) => p.username === username);
+                myReady = !!(me && me.ready);
+                readyBtn.textContent = myReady ? '取消准备' : '准备';
+                startBtn.style.display = room.host === username ? 'inline-block' : 'none';
+
+                seatsEl.innerHTML = players.map((p) => {
+                    const tags = [];
+                    if (p.username === room.host) tags.push('<span class="badge">房主</span>');
+                    tags.push(p.ready ? '<span class="badge ready">已准备</span>' : '<span class="badge">未准备</span>');
+                    if (!p.connected) tags.push('<span class="badge off">离线</span>');
+                    const kick = (room.host === username && p.username !== username)
+                        ? `<button class="btn btn-danger kick" data-kick="${p.username}">踢出</button>` : '';
+                    return `<div class="seat ${p.username === room.host ? 'host' : ''}">
+                        <div><span class="name">${p.username}</span> · 座位 ${p.seat + 1}${kick}</div>
+                        <div>${tags.join(' ')}</div>
+                    </div>`;
+                }).join('');
+
+                seatsEl.querySelectorAll('[data-kick]').forEach((btn) => {
+                    btn.addEventListener('click', () => {
+                        sock.send('kick', { target: btn.getAttribute('data-kick') }, roomId);
+                    });
+                });
+
+                if (room.status === 'playing' || room.status === 'ended') {
+                    window.location.href = '/table/' + room.room_id;
+                }
+            }
+
+            const sock = new TBK.GameSocket();
+            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
+            sock.on('room_state', (msg) => {
+                if (msg.room_id && msg.room_id !== roomId) return;
+                render(msg.payload);
+            });
+            sock.on('kicked', () => {
+                setStatus('你已被踢出房间', 'error');
+                setTimeout(() => { window.location.href = '/lobby'; }, 800);
+            });
+            sock.on('game_started', (msg) => {
+                window.location.href = '/table/' + (msg.room_id || roomId);
+            });
+            sock.on('_open', async () => {
+                // Ensure we are in the room then request state
+                try {
+                    const { data } = await TBK.api('/api/rooms/' + encodeURIComponent(roomId) + '/join', {
+                        method: 'POST',
+                        body: '{}',
+                    });
+                    if (!data.success) {
+                        setStatus(data.message || '无法进入房间', 'error');
+                        return;
+                    }
+                    render(data.room);
+                    sock.send('get_room_state', {}, roomId);
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
+                }
+            });
+            sock.connect();
+
+            readyBtn.addEventListener('click', () => {
+                sock.send('set_ready', { ready: !myReady }, roomId);
+            });
+            startBtn.addEventListener('click', () => {
+                sock.send('start_game', {}, roomId);
+            });
+            document.getElementById('leaveBtn').addEventListener('click', () => {
+                sock.send('leave_room', {}, roomId);
+                window.location.href = '/lobby';
+            });
+        }
+    </script>
+</body>
+</html>

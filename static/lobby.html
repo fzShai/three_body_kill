@@ -3,215 +3,221 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🌌 三体杀 - 大厅</title>
+    <title>三体杀 - 大厅</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             min-height: 100vh;
-            position: relative;
-            overflow: hidden;
-            background: linear-gradient(180deg, #f5d6b3 0%, #ecb26b 40%, #b44c1a 100%);
-            color: #fff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
+            background: linear-gradient(180deg, #0a1220 0%, #122033 50%, #1a2838 100%);
+            color: #e8f4ff;
+            padding: 32px 16px 48px;
         }
-        body::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 50% 15%, rgba(255, 245, 210, 0.55), transparent 28%);
-            pointer-events: none;
-            opacity: 0.8;
-            filter: blur(28px);
-        }
-        body::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 38vh;
-            background: linear-gradient(180deg, rgba(255, 192, 123, 0.12), rgba(0,0,0,0.24));
-            pointer-events: none;
-        }
-        .sunset-sun {
-            position: absolute;
-            bottom: 16vh;
-            left: 50%;
-            width: 34vh;
-            height: 34vh;
-            border-radius: 50%;
-            transform: translateX(-50%);
-            background: radial-gradient(circle at 35% 35%, #fff5c6 0%, #ffcd5d 22%, #ff7f28 55%, rgba(255, 116, 22, 0.0) 100%);
-            box-shadow: 0 0 120px rgba(255, 170, 80, 0.28);
-            filter: blur(0.6px);
-            z-index: 0;
-            opacity: 0.95;
-        }
-        .sunset-sun.small {
-            width: 26vh;
-            height: 26vh;
-            left: 24%;
-            bottom: 18vh;
-        }
-        .sunset-sun.right {
-            width: 30vh;
-            height: 30vh;
-            left: 76%;
-            bottom: 18vh;
-        }
-        .horizon-glow {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 16vh;
-            background: radial-gradient(circle at 50% 0%, rgba(255, 226, 170, 0.35), transparent 55%);
-            pointer-events: none;
-            z-index: 0;
-        }
-        .forest-silhouette {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 24vh;
-            background: linear-gradient(180deg, rgba(127,18,4,0) 0%, rgba(127,18,4,0.45) 30%, rgba(63,14,4,0.95) 100%);
-            pointer-events: none;
-            z-index: 0;
-            mix-blend-mode: multiply;
-        }
-        .container {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            padding: 40px;
-            backdrop-filter: blur(14px);
-            background: rgba(20, 18, 26, 0.48);
-            border: 1px solid rgba(255,255,255,0.14);
-            box-shadow: 0 0 80px rgba(255, 160, 80, 0.08);
-            border-radius: 18px;
-        }
+        .wrap { max-width: 880px; margin: 0 auto; }
         h1 {
-            font-size: 48px;
-            background: linear-gradient(135deg, #00e5ff, #0077ff);
+            font-size: 36px;
+            background: linear-gradient(135deg, #00e5ff, #6aa8ff);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 12px;
+            margin-bottom: 6px;
         }
-        .sub {
-            color: rgba(255,255,255,0.3);
-            letter-spacing: 4px;
-            font-size: 14px;
-            margin-bottom: 40px;
-        }
-        .user-info {
-            color: rgba(255,255,255,0.5);
-            margin-bottom: 30px;
-            font-size: 16px;
-        }
-        .user-info span {
-            color: #00e5ff;
-        }
-        .btn {
-            display: inline-block;
-            padding: 16px 48px;
+        .sub { color: rgba(255,255,255,0.35); letter-spacing: 3px; font-size: 13px; margin-bottom: 28px; }
+        .user-info { color: rgba(255,255,255,0.55); margin-bottom: 20px; }
+        .user-info span { color: #00e5ff; }
+        .panel {
+            background: rgba(12, 22, 36, 0.72);
+            border: 1px solid rgba(0, 200, 255, 0.18);
             border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .panel h2 { font-size: 16px; color: #9fd9ff; margin-bottom: 14px; font-weight: 700; }
+        .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .btn {
+            padding: 12px 22px;
+            border-radius: 8px;
             border: none;
             background: linear-gradient(135deg, #00e5ff, #0077ff);
             color: #fff;
-            font-size: 18px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            transition: 0.3s;
-            margin: 8px;
-            text-decoration: none;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(0, 229, 255, 0.2);
-        }
+        .btn:hover { filter: brightness(1.08); }
         .btn-outline {
             background: transparent;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.5);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: rgba(255,255,255,0.7);
         }
-        .btn-outline:hover {
-            border-color: #00e5ff;
-            color: #00e5ff;
-            box-shadow: none;
+        .btn-outline:hover { border-color: #00e5ff; color: #00e5ff; }
+        input {
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,180,220,0.25);
+            background: rgba(0,40,60,0.4);
+            color: #cfefff;
+            font-size: 15px;
+            outline: none;
+            min-width: 140px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
-        .placeholder {
-            color: rgba(255,255,255,0.1);
-            font-size: 14px;
-            margin-top: 40px;
+        .status { font-size: 13px; color: rgba(180,210,230,0.7); min-height: 20px; margin-top: 10px; }
+        .status.error { color: #ff8a8a; }
+        .status.ok { color: #6ad8ff; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        th { color: rgba(160,200,230,0.55); font-weight: 600; }
+        td .join { padding: 6px 12px; font-size: 13px; }
+        .empty { color: rgba(255,255,255,0.25); padding: 16px 0; text-align: center; }
+        .ws-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #666; margin-right: 6px; vertical-align: middle;
         }
+        .ws-dot.on { background: #3dffa8; box-shadow: 0 0 8px rgba(61,255,168,0.5); }
     </style>
 </head>
 <body>
-    <div class="sunset-sun small"></div>
-    <div class="sunset-sun"></div>
-    <div class="sunset-sun right"></div>
-    <div class="horizon-glow"></div>
-    <div class="forest-silhouette"></div>
-    <div class="container">
-        <h1>🌌 三体杀</h1>
-        <div class="sub">✦ 等待 · 集结 ✦</div>
-
+    <div class="wrap">
+        <h1>三体杀</h1>
+        <div class="sub">✦ 大厅 · 集结 ✦</div>
         <div class="user-info">
-            👤 欢迎，<span id="usernameDisplay"></span>
+            <span class="ws-dot" id="wsDot"></span>
+            欢迎，<span id="usernameDisplay"></span>
+            · <span id="wsLabel">连接中…</span>
         </div>
 
-        <div>
-            <button class="btn" id="createRoomBtn">🚀 创建房间</button>
-            <button class="btn btn-outline" id="logoutBtn">退出登录</button>
+        <div class="panel">
+            <h2>房间</h2>
+            <div class="row">
+                <button class="btn" id="createRoomBtn">创建房间</button>
+                <input id="joinCode" maxlength="8" placeholder="输入房号" />
+                <button class="btn btn-outline" id="joinRoomBtn">加入房间</button>
+                <button class="btn btn-outline" id="logoutBtn">退出登录</button>
+            </div>
+            <div class="status" id="statusMsg"></div>
         </div>
 
-        <div class="placeholder">
-            ⚡ 房间功能开发中 · 敬请期待 ⚡
+        <div class="panel">
+            <h2>房间列表 <button class="btn btn-outline" id="refreshBtn" style="padding:6px 12px;font-size:12px;margin-left:8px;">刷新</button></h2>
+            <div id="roomListWrap">
+                <div class="empty">加载中…</div>
+            </div>
         </div>
     </div>
-
+    <script src="/static/app.js"></script>
     <script>
-        // ✅ 同时校验 localStorage 和 Cookie，防止不一致导致 401
-                const storedUser = localStorage.getItem('username');
-                const cookieMatch = document.cookie
-                    .split(';')
-                    .map(c => c.trim())
-                    .find(c => c.startsWith('username='));
+        const username = TBK.requireLogin();
+        if (!username) { /* redirecting */ }
+        else {
+            document.getElementById('usernameDisplay').textContent = username;
+            const statusMsg = document.getElementById('statusMsg');
+            const wsDot = document.getElementById('wsDot');
+            const wsLabel = document.getElementById('wsLabel');
+            const sock = new TBK.GameSocket();
 
-                let cookieUser = '';
-                if (cookieMatch) {
-                    try {
-                        cookieUser = decodeURIComponent(cookieMatch.split('=').slice(1).join('='));
-                    } catch (e) {
-                        cookieUser = '';
+            function setStatus(text, kind) {
+                statusMsg.textContent = text || '';
+                statusMsg.className = 'status' + (kind ? ' ' + kind : '');
+            }
+
+            sock.on('_open', () => {
+                wsDot.classList.add('on');
+                wsLabel.textContent = '已连接';
+            });
+            sock.on('_close', () => {
+                wsDot.classList.remove('on');
+                wsLabel.textContent = '重连中…';
+            });
+            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
+            sock.connect();
+
+            async function loadRooms() {
+                try {
+                    const { data } = await TBK.api('/api/rooms');
+                    const rooms = data.rooms || [];
+                    const wrap = document.getElementById('roomListWrap');
+                    if (!rooms.length) {
+                        wrap.innerHTML = '<div class="empty">暂无房间 · 创建一个吧</div>';
+                        return;
                     }
+                    wrap.innerHTML = `
+                        <table>
+                            <thead><tr><th>房号</th><th>房主</th><th>人数</th><th>状态</th><th></th></tr></thead>
+                            <tbody>
+                                ${rooms.map((r) => `
+                                    <tr>
+                                        <td><strong>${r.room_id}</strong></td>
+                                        <td>${r.host}</td>
+                                        <td>${r.player_count}/${r.max_players}</td>
+                                        <td>${r.status}</td>
+                                        <td>${r.can_join ? `<button class="btn join" data-id="${r.room_id}">加入</button>` : '—'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>`;
+                    wrap.querySelectorAll('button.join').forEach((btn) => {
+                        btn.addEventListener('click', () => joinRoom(btn.getAttribute('data-id')));
+                    });
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('加载房间列表失败', 'error');
                 }
+            }
 
-                // 两者都存在且一致才放行
-                if (!storedUser || !cookieUser || storedUser !== cookieUser) {
-                    // 清理不一致的残留数据
-                    localStorage.removeItem('username');
-                    document.cookie = 'username=; path=/; max-age=0';
-                    window.location.href = '/';
+            async function createRoom() {
+                setStatus('创建中…');
+                try {
+                    const { data } = await TBK.api('/api/rooms', { method: 'POST', body: '{}' });
+                    if (!data.success) {
+                        setStatus(data.message || '创建失败', 'error');
+                        return;
+                    }
+                    window.location.href = '/room/' + data.room.room_id;
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
                 }
+            }
 
-                document.getElementById('usernameDisplay').textContent = storedUser || cookieUser;
+            async function joinRoom(code) {
+                const id = (code || '').trim().toUpperCase();
+                if (!id) {
+                    setStatus('请输入房号', 'error');
+                    return;
+                }
+                setStatus('加入中…');
+                try {
+                    const { data } = await TBK.api('/api/rooms/' + encodeURIComponent(id) + '/join', {
+                        method: 'POST',
+                        body: '{}',
+                    });
+                    if (!data.success) {
+                        setStatus(data.message || '加入失败', 'error');
+                        return;
+                    }
+                    window.location.href = '/room/' + data.room.room_id;
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
+                }
+            }
 
-                document.getElementById('logoutBtn').addEventListener('click', () => {
-                    localStorage.removeItem('username');
-                    document.cookie = 'username=; path=/; max-age=0';
-                    window.location.href = '/';
-                });
+            document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+            document.getElementById('joinRoomBtn').addEventListener('click', () => {
+                joinRoom(document.getElementById('joinCode').value);
+            });
+            document.getElementById('joinCode').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') joinRoom(document.getElementById('joinCode').value);
+            });
+            document.getElementById('refreshBtn').addEventListener('click', loadRooms);
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                try { await TBK.api('/api/logout', { method: 'POST', body: '{}' }); } catch (e) {}
+                localStorage.removeItem('username');
+                window.location.href = '/';
+            });
 
-        document.getElementById('createRoomBtn').addEventListener('click', () => {
-            alert('房间功能即将上线！🚀');
-        });
+            loadRooms();
+            setInterval(loadRooms, 5000);
+        }
     </script>
 </body>
 </html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三体杀 - 桌面</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at 50% 0%, #1a3050 0%, #0a121c 55%, #05080e 100%);
+            color: #e8f4ff;
+            padding: 20px 12px 32px;
+        }
+        .wrap { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 22px; color: #7fd9ff; margin-bottom: 4px; }
+        .meta { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr 280px; gap: 14px; }
+        @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+        .panel {
+            background: rgba(10, 20, 34, 0.78);
+            border: 1px solid rgba(0, 200, 255, 0.16);
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .panel h2 { font-size: 13px; color: rgba(160,200,230,0.65); margin-bottom: 10px; letter-spacing: 1px; }
+        .players { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .player-chip {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 120px;
+            background: rgba(0,40,70,0.35);
+        }
+        .player-chip.turn { border-color: #00e5ff; box-shadow: 0 0 12px rgba(0,229,255,0.2); }
+        .player-chip.dead { opacity: 0.4; }
+        .player-chip .n { font-weight: 700; font-size: 14px; }
+        .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
+        .role {
+            display: inline-block; margin-bottom: 10px;
+            padding: 8px 12px; border-radius: 6px;
+            background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.22);
+            font-size: 13px;
+        }
+        .hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 110px; }
+        .card {
+            width: 118px; min-height: 140px; padding: 10px;
+            border-radius: 8px; cursor: pointer;
+            background: linear-gradient(160deg, rgba(20,40,70,0.95), rgba(10,20,36,0.95));
+            border: 1px solid rgba(0,200,255,0.28);
+            transition: transform 0.15s, border-color 0.15s;
+        }
+        .card:hover { transform: translateY(-4px); border-color: #00e5ff; }
+        .card.selected { border-color: #ffcc66; box-shadow: 0 0 14px rgba(255,200,100,0.25); }
+        .card .cname { font-weight: 800; font-size: 13px; color: #9fdfff; margin-bottom: 6px; }
+        .card .ctype { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 6px; }
+        .card .ctext { font-size: 11px; color: rgba(220,230,240,0.7); line-height: 1.35; }
+        .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+        .btn {
+            padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer;
+            background: linear-gradient(135deg, #00e5ff, #0077ff); color: #fff; font-weight: 700; font-size: 13px;
+        }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-outline {
+            background: transparent; border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.7);
+        }
+        select {
+            padding: 10px 12px; border-radius: 8px;
+            background: rgba(0,40,60,0.5); color: #cfefff;
+            border: 1px solid rgba(0,180,220,0.25);
+        }
+        .log {
+            font-size: 12px; color: rgba(200,220,240,0.6);
+            max-height: 280px; overflow-y: auto; line-height: 1.5;
+        }
+        .log div { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .status { margin-top: 10px; font-size: 13px; color: rgba(180,210,230,0.7); }
+        .status.error { color: #ff8a8a; }
+        .banner {
+            margin-bottom: 12px; padding: 12px; border-radius: 8px;
+            background: rgba(255, 180, 60, 0.12); border: 1px solid rgba(255,180,60,0.3);
+            display: none;
+        }
+        .banner.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>黑暗森林 · 对局桌</h1>
+        <div class="meta">房号 <span id="roomIdDisplay"></span> · 牌库 <span id="deckCount">0</span> · 弃牌 <span id="discardCount">0</span></div>
+        <div class="banner" id="endBanner"></div>
+
+        <div class="grid">
+            <div>
+                <div class="panel" style="margin-bottom:14px;">
+                    <h2>战场</h2>
+                    <div class="players" id="players"></div>
+                </div>
+                <div class="panel">
+                    <h2>你的身份</h2>
+                    <div class="role" id="roleBox">—</div>
+                    <h2>手牌</h2>
+                    <div class="hand" id="hand"></div>
+                    <div class="row">
+                        <label style="font-size:12px;color:rgba(255,255,255,0.45);">目标</label>
+                        <select id="targetSelect"></select>
+                        <button class="btn" id="playBtn">出牌</button>
+                        <button class="btn btn-outline" id="passBtn">过牌</button>
+                        <button class="btn btn-outline" id="placeholderBtn">占位出牌</button>
+                    </div>
+                    <div class="status" id="statusMsg"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>战报</h2>
+                <div class="log" id="log"></div>
+                <div class="row" style="margin-top:14px;">
+                    <a class="btn btn-outline" href="/lobby" style="text-decoration:none;">回大厅</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+    <script>
+        const username = TBK.requireLogin();
+        const roomId = TBK.roomIdFromPathOrQuery();
+        if (!username) {}
+        else if (!roomId) { window.location.href = '/lobby'; }
+        else {
+            document.getElementById('roomIdDisplay').textContent = roomId;
+            let state = null;
+            let selectedId = null;
+            const statusMsg = document.getElementById('statusMsg');
+
+            function setStatus(text, kind) {
+                statusMsg.textContent = text || '';
+                statusMsg.className = 'status' + (kind ? ' ' + kind : '');
+            }
+
+            function needsTarget(card) {
+                return ['probe', 'sophon', 'dark_forest', 'droplet', 'dimensions'].includes(card.id);
+            }
+
+            function render(snap) {
+                state = snap;
+                document.getElementById('deckCount').textContent = snap.deck_count;
+                document.getElementById('discardCount').textContent = snap.discard_count;
+                const myTurn = snap.current_player === username && snap.phase === 'turn';
+
+                const playersEl = document.getElementById('players');
+                playersEl.innerHTML = (snap.players || []).map((p) => `
+                    <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'}">
+                        <div class="n">${p.username}${p.username === username ? ' (你)' : ''}</div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.skip_next ? ' · 锁死' : ''}${p.alive ? '' : ' · 出局'}</div>
+                    </div>
+                `).join('');
+
+                const role = snap.you?.role;
+                document.getElementById('roleBox').textContent = role
+                    ? `${role.role_name}（${role.faction}） · HP ${snap.you.hp}`
+                    : '—';
+
+                const hand = snap.you?.hand || [];
+                const handEl = document.getElementById('hand');
+                handEl.innerHTML = hand.map((c) => `
+                    <div class="card ${selectedId === c.instance_id ? 'selected' : ''}" data-id="${c.instance_id}">
+                        <div class="cname">${c.name}</div>
+                        <div class="ctype">${c.type} · 费${c.cost}</div>
+                        <div class="ctext">${c.text}</div>
+                    </div>
+                `).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';
+                handEl.querySelectorAll('.card').forEach((el) => {
+                    el.addEventListener('click', () => {
+                        selectedId = el.getAttribute('data-id');
+                        render(state);
+                    });
+                });
+
+                const sel = document.getElementById('targetSelect');
+                const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                sel.innerHTML = '<option value=\"\">（无目标）</option>' +
+                    targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+
+                document.getElementById('playBtn').disabled = !myTurn || !selectedId;
+                document.getElementById('passBtn').disabled = !myTurn;
+                document.getElementById('placeholderBtn').disabled = !myTurn;
+
+                const logEl = document.getElementById('log');
+                logEl.innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
+
+                const banner = document.getElementById('endBanner');
+                if (snap.phase === 'ended') {
+                    banner.classList.add('show');
+                    banner.textContent = snap.winner
+                        ? `对局结束 · 胜者 ${snap.winner}（${snap.winner_faction || ''}）`
+                        : '对局结束';
+                } else {
+                    banner.classList.remove('show');
+                }
+            }
+
+            const sock = new TBK.GameSocket();
+            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
+            sock.on('game_state', (msg) => {
+                if (msg.room_id && msg.room_id !== roomId) return;
+                setStatus('');
+                render(msg.payload);
+            });
+            sock.on('game_started', () => sock.send('get_game_state', {}, roomId));
+            sock.on('_open', () => sock.send('get_game_state', {}, roomId));
+            sock.connect();
+
+            document.getElementById('playBtn').addEventListener('click', () => {
+                if (!selectedId || !state) return;
+                const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
+                const target = document.getElementById('targetSelect').value || null;
+                if (card && needsTarget(card) && !target) {
+                    setStatus('该牌需要选择目标', 'error');
+                    return;
+                }
+                sock.send('game_action', {
+                    action: 'play_card',
+                    instance_id: selectedId,
+                    target,
+                }, roomId);
+                selectedId = null;
+            });
+            document.getElementById('passBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'pass' }, roomId);
+            });
+            document.getElementById('placeholderBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'play_placeholder' }, roomId);
+            });
+        }
+    </script>
+</body>
+</html>

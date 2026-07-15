@@ -1,0 +1,60 @@
+{
+  "cards": [
+    {
+      "id": "probe",
+      "name": "智子探测",
+      "type": "action",
+      "cost": 1,
+      "text": "查看一名玩家的一张手牌（占位：揭示其手牌数量）。"
+    },
+    {
+      "id": "sophon",
+      "name": "智子锁死",
+      "type": "action",
+      "cost": 2,
+      "text": "目标玩家下回合跳过出牌（占位：标记 skip）。"
+    },
+    {
+      "id": "dark_forest",
+      "name": "黑暗森林打击",
+      "type": "attack",
+      "cost": 3,
+      "text": "对目标造成 2 点损伤。"
+    },
+    {
+      "id": "wallfacer",
+      "name": "面壁计划",
+      "type": "defense",
+      "cost": 1,
+      "text": "本回合减免 1 点伤害。"
+    },
+    {
+      "id": "escape",
+      "name": "阶梯计划",
+      "type": "action",
+      "cost": 2,
+      "text": "抽 2 张牌。"
+    },
+    {
+      "id": "broadcast",
+      "name": "文明广播",
+      "type": "action",
+      "cost": 1,
+      "text": "所有存活玩家各抽 1 张牌。"
+    },
+    {
+      "id": "droplet",
+      "name": "水滴",
+      "type": "attack",
+      "cost": 2,
+      "text": "对目标造成 1 点损伤；无法被普通防御抵消（占位按普通攻击结算）。"
+    },
+    {
+      "id": "dimensions",
+      "name": "二向箔",
+      "type": "ultimate",
+      "cost": 4,
+      "text": "对目标造成 3 点损伤。"
+    }
+  ]
+}

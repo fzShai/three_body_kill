@@ -323,7 +323,7 @@
             <label>密码</label>
             <div class="password-row">
                 <input type="password" id="loginPassword" placeholder="输入密码" />
-                <button type="button" class="password-toggle" data-target="loginPassword" aria-label="显示密码">👁</button>
+                <button type="button" class="password-toggle hidden" data-target="loginPassword" aria-label="显示密码">👁</button>
             </div>
             <button id="loginBtn">登录</button>
             <div class="hint-text">还没有账号？点击「注册」加入</div>
@@ -336,12 +336,12 @@
             <label>密码</label>
             <div class="password-row">
                 <input type="password" id="regPassword" placeholder="设置密码（至少3位）" />
-                <button type="button" class="password-toggle" data-target="regPassword" aria-label="显示密码">👁</button>
+                <button type="button" class="password-toggle hidden" data-target="regPassword" aria-label="显示密码">👁</button>
             </div>
             <label>确认密码</label>
             <div class="password-row">
                 <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" />
-                <button type="button" class="password-toggle" data-target="regPasswordConfirm" aria-label="显示密码">👁</button>
+                <button type="button" class="password-toggle hidden" data-target="regPasswordConfirm" aria-label="显示密码">👁</button>
             </div>
             <button id="registerBtn">注册</button>
             <div class="hint-text">已有账号？点击「登录」返回</div>
@@ -470,32 +470,99 @@
             messageEl.className = 'message' + (type ? ' ' + type : '');
         }
 
-        function startSceneTransition(username) {
-            document.body.classList.add('scene-transition-start');
-            document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
-            setTimeout(() => {
-                if (window.startStarDrop) window.startStarDrop();
-            }, 0);
-            setTimeout(() => {
-                document.getElementById('solarRise')?.classList.add('sun-rise-active');
-            }, 3000);
-            setTimeout(() => {
-                document.body.classList.add('scene-transition-sky');
-            }, 4200);
-            setTimeout(() => {
-                document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
-            }, 7000);
-            setTimeout(() => {
-                document.body.classList.add('forest-burning-active');
-                if (window.startFire) window.startFire();
-            }, 5000);
-            setTimeout(() => {
-                if (window.stopFire) window.stopFire();
-            }, 11000);
-            setTimeout(() => {
-                window.location.href = '/lobby';
-            }, 11500);
+        // ========== 统一时间轴控制器（替代多个分散的 setTimeout） ==========
+        function createTimeline() {
+            let events = [];           // { at: 相对时间(ms), fn: 回调 }
+            let startTime = null;
+            let rafId = null;
+            let nextEventIndex = 0;
+            let cancelled = false;
+
+            function at(ms, fn) {
+                events.push({ at: ms, fn });
+                return api; // 链式调用
+            }
+
+            function start() {
+                if (startTime !== null) return;
+                cancelled = false;
+                events.sort((a, b) => a.at - b.at);
+                nextEventIndex = 0;
+                startTime = performance.now();
+                tick(startTime);
+            }
+
+            function cancel() {
+                cancelled = true;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+                startTime = null;
+            }
+
+            function tick(ts) {
+                if (cancelled) return;
+                const elapsed = ts - startTime;
+
+                while (nextEventIndex < events.length && events[nextEventIndex].at <= elapsed) {
+                    try {
+                        events[nextEventIndex].fn();
+                    } catch (e) {
+                        console.error('Timeline event error:', e);
+                    }
+                    nextEventIndex++;
+                }
+
+                if (nextEventIndex < events.length) {
+                    rafId = requestAnimationFrame(tick);
+                } else {
+                    rafId = null;
+                }
+            }
+
+            const api = { at, start, cancel };
+            return api;
         }
+
+        function startSceneTransition(username) {
+                    document.body.classList.add('scene-transition-start');
+                    document.querySelector('.container')?.setAttribute('aria-hidden', 'true');
+
+                    // 启动星星坠落（微任务确保 CSS 类已应用）
+                    setTimeout(() => {
+                        if (window.startStarDrop) window.startStarDrop();
+                    }, 0);
+
+                    // 创建统一时间轴，集中管理所有转场事件
+                    const timeline = createTimeline();
+
+                    timeline
+                        .at(3000, () => {
+                            document.getElementById('solarRise')?.classList.add('sun-rise-active');
+                        })
+                        .at(4200, () => {
+                            document.body.classList.add('scene-transition-sky');
+                        })
+                        .at(5000, () => {
+                            document.body.classList.add('forest-burning-active');
+                            if (window.startFire) window.startFire();
+                        })
+                        .at(7000, () => {
+                            document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
+                        })
+                        .at(11000, () => {
+                            if (window.stopFire) window.stopFire();
+                        })
+                        .at(11500, () => {
+                            window.location.href = '/lobby';
+                        });
+
+                    timeline.start();
+
+                    // 挂到 window 上，便于 beforeunload 时取消
+                    window._sceneTimeline = timeline;
+                }
 
         // 按回车键触发登录/注册
         document.getElementById('loginPassword').addEventListener('keydown', (e) => {
@@ -521,11 +588,16 @@
             }
         }
 
-        if (savedUser && savedUser === cookieUsername) {
-            window.location.href = '/lobby';
-        } else if (savedUser && savedUser !== cookieUsername) {
-            localStorage.removeItem('username');
-        }
+        if (savedUser && cookieUsername && savedUser === cookieUsername) {
+                    window.location.href = '/lobby';
+                } else if (savedUser && !cookieUsername) {
+                    // Cookie 已过期但 localStorage 仍有用户名，一并清理
+                    localStorage.removeItem('username');
+                } else if (savedUser && savedUser !== cookieUsername) {
+                    localStorage.removeItem('username');
+                    // 同时清除过期/不匹配的 Cookie
+                    document.cookie = 'username=; path=/; max-age=0';
+                }
     </script>
     <script>
         /* Star drift: 改为在登录框左侧区域内移动，速度与亮度随机化 */
@@ -584,27 +656,29 @@
                     if(this.baseY > this.maxY) this.baseY = this.maxY - rand(0, 10);
                 }
                 setNewTarget(){
-                    this.startX = this.baseX;
-                    this.startY = this.baseY;
-                    this.targetX = rand(this.minX, this.maxX);
-                    this.targetY = rand(this.minY, this.maxY);
-                    this.duration = rand(this.durationMin, this.durationMax);
-                    this.startTime = 0;
-                }
+                                    this.startX = this.baseX;
+                                    this.startY = this.baseY;
+                                    this.targetX = rand(this.minX, this.maxX);
+                                    this.targetY = rand(this.minY, this.maxY);
+                                    this.duration = rand(this.durationMin, this.durationMax);
+                                    this.startTime = undefined;
+                                }
                 step(ts){
                     if(!this.startTime) this.startTime = ts;
                     if(this.dropMode){
-                        const t = Math.min((ts - this.startTime) / this.duration, 1);
-                        const ease = t * t;
-                        const curY = this.startY + (this.targetY - this.startY) * ease;
-                        this.el.style.left = this.startX + 'px';
-                        this.el.style.top = curY + 'px';
-                        this.el.style.opacity = String(Math.max(0, 1 - t));
-                        if(t >= 1){
-                            this.el.style.opacity = '0';
-                        }
-                        return;
-                    }
+                                            const t = Math.min((ts - this.startTime) / this.duration, 1);
+                                            const ease = t * t;
+                                            const curY = this.startY + (this.targetY - this.startY) * ease;
+                                            this.el.style.left = this.startX + 'px';
+                                            this.el.style.top = curY + 'px';
+                                            this.el.style.opacity = String(Math.max(0, 1 - t));
+                                            if(t >= 1){
+                                                this.el.style.opacity = '0';
+                                                this.el.style.display = 'none';
+                                                this.done = true; // 标记已完成，从循环中移除
+                                            }
+                                            return;
+                                        }
                     const t = Math.min((ts - this.startTime) / this.duration, 1);
                     const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
                     const curX = this.startX + (this.targetX - this.startX) * ease;
@@ -641,12 +715,13 @@
                     const currentX = parseFloat(cs.left);
                     const currentY = parseFloat(cs.top);
                     walker.startX = currentX;
-                    walker.startY = currentY;
-                    walker.targetX = currentX;
-                    walker.targetY = window.innerHeight + 100;
-                    walker.duration = 2200;
-                    walker.startTime = 0;
-                    walker.dropMode = true;
+                                        walker.startY = currentY;
+                                        walker.targetX = currentX;
+                                        walker.targetY = window.innerHeight + 100;
+                                        walker.duration = 2200;
+                                        // ✅ 修复：使用 undefined 而非 0，避免与 falsy 检查冲突
+                                        walker.startTime = undefined;
+                                        walker.dropMode = true;
                     const base = parseFloat(walker.el.dataset.baseBrightness) || 1;
                     walker.el.style.filter = `brightness(${base * 2})`;
                 });
@@ -668,9 +743,11 @@
             window.addEventListener('resize', onResize);
 
             function loop(ts){
-                walkers.forEach(w => w.step(ts));
-                requestAnimationFrame(loop);
-            }
+                            // 过滤掉已完成的 walker，避免资源泄漏
+                            walkers = walkers.filter(w => !w.done);
+                            walkers.forEach(w => w.step(ts));
+                            requestAnimationFrame(loop);
+                        }
 
             requestAnimationFrame(loop);
         })();
@@ -769,12 +846,13 @@
             }
 
             function startFire(){
-                if (running) return;
-                running = true;
-                fireIntensity = 0;
-                resizeCanvas();
-                lastTime = 0;
-                const start = performance.now();
+                            if (running) return;
+                            running = true;
+                            fireIntensity = 0;
+                            resizeCanvas();
+                            // ✅ 修复：使用 undefined 而非 0，避免与 falsy 检查冲突
+                            lastTime = undefined;
+                            const start = performance.now();
                 const ramp = (time) => {
                     const elapsed = time - start;
                     fireIntensity = Math.min(1, elapsed / 3000);

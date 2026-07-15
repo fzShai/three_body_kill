@@ -362,6 +362,9 @@
     </div>
 
     <script>
+        // 登录成功后的转场动画开关：false = 保留代码但不播放，直接进入大厅
+        const login_animation = false;
+
         const messageEl = document.getElementById('message');
 
         // Tab 切换
@@ -438,7 +441,11 @@
                                 const loginUsername = data.username || username;
                                 localStorage.setItem('username', loginUsername);
                                 setAuthCookie(loginUsername);
-                                startSceneTransition(loginUsername);
+                                if (login_animation) {
+                                    startSceneTransition(loginUsername);
+                                } else {
+                                    window.location.href = '/lobby';
+                                }
                             } else {
                                 // ✅ 注册成功：清空注册表单，切到登录面板
                                 document.getElementById('regUsername').value = '';

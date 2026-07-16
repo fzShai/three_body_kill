@@ -172,6 +172,11 @@ class GameSession:
                 self._log("无人存活，平局")
             return True
 
+        # No eliminations yet — do not end by faction (2-player same-faction
+        # games would otherwise end on the first pass/skip/timeout).
+        if len(alive) >= len(self.player_order):
+            return False
+
         factions = {self.players[n]["faction"] for n in alive}
         earthish = {"earth"}
         alien = {"eto", "trisolaris"}

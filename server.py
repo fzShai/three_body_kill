@@ -216,10 +216,27 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
         _schedule_host_transfer(room_id)
 
     if room_manager.all_players_offline(room):
-        if room.status == "waiting":
-            _schedule_room_cleanup(room_id)
+        # Waiting and playing both get a short grace window so page navigation
+        # (room -> table) does not wipe the room when both sockets flip briefly.
+        _schedule_room_cleanup(room_id)
+        # #region agent log
+        _debug_session_log(
+            "H_ALL_OFF",
+            "server.py:_handle_player_offline",
+            "all offline grace scheduled",
+            {
+                "username": username,
+                "room_id": room_id.upper(),
+                "room_status": room.status,
+                "turn_skipped": turn_skipped,
+            },
+        )
+        # #endregion
+        if room.status == "playing" and room.game:
+            await _broadcast_game_state(room)
+            await _broadcast_room_state(room)
         else:
-            await _destroy_room_all_offline(room_id)
+            await _broadcast_room_state(room)
         return
 
     if room.status == "playing" and room.game:

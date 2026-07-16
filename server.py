@@ -676,23 +676,39 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         pass
     finally:
-        ws_hub.disconnect(username, websocket)
+        disconnected_active = ws_hub.disconnect(username, websocket)
         rid = ws_hub.get_user_room(username)
         # #region agent log
         _debug_session_log(
-            "H2",
+            "H5",
             "server.py:websocket_endpoint.finally",
             "websocket closing",
             {
                 "username": username,
                 "user_room_mapping": rid,
                 "rooms_before_offline": list(room_manager._rooms.keys()),
+                "disconnected_active": disconnected_active,
                 "ws_online_after_disconnect_call": ws_hub.online(username),
             },
+            run_id="post-fix",
         )
         # #endregion
-        if rid:
+        if rid and disconnected_active:
             await _handle_player_offline(username, rid)
+        elif rid:
+            # #region agent log
+            _debug_session_log(
+                "H5",
+                "server.py:websocket_endpoint.finally",
+                "stale websocket close ignored",
+                {
+                    "username": username,
+                    "room_id": rid,
+                    "ws_still_online": ws_hub.online(username),
+                },
+                run_id="post-fix",
+            )
+            # #endregion
         print(f"[ws] {username} disconnected")
 
 

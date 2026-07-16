@@ -34,12 +34,14 @@ class ConnectionManager:
                 pass
         self._by_user[username] = websocket
 
-    def disconnect(self, username: str, websocket: WebSocket | None = None) -> None:
+    def disconnect(self, username: str, websocket: WebSocket | None = None) -> bool:
         current = self._by_user.get(username)
         if websocket is not None and current is not websocket:
-            return
+            return False
         if current is not None:
             del self._by_user[username]
+            return True
+        return False
 
     def set_user_room(self, username: str, room_id: str | None) -> None:
         if room_id is None:

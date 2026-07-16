@@ -66,7 +66,7 @@
                 <button class="btn" id="readyBtn">准备</button>
                 <button class="btn" id="startBtn" style="display:none;">开始游戏</button>
                 <button class="btn btn-outline" id="leaveBtn">离开房间</button>
-                <a class="btn btn-outline" href="/lobby" style="text-decoration:none;display:inline-block;">回大厅</a>
+                <a class="btn btn-outline" href="/lobby" id="backLobbyLink" style="text-decoration:none;display:inline-block;">回大厅</a>
             </div>
             <div class="status" id="statusMsg"></div>
         </div>
@@ -165,6 +165,9 @@
             });
             document.getElementById('leaveBtn').addEventListener('click', () => {
                 sock.send('leave_room', {}, roomId);
+                window.location.href = '/lobby';
+            });
+            document.getElementById('backLobbyLink')?.addEventListener('click', () => {
                 window.location.href = '/lobby';
             });
         }

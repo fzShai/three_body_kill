@@ -35,6 +35,8 @@
         }
         .player-chip.turn { border-color: #00e5ff; box-shadow: 0 0 12px rgba(0,229,255,0.2); }
         .player-chip.dead { opacity: 0.4; }
+        .player-chip.offline { opacity: 0.65; border-color: rgba(255,120,120,0.35); }
+        .badge-off { font-size: 11px; color: #ff8a8a; margin-left: 4px; }
         .player-chip .n { font-weight: 700; font-size: 14px; }
         .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
         .role {
@@ -116,7 +118,7 @@
                 <h2>战报</h2>
                 <div class="log" id="log"></div>
                 <div class="row" style="margin-top:14px;">
-                    <a class="btn btn-outline" href="/lobby" style="text-decoration:none;">回大厅</a>
+                    <a class="btn btn-outline" href="/lobby" id="backLobbyLink" style="text-decoration:none;">回大厅</a>
                 </div>
             </div>
         </div>
@@ -150,8 +152,8 @@
 
                 const playersEl = document.getElementById('players');
                 playersEl.innerHTML = (snap.players || []).map((p) => `
-                    <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'}">
-                        <div class="n">${p.username}${p.username === username ? ' (你)' : ''}</div>
+                    <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'} ${p.online === false ? 'offline' : ''}">
+                        <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
                         <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.skip_next ? ' · 锁死' : ''}${p.alive ? '' : ' · 出局'}</div>
                     </div>
                 `).join('');
@@ -231,6 +233,9 @@
             });
             document.getElementById('placeholderBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'play_placeholder' }, roomId);
+            });
+            document.getElementById('backLobbyLink')?.addEventListener('click', () => {
+                window.location.href = '/lobby';
             });
         }
     </script>

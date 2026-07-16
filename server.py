@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import auth
-from rooms import room_manager
+from rooms import HOST_TRANSFER_SECONDS, room_manager
 from ws_hub import make_message, ws_hub
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -21,7 +24,18 @@ LOBBY_PAGE = STATIC_DIR / "lobby.html"
 ROOM_PAGE = STATIC_DIR / "room.html"
 TABLE_PAGE = STATIC_DIR / "table.html"
 
-app = FastAPI(title="三体杀")
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    poller = asyncio.create_task(_host_transfer_poller())
+    yield
+    poller.cancel()
+    try:
+        await poller
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(title="三体杀", lifespan=_lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
@@ -36,7 +50,7 @@ def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | Non
 
         payload = {
             "sessionId": "2b39ab",
-            "runId": "pre-fix",
+            "runId": "room-leak",
             "hypothesisId": hypothesis_id,
             "location": location,
             "message": message,
@@ -50,6 +64,136 @@ def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | Non
 
 
 # #endregion
+
+_host_transfer_deadlines: dict[str, float] = {}
+
+
+def _cancel_host_transfer(room_id: str) -> None:
+    _host_transfer_deadlines.pop(room_id.upper(), None)
+
+
+def _schedule_host_transfer(room_id: str) -> None:
+    key = room_id.upper()
+    deadline = time.monotonic() + HOST_TRANSFER_SECONDS
+    _host_transfer_deadlines[key] = deadline
+    # #region agent log
+    _agent_log(
+        "H",
+        "server.py:host_transfer",
+        "host transfer scheduled",
+        {"room_id": key, "deadline_in_sec": HOST_TRANSFER_SECONDS},
+    )
+    # #endregion
+
+
+async def _process_due_host_transfers() -> None:
+    now = time.monotonic()
+    due = [rid for rid, deadline in list(_host_transfer_deadlines.items()) if now >= deadline]
+    for rid in due:
+        _host_transfer_deadlines.pop(rid, None)
+        room = room_manager.transfer_host_if_still_offline(rid)
+        # #region agent log
+        _agent_log(
+            "H",
+            "server.py:host_transfer",
+            "host transfer timer fired",
+            {
+                "room_id": rid,
+                "new_host": room.host if room else None,
+                "transferred": bool(room and room.find_player(room.host)),
+            },
+        )
+        # #endregion
+        if room:
+            await _broadcast_room_state(room)
+
+
+async def _host_transfer_poller() -> None:
+    while True:
+        await asyncio.sleep(0.25)
+        await _process_due_host_transfers()
+
+
+async def _destroy_room_all_offline(room_id: str) -> None:
+    key = room_id.upper()
+    _cancel_host_transfer(key)
+    names = room_manager.delete_room(key)
+    for name in names:
+        ws_hub.set_user_room(name, None)
+    # #region agent log
+    _agent_log(
+        "G",
+        "server.py:destroy_all_offline",
+        "room destroyed (all offline)",
+        {"room_id": key, "players": names, "total_rooms": len(room_manager._rooms)},
+    )
+    # #endregion
+
+
+async def _handle_player_online(username: str, room_id: str) -> None:
+    room = room_manager.mark_player_online(room_id, username)
+    if not room:
+        return
+    if room.host == username and room.status == "waiting":
+        _cancel_host_transfer(room_id)
+    room_manager.sync_game_online(room)
+    if room.status == "playing" and room.game:
+        await _broadcast_game_state(room)
+    else:
+        await _broadcast_room_state(room)
+
+
+async def _handle_player_offline(username: str, room_id: str) -> None:
+    room = room_manager.mark_player_offline(room_id, username)
+    if not room:
+        return
+
+    was_host = room.host == username
+    turn_skipped = False
+
+    if room.status == "playing" and room.game:
+        room_manager.sync_game_online(room)
+        room.game.mark_disconnected(username)
+        turn_skipped = room.game.skip_current_if_offline(username)
+        if room.game.phase == "ended":
+            room.status = "ended"
+    elif was_host and room.status == "waiting":
+        _schedule_host_transfer(room_id)
+
+    if room_manager.all_players_offline(room):
+        await _destroy_room_all_offline(room_id)
+        # #region agent log
+        _agent_log(
+            "F",
+            "server.py:disconnect",
+            "player offline -> all offline destroy",
+            {"username": username, "room_id": room_id.upper()},
+        )
+        # #endregion
+        return
+
+    # #region agent log
+    _agent_log(
+        "F",
+        "server.py:disconnect",
+        "player marked offline (kept in room)",
+        {
+            "username": username,
+            "room_id": room_id.upper(),
+            "room_status": room.status,
+            "was_host": was_host,
+            "turn_skipped": turn_skipped,
+            "host": room.host,
+            "offline_count": sum(1 for p in room.players if not p.connected),
+        },
+    )
+    # #endregion
+
+    if room.status == "playing" and room.game:
+        await _broadcast_game_state(room)
+        await _broadcast_room_state(room)
+    else:
+        await _broadcast_room_state(room)
 
 
 def _unauthorized_html() -> HTMLResponse:
@@ -93,40 +237,8 @@ def _path_needs_auth(path: str) -> bool:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     if _path_needs_auth(request.url.path):
-        cookie_keys = list(request.cookies.keys())
-        has_session = bool(request.cookies.get("session"))
-        has_username_cookie = bool(request.cookies.get("username"))
-        token = auth.get_session_token_from_request(request)
         username = auth.get_username_from_request(request)
-        # #region agent log
-        _agent_log(
-            "B",
-            "server.py:auth_middleware",
-            "auth check for protected path",
-            {
-                "path": request.url.path,
-                "cookie_keys": cookie_keys,
-                "has_session": has_session,
-                "has_username_cookie": has_username_cookie,
-                "token_prefix": (token[:8] if token else None),
-                "username_resolved": username,
-                "session_store_size": len(auth._sessions),
-            },
-        )
-        # #endregion
         if not username:
-            # #region agent log
-            _agent_log(
-                "D",
-                "server.py:auth_middleware",
-                "auth failed -> 401",
-                {
-                    "path": request.url.path,
-                    "reason": "no_session" if not has_session else "token_not_in_store",
-                    "has_username_cookie": has_username_cookie,
-                },
-            )
-            # #endregion
             if request.url.path.startswith("/api/"):
                 return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
             return _unauthorized_html()
@@ -181,33 +293,42 @@ async def login(request: Request):
     data = await request.json()
     ok, message, token, code = auth.login_user(str(data.get("username", "")), str(data.get("password", "")))
     if not ok or not token:
-        # #region agent log
-        _agent_log("A", "server.py:login", "login failed", {"ok": ok, "code": code})
-        # #endregion
         return JSONResponse({"success": False, "message": message}, status_code=code)
     username = str(data.get("username", "")).strip()
     resp = JSONResponse({"success": True, "message": message, "username": username})
     resp.set_cookie(**_session_cookie_kwargs(token))
     # Display name cookie (non-sensitive); session cookie is authoritative
     resp.set_cookie(key="username", value=username, httponly=False, samesite="lax", max_age=60 * 60 * 24, path="/")
-    # #region agent log
-    _agent_log(
-        "A",
-        "server.py:login",
-        "login success, cookies set",
-        {
-            "username": username,
-            "token_prefix": token[:8],
-            "session_store_size": len(auth._sessions),
-            "token_in_store": token in auth._sessions,
-        },
-    )
-    # #endregion
     return resp
 
 
 @app.post("/api/logout")
 async def logout(request: Request):
+    username = getattr(request.state, "username", None) or auth.get_username_from_request(request)
+    rid_before = ws_hub.get_user_room(username) if username else None
+    rooms_before = len(room_manager._rooms)
+    left_rooms: list[str] = []
+    if username:
+        left_rooms = room_manager.leave_all(username)
+        ws_hub.set_user_room(username, None)
+        for rid in left_rooms:
+            room = room_manager.get(rid)
+            if room:
+                await _broadcast_room_state(room)
+    # #region agent log
+    _agent_log(
+        "B",
+        "server.py:logout",
+        "logout called",
+        {
+            "username": username,
+            "room_id_before": rid_before,
+            "left_rooms": left_rooms,
+            "total_rooms_after": len(room_manager._rooms),
+            "rooms_before": rooms_before,
+        },
+    )
+    # #endregion
     token = auth.get_session_token_from_request(request)
     auth.revoke_session(token)
     resp = JSONResponse({"success": True, "message": "已退出"})
@@ -239,9 +360,37 @@ async def table_page(room_id: str | None = None):
     return JSONResponse({"error": "找不到桌面页面"}, status_code=404)
 
 
+@app.post("/api/rooms/{room_id}/leave")
+async def leave_room_api(room_id: str, request: Request):
+    username = getattr(request.state, "username", None) or auth.get_username_from_request(request)
+    if not username:
+        return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
+    room = room_manager.leave_room(room_id, username)
+    _cancel_host_transfer(room_id)
+    ws_hub.set_user_room(username, None)
+    if room:
+        await _broadcast_room_state(room)
+    return JSONResponse({"success": True, "room_id": room_id.upper()})
+
+
 @app.get("/api/rooms")
 async def list_rooms():
-    return JSONResponse({"success": True, "rooms": room_manager.list_rooms()})
+    rooms = room_manager.list_rooms()
+    # #region agent log
+    _agent_log(
+        "E",
+        "server.py:list_rooms",
+        "room list requested",
+        {
+            "count": len(rooms),
+            "rooms": [
+                {"id": r["room_id"], "players": r["player_count"], "status": r["status"]}
+                for r in rooms
+            ],
+        },
+    )
+    # #endregion
+    return JSONResponse({"success": True, "rooms": rooms})
 
 
 @app.post("/api/rooms")
@@ -291,12 +440,7 @@ async def websocket_endpoint(websocket: WebSocket):
     if rid:
         room = room_manager.get(rid)
         if room and room.find_player(username):
-            p = room.find_player(username)
-            if p:
-                p.connected = True
-            await _broadcast_room_state(room)
-            if room.status == "playing" and room.game:
-                await _broadcast_game_state(room)
+            await _handle_player_online(username, rid)
 
     try:
         while True:
@@ -315,16 +459,7 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_hub.disconnect(username, websocket)
         rid = ws_hub.get_user_room(username)
         if rid:
-            room = room_manager.get(rid)
-            if room:
-                player = room.find_player(username)
-                if player:
-                    player.connected = False
-                if room.status == "playing" and room.game:
-                    room.game.mark_disconnected(username)
-                    await _broadcast_game_state(room)
-                else:
-                    await _broadcast_room_state(room)
+            await _handle_player_offline(username, rid)
         print(f"[ws] {username} disconnected")
 
 
@@ -349,6 +484,7 @@ async def _handle_ws_message(username: str, data: dict[str, Any]) -> None:
 
     if msg_type == "leave_room":
         rid = str(payload.get("room_id") or room_id).upper()
+        _cancel_host_transfer(rid)
         room = room_manager.leave_room(rid, username)
         ws_hub.set_user_room(username, None)
         await ws_hub.send_to(username, make_message("left_room", {"room_id": rid}))

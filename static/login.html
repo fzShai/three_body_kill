@@ -441,10 +441,6 @@
                                 // 服务端 Set-Cookie: session(HttpOnly) + username；localStorage 仅作展示
                                 const loginUsername = data.username || username;
                                 localStorage.setItem('username', loginUsername);
-                                // #region agent log
-                                const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0]).filter(Boolean);
-                                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2b39ab'},body:JSON.stringify({sessionId:'2b39ab',runId:'pre-fix',hypothesisId:'A',location:'login.html:afterLogin',message:'client after login before redirect',data:{loginUsername,cookieNames,hasUsernameCookie:cookieNames.includes('username'),setCookieHeaderPresent:!!res.headers.get('set-cookie')},timestamp:Date.now()})}).catch(()=>{});
-                                // #endregion
                                 if (login_animation) {
                                     startSceneTransition(loginUsername);
                                 } else {

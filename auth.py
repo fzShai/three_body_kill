@@ -69,14 +69,12 @@ def get_username_from_request(request: Request) -> str | None:
     user = username_from_token(token)
     if user:
         return user
-    # Legacy fallback during transition: only if session missing
     return None
 
 
 def get_username_from_websocket(websocket: WebSocket) -> str | None:
     token = (websocket.cookies.get("session") or "").strip()
     if not token:
-        # Some clients pass via query
         token = (websocket.query_params.get("session") or "").strip()
     return username_from_token(token) if token else None
 

@@ -70,6 +70,7 @@ class GameSession:
         self.players = _assign_roles(player_names, self.roles_catalog)
         self.winner: str | None = None
         self.winner_faction: str | None = None
+        self.player_online: dict[str, bool] = {name: True for name in player_names}
         self._deal_initial()
         self.phase = "turn"
         self._log(f"对局开始，先手：{self.current_player()}")
@@ -109,7 +110,27 @@ class GameSession:
 
     def mark_disconnected(self, username: str) -> None:
         if username in self.players and self.players[username]["alive"]:
+            self.player_online[username] = False
             self._log(f"{username} 断开连接（仍保留座位）")
+
+    def sync_online(self, online_map: dict[str, bool]) -> None:
+        for name in self.player_order:
+            if name in online_map:
+                self.player_online[name] = online_map[name]
+
+    def skip_current_if_offline(self, username: str) -> bool:
+        """If it's this player's turn and they are offline, auto-skip."""
+        if self.phase != "turn":
+            return False
+        if self.current_player() != username:
+            return False
+        if self.player_online.get(username, True):
+            return False
+        self._log(f"{username} 离线，自动跳过出牌阶段")
+        self._advance_turn()
+        self._check_win()
+        self.seq += 1
+        return True
 
     def _alive_players(self) -> list[str]:
         return [n for n in self.player_order if self.players[n]["alive"]]
@@ -161,6 +182,9 @@ class GameSession:
             name = self.current_player()
             if not self.players[name]["alive"]:
                 continue
+            if not self.player_online.get(name, True):
+                self._log(f"{name} 离线，跳过回合")
+                continue
             if self.players[name]["skip_next"]:
                 self.players[name]["skip_next"] = False
                 self._log(f"{name} 被锁死，跳过回合")
@@ -186,6 +210,8 @@ class GameSession:
         if act == "pass":
             if self.current_player() != username:
                 return False, "还没轮到你"
+            if not self.player_online.get(username, True):
+                return False, "你已离线"
             self._log(f"{username} 选择过牌")
             self._advance_turn()
             self._check_win()
@@ -301,6 +327,7 @@ class GameSession:
             "alive": p["alive"],
             "hand_count": len(p["hand"]),
             "skip_next": p["skip_next"],
+            "online": self.player_online.get(name, True),
             "faction": p["faction"] if self.phase == "ended" else None,
             "role_name": p["role_name"] if self.phase == "ended" else None,
         }

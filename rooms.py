@@ -12,6 +12,7 @@ from game.engine import GameSession
 
 MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
+HOST_TRANSFER_SECONDS = 15
 
 
 def _now() -> str:
@@ -126,6 +127,60 @@ class RoomManager:
         room.players.append(PlayerSeat(username=username, seat=seat, ready=False))
         return room, None
 
+    def all_players_offline(self, room: Room) -> bool:
+        return bool(room.players) and all(not p.connected for p in room.players)
+
+    def delete_room(self, room_id: str) -> list[str]:
+        room = self.get(room_id)
+        if not room:
+            return []
+        names = [p.username for p in room.players]
+        key = room_id.upper()
+        if key in self._rooms:
+            del self._rooms[key]
+        return names
+
+    def mark_player_offline(self, room_id: str, username: str) -> Room | None:
+        room = self.get(room_id)
+        if not room:
+            return None
+        player = room.find_player(username)
+        if not player:
+            return None
+        player.connected = False
+        return room
+
+    def mark_player_online(self, room_id: str, username: str) -> Room | None:
+        room = self.get(room_id)
+        if not room:
+            return None
+        player = room.find_player(username)
+        if not player:
+            return None
+        player.connected = True
+        return room
+
+    def transfer_host_if_still_offline(self, room_id: str) -> Room | None:
+        """After delay: transfer host to next seat if current host remains offline."""
+        room = self.get(room_id)
+        if not room or room.status != "waiting":
+            return None
+        host_p = room.find_player(room.host)
+        if not host_p or host_p.connected:
+            return None
+        ordered = sorted(room.players, key=lambda p: p.seat)
+        if len(ordered) <= 1:
+            return room
+        idx = next(i for i, p in enumerate(ordered) if p.username == room.host)
+        room.host = ordered[(idx + 1) % len(ordered)].username
+        for p in room.players:
+            p.ready = False
+        return room
+
+    def sync_game_online(self, room: Room) -> None:
+        if room.game:
+            room.game.sync_online({p.username: p.connected for p in room.players})
+
     def leave_room(self, room_id: str, username: str) -> Room | None:
         room = self.get(room_id)
         if not room:
@@ -199,6 +254,7 @@ class RoomManager:
 
         names = [p.username for p in sorted(room.players, key=lambda x: x.seat)]
         room.game = GameSession.create(room_id=room.room_id, player_names=names)
+        room.game.sync_online({p.username: p.connected for p in room.players})
         room.status = "playing"
         return room, None
 

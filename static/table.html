@@ -90,7 +90,7 @@
 <body>
     <div class="wrap">
         <h1>黑暗森林 · 对局桌</h1>
-        <div class="meta">房号 <span id="roomIdDisplay"></span> · 牌库 <span id="deckCount">0</span> · 弃牌 <span id="discardCount">0</span></div>
+        <div class="meta">房号 <span id="roomIdDisplay"></span> · 牌库 <span id="deckCount">0</span> · 弃牌 <span id="discardCount">0</span> · 倒计时 <span id="turnTimer">—</span></div>
         <div class="banner" id="endBanner"></div>
 
         <div class="grid">
@@ -133,7 +133,9 @@
             document.getElementById('roomIdDisplay').textContent = roomId;
             let state = null;
             let selectedId = null;
+            let turnDeadlineMs = null;
             const statusMsg = document.getElementById('statusMsg');
+            const turnTimerEl = document.getElementById('turnTimer');
 
             function setStatus(text, kind) {
                 statusMsg.textContent = text || '';
@@ -144,8 +146,18 @@
                 return ['probe', 'sophon', 'dark_forest', 'droplet', 'dimensions'].includes(card.id);
             }
 
+            setInterval(() => {
+                if (!turnDeadlineMs || !state || state.phase !== 'turn') {
+                    turnTimerEl.textContent = '—';
+                    return;
+                }
+                const left = Math.max(0, Math.ceil((turnDeadlineMs - Date.now()) / 1000));
+                turnTimerEl.textContent = left + 's';
+            }, 200);
+
             function render(snap) {
                 state = snap;
+                turnDeadlineMs = snap.turn_deadline_ms || null;
                 document.getElementById('deckCount').textContent = snap.deck_count;
                 document.getElementById('discardCount').textContent = snap.discard_count;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';

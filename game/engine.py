@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import random
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+TURN_SECONDS = 12.0
 
 
 def load_cards() -> list[dict[str, Any]]:
@@ -71,8 +73,10 @@ class GameSession:
         self.winner: str | None = None
         self.winner_faction: str | None = None
         self.player_online: dict[str, bool] = {name: True for name in player_names}
+        self.turn_deadline_at = 0.0
         self._deal_initial()
         self.phase = "turn"
+        self._start_turn_timer()
         self._log(f"对局开始，先手：{self.current_player()}")
 
     @classmethod
@@ -86,6 +90,26 @@ class GameSession:
 
     def current_player(self) -> str:
         return self.player_order[self.turn_index % len(self.player_order)]
+
+    def _start_turn_timer(self) -> None:
+        self.turn_deadline_at = time.time() + TURN_SECONDS
+
+    def refresh_turn_timer(self) -> None:
+        if self.phase == "turn":
+            self._start_turn_timer()
+
+    def expire_turn_if_due(self) -> bool:
+        """Auto-end current turn when the 12s timer expires."""
+        if self.phase != "turn":
+            return False
+        if time.time() < self.turn_deadline_at:
+            return False
+        name = self.current_player()
+        self._log(f"{name} 出牌超时，自动结束回合")
+        self._advance_turn()
+        self._check_win()
+        self.seq += 1
+        return True
 
     def _draw(self, username: str, n: int = 1) -> list[dict[str, Any]]:
         drawn: list[dict[str, Any]] = []
@@ -190,6 +214,7 @@ class GameSession:
                 self._log(f"{name} 被锁死，跳过回合")
                 continue
             self._draw(name, 1)
+            self._start_turn_timer()
             self._log(f"轮到 {name}")
             return
         self.phase = "ended"
@@ -221,20 +246,26 @@ class GameSession:
         if act == "play_placeholder":
             if self.current_player() != username:
                 return False, "还没轮到你"
+            if not self.player_online.get(username, True):
+                return False, "你已离线"
             hand = self.players[username]["hand"]
             if not hand:
                 return False, "没有手牌可打出"
             card = hand.pop(0)
             self.discard.append(card)
             self._log(f"{username} 打出占位牌 {card['name']}")
-            self._advance_turn()
-            self._check_win()
+            self.refresh_turn_timer()
+            if self._check_win():
+                self.seq += 1
+                return True, f"打出 {card['name']}"
             self.seq += 1
             return True, f"打出 {card['name']}"
 
         if act == "play_card":
             if self.current_player() != username:
                 return False, "还没轮到你"
+            if not self.player_online.get(username, True):
+                return False, "你已离线"
             instance_id = str(action.get("instance_id", "")).strip()
             target = str(action.get("target", "")).strip() or None
             hand = self.players[username]["hand"]
@@ -248,10 +279,10 @@ class GameSession:
                 return False, msg
             self.discard.append(card)
             self._log(f"{username} 打出 {card['name']}：{msg}")
+            self.refresh_turn_timer()
             if self._check_win():
                 self.seq += 1
                 return True, msg
-            self._advance_turn()
             self.seq += 1
             return True, msg
 
@@ -343,6 +374,7 @@ class GameSession:
                 "role_name": me["role_name"],
                 "faction": me["faction"],
             }
+        remaining = max(0.0, self.turn_deadline_at - time.time()) if self.phase == "turn" else 0.0
         return {
             "room_id": self.room_id,
             "phase": self.phase,
@@ -355,6 +387,9 @@ class GameSession:
             "log": self.log[-12:],
             "winner": self.winner,
             "winner_faction": self.winner_faction,
+            "turn_seconds": TURN_SECONDS,
+            "turn_remaining": remaining,
+            "turn_deadline_ms": int(self.turn_deadline_at * 1000) if self.phase == "turn" else None,
             "you": {
                 "username": viewer,
                 "hand": private_hand,

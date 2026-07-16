@@ -8,6 +8,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -39,29 +40,6 @@ app = FastAPI(title="三体杀", lifespan=_lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
-
-# #region agent log
-_DEBUG_LOG_SESSION = BASE_DIR / "debug-2bc8fb.log"
-
-
-def _debug_session_log(hypothesis_id: str, location: str, message: str, data: dict | None = None, run_id: str = "offline-skip") -> None:
-    try:
-        payload = {
-            "sessionId": "2bc8fb",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_SESSION.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# #endregion
 
 _host_transfer_deadlines: dict[str, float] = {}
 ROOM_OFFLINE_GRACE_SECONDS = 3.0
@@ -116,19 +94,6 @@ async def _process_due_turn_timeouts() -> None:
             continue
         if not room.game.expire_turn_if_due():
             continue
-        # #region agent log
-        _debug_session_log(
-            "H_TIMER",
-            "server.py:_process_due_turn_timeouts",
-            "turn timeout applied",
-            {
-                "room_id": room.room_id,
-                "phase": room.game.phase,
-                "current_player": room.game.current_player() if room.game.phase != "ended" else None,
-                "online_map": dict(room.game.player_online),
-            },
-        )
-        # #endregion
         if room.game.phase == "ended":
             room.status = "ended"
         await _broadcast_game_state(room)
@@ -158,19 +123,6 @@ async def _handle_player_online(username: str, room_id: str) -> None:
     if not room:
         return
     _cancel_room_cleanup(room_id)
-    # #region agent log
-    _debug_session_log(
-        "H_B",
-        "server.py:_handle_player_online",
-        "player marked online",
-        {
-            "username": username,
-            "room_id": room_id.upper(),
-            "status": room.status,
-            "online_map": dict(room.game.player_online) if room.game else None,
-        },
-    )
-    # #endregion
     if room.host == username and room.status == "waiting":
         _cancel_host_transfer(room_id)
     room_manager.sync_game_online(room)
@@ -183,33 +135,14 @@ async def _handle_player_online(username: str, room_id: str) -> None:
 async def _handle_player_offline(username: str, room_id: str) -> None:
     room = room_manager.mark_player_offline(room_id, username)
     if not room:
-        # #region agent log
-        _debug_session_log("H_C", "server.py:_handle_player_offline", "offline handler room missing", {"username": username, "room_id": room_id})
-        # #endregion
         return
 
     was_host = room.host == username
-    turn_skipped = False
 
     if room.status == "playing" and room.game:
         room_manager.sync_game_online(room)
         room.game.mark_disconnected(username)
-        turn_skipped = room.game.skip_current_if_offline(username)
-        # #region agent log
-        _debug_session_log(
-            "H_C",
-            "server.py:_handle_player_offline",
-            "playing offline applied",
-            {
-                "username": username,
-                "room_id": room_id.upper(),
-                "current_player": room.game.current_player() if room.game.phase != "ended" else None,
-                "turn_skipped": turn_skipped,
-                "online_map": dict(room.game.player_online),
-                "phase": room.game.phase,
-            },
-        )
-        # #endregion
+        room.game.skip_current_if_offline(username)
         if room.game.phase == "ended":
             room.status = "ended"
     elif was_host and room.status == "waiting":
@@ -219,19 +152,6 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
         # Waiting and playing both get a short grace window so page navigation
         # (room -> table) does not wipe the room when both sockets flip briefly.
         _schedule_room_cleanup(room_id)
-        # #region agent log
-        _debug_session_log(
-            "H_ALL_OFF",
-            "server.py:_handle_player_offline",
-            "all offline grace scheduled",
-            {
-                "username": username,
-                "room_id": room_id.upper(),
-                "room_status": room.status,
-                "turn_skipped": turn_skipped,
-            },
-        )
-        # #endregion
         if room.status == "playing" and room.game:
             await _broadcast_game_state(room)
             await _broadcast_room_state(room)
@@ -240,18 +160,6 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
         return
 
     if room.status == "playing" and room.game:
-        # #region agent log
-        _debug_session_log(
-            "H_D",
-            "server.py:_handle_player_offline",
-            "broadcasting game_state after offline",
-            {
-                "username": username,
-                "recipients": [p.username for p in room.players if p.connected],
-                "online_in_snapshot": {n: room.game.player_online.get(n) for n in room.game.player_order},
-            },
-        )
-        # #endregion
         await _broadcast_game_state(room)
         await _broadcast_room_state(room)
     else:
@@ -359,8 +267,16 @@ async def login(request: Request):
     username = str(data.get("username", "")).strip()
     resp = JSONResponse({"success": True, "message": message, "username": username})
     resp.set_cookie(**_session_cookie_kwargs(token))
-    # Display name cookie (non-sensitive); session cookie is authoritative
-    resp.set_cookie(key="username", value=username, httponly=False, samesite="lax", max_age=60 * 60 * 24, path="/")
+    # Display name cookie (non-sensitive); session cookie is authoritative.
+    # Cookie values must be latin-1, so percent-encode non-ASCII usernames.
+    resp.set_cookie(
+        key="username",
+        value=quote(username, safe=""),
+        httponly=False,
+        samesite="lax",
+        max_age=60 * 60 * 24,
+        path="/",
+    )
     return resp
 
 
@@ -489,29 +405,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         pass
     finally:
-        was_online_before = ws_hub.online(username)
-        disconnected_active = ws_hub.disconnect(username, websocket)
-        still_online = ws_hub.online(username)
+        ws_hub.disconnect(username, websocket)
         rid = ws_hub.get_user_room(username)
         # Mark offline only when no replacement connection exists.
         # Covers both active closes and send_to() clearing a dead socket first.
-        will_mark_offline = bool(rid and not still_online)
-        # #region agent log
-        _debug_session_log(
-            "H_A",
-            "server.py:websocket_endpoint.finally",
-            "websocket finally",
-            {
-                "username": username,
-                "was_online_before": was_online_before,
-                "disconnected_active": disconnected_active,
-                "still_online": still_online,
-                "room_id": rid,
-                "will_mark_offline": will_mark_offline,
-            },
-        )
-        # #endregion
-        if will_mark_offline:
+        if rid and not ws_hub.online(username):
             await _handle_player_offline(username, rid)
         print(f"[ws] {username} disconnected")
 

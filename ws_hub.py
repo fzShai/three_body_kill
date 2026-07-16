@@ -3,34 +3,9 @@
 from __future__ import annotations
 
 import json
-import time
-from pathlib import Path
 from typing import Any
 
 from fastapi import WebSocket
-
-# #region agent log
-_DEBUG_LOG_SESSION = Path(__file__).resolve().parent / "debug-2bc8fb.log"
-
-
-def _debug_session_log(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
-    try:
-        payload = {
-            "sessionId": "2bc8fb",
-            "runId": "offline-skip",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_SESSION.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# #endregion
 
 
 def make_message(msg_type: str, payload: dict[str, Any] | None = None, room_id: str | None = None, seq: int | None = None) -> dict[str, Any]:
@@ -87,21 +62,7 @@ class ConnectionManager:
         try:
             await ws.send_text(json.dumps(message, ensure_ascii=False))
         except Exception:
-            removed = self.disconnect(username, ws)
-            # #region agent log
-            _debug_session_log(
-                "H_A",
-                "ws_hub.py:send_to",
-                "send failed, socket cleared without offline handler",
-                {
-                    "username": username,
-                    "removed_active": removed,
-                    "msg_type": message.get("type"),
-                    "still_online": self.online(username),
-                    "mapped_room": self.get_user_room(username),
-                },
-            )
-            # #endregion
+            self.disconnect(username, ws)
 
     async def broadcast_room(self, room_id: str, usernames: list[str], message: dict[str, Any]) -> None:
         for name in usernames:

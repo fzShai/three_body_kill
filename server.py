@@ -42,6 +42,7 @@ PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
 
 # #region agent log
 _DEBUG_LOG = BASE_DIR / "debug-2b39ab.log"
+_DEBUG_LOG_SESSION = BASE_DIR / "debug-2bc8fb.log"
 
 
 def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
@@ -58,6 +59,23 @@ def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | Non
             "timestamp": int(time.time() * 1000),
         }
         with _DEBUG_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _debug_session_log(hypothesis_id: str, location: str, message: str, data: dict | None = None, run_id: str = "initial") -> None:
+    try:
+        payload = {
+            "sessionId": "2bc8fb",
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG_SESSION.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
     except Exception:
         pass
@@ -116,6 +134,22 @@ async def _host_transfer_poller() -> None:
 
 async def _destroy_room_all_offline(room_id: str) -> None:
     key = room_id.upper()
+    room = room_manager.get(key)
+    # #region agent log
+    _debug_session_log(
+        "H2",
+        "server.py:_destroy_room_all_offline",
+        "destroy room all offline",
+        {
+            "room_id": key,
+            "players": [
+                {"username": p.username, "connected": p.connected}
+                for p in (room.players if room else [])
+            ],
+            "rooms_before": list(room_manager._rooms.keys()),
+        },
+    )
+    # #endregion
     _cancel_host_transfer(key)
     names = room_manager.delete_room(key)
     for name in names:
@@ -400,6 +434,19 @@ async def create_room(request: Request):
         return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
     room = room_manager.create_room(username)
     ws_hub.set_user_room(username, room.room_id)
+    # #region agent log
+    _debug_session_log(
+        "H1",
+        "server.py:create_room",
+        "create room success",
+        {
+            "username": username,
+            "room_id": room.room_id,
+            "room_exists_after_create": bool(room_manager.get(room.room_id)),
+            "rooms_after_create": list(room_manager._rooms.keys()),
+        },
+    )
+    # #endregion
     await _broadcast_room_state(room)
     return JSONResponse({"success": True, "room": room.to_public()})
 
@@ -409,10 +456,49 @@ async def join_room_api(room_id: str, request: Request):
     username = getattr(request.state, "username", None) or auth.get_username_from_request(request)
     if not username:
         return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
+    # #region agent log
+    _debug_session_log(
+        "H1",
+        "server.py:join_room_api",
+        "join room requested",
+        {
+            "username": username,
+            "requested_room_id": room_id,
+            "normalized_room_id": room_id.upper(),
+            "room_exists_before_join": bool(room_manager.get(room_id)),
+            "rooms_before_join": list(room_manager._rooms.keys()),
+        },
+    )
+    # #endregion
     room, err = room_manager.join_room(room_id, username)
     if err or not room:
+        # #region agent log
+        _debug_session_log(
+            "H3",
+            "server.py:join_room_api",
+            "join room failed",
+            {
+                "username": username,
+                "requested_room_id": room_id,
+                "error": err or "join returned no room",
+                "rooms_at_failure": list(room_manager._rooms.keys()),
+            },
+        )
+        # #endregion
         return JSONResponse({"success": False, "message": err or "加入失败"}, status_code=400)
     ws_hub.set_user_room(username, room.room_id)
+    # #region agent log
+    _debug_session_log(
+        "H1",
+        "server.py:join_room_api",
+        "join room success",
+        {
+            "username": username,
+            "room_id": room.room_id,
+            "player_count": len(room.players),
+        },
+    )
+    # #endregion
     await _broadcast_room_state(room)
     return JSONResponse({"success": True, "room": room.to_public()})
 
@@ -458,6 +544,18 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         ws_hub.disconnect(username, websocket)
         rid = ws_hub.get_user_room(username)
+        # #region agent log
+        _debug_session_log(
+            "H2",
+            "server.py:websocket_endpoint.finally",
+            "websocket closing",
+            {
+                "username": username,
+                "user_room_mapping": rid,
+                "rooms_before_offline": list(room_manager._rooms.keys()),
+            },
+        )
+        # #endregion
         if rid:
             await _handle_player_offline(username, rid)
         print(f"[ws] {username} disconnected")

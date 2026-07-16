@@ -84,6 +84,8 @@ def _debug_session_log(hypothesis_id: str, location: str, message: str, data: di
 # #endregion
 
 _host_transfer_deadlines: dict[str, float] = {}
+ROOM_OFFLINE_GRACE_SECONDS = 3.0
+_room_cleanup_deadlines: dict[str, float] = {}
 
 
 def _cancel_host_transfer(room_id: str) -> None:
@@ -100,6 +102,24 @@ def _schedule_host_transfer(room_id: str) -> None:
         "server.py:host_transfer",
         "host transfer scheduled",
         {"room_id": key, "deadline_in_sec": HOST_TRANSFER_SECONDS},
+    )
+    # #endregion
+
+
+def _cancel_room_cleanup(room_id: str) -> None:
+    _room_cleanup_deadlines.pop(room_id.upper(), None)
+
+
+def _schedule_room_cleanup(room_id: str) -> None:
+    key = room_id.upper()
+    _room_cleanup_deadlines[key] = time.monotonic() + ROOM_OFFLINE_GRACE_SECONDS
+    # #region agent log
+    _debug_session_log(
+        "H2",
+        "server.py:room_cleanup",
+        "room cleanup scheduled",
+        {"room_id": key, "deadline_in_sec": ROOM_OFFLINE_GRACE_SECONDS},
+        run_id="post-fix",
     )
     # #endregion
 
@@ -126,10 +146,46 @@ async def _process_due_host_transfers() -> None:
             await _broadcast_room_state(room)
 
 
+async def _process_due_room_cleanups() -> None:
+    now = time.monotonic()
+    due = [rid for rid, deadline in list(_room_cleanup_deadlines.items()) if now >= deadline]
+    for rid in due:
+        _room_cleanup_deadlines.pop(rid, None)
+        room = room_manager.get(rid)
+        if not room:
+            continue
+        if not room_manager.all_players_offline(room):
+            # #region agent log
+            _debug_session_log(
+                "H2",
+                "server.py:room_cleanup",
+                "room cleanup cancelled by reconnect",
+                {"room_id": rid, "players_online": [p.username for p in room.players if p.connected]},
+                run_id="post-fix",
+            )
+            # #endregion
+            continue
+        # #region agent log
+        _debug_session_log(
+            "H2",
+            "server.py:room_cleanup",
+            "room cleanup timer fired",
+            {
+                "room_id": rid,
+                "room_status": room.status,
+                "players": [{"username": p.username, "connected": p.connected} for p in room.players],
+            },
+            run_id="post-fix",
+        )
+        # #endregion
+        await _destroy_room_all_offline(rid)
+
+
 async def _host_transfer_poller() -> None:
     while True:
         await asyncio.sleep(0.25)
         await _process_due_host_transfers()
+        await _process_due_room_cleanups()
 
 
 async def _destroy_room_all_offline(room_id: str) -> None:
@@ -151,6 +207,7 @@ async def _destroy_room_all_offline(room_id: str) -> None:
     )
     # #endregion
     _cancel_host_transfer(key)
+    _cancel_room_cleanup(key)
     names = room_manager.delete_room(key)
     for name in names:
         ws_hub.set_user_room(name, None)
@@ -168,6 +225,7 @@ async def _handle_player_online(username: str, room_id: str) -> None:
     room = room_manager.mark_player_online(room_id, username)
     if not room:
         return
+    _cancel_room_cleanup(room_id)
     if room.host == username and room.status == "waiting":
         _cancel_host_transfer(room_id)
     room_manager.sync_game_online(room)
@@ -195,15 +253,27 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
         _schedule_host_transfer(room_id)
 
     if room_manager.all_players_offline(room):
-        await _destroy_room_all_offline(room_id)
-        # #region agent log
-        _agent_log(
-            "F",
-            "server.py:disconnect",
-            "player offline -> all offline destroy",
-            {"username": username, "room_id": room_id.upper()},
-        )
-        # #endregion
+        if room.status == "waiting":
+            _schedule_room_cleanup(room_id)
+            # #region agent log
+            _debug_session_log(
+                "H2",
+                "server.py:disconnect",
+                "all offline in waiting room, grace period started",
+                {"username": username, "room_id": room_id.upper()},
+                run_id="post-fix",
+            )
+            # #endregion
+        else:
+            await _destroy_room_all_offline(room_id)
+            # #region agent log
+            _agent_log(
+                "F",
+                "server.py:disconnect",
+                "player offline -> all offline destroy",
+                {"username": username, "room_id": room_id.upper()},
+            )
+            # #endregion
         return
 
     # #region agent log
@@ -433,6 +503,7 @@ async def create_room(request: Request):
     if not username:
         return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
     room = room_manager.create_room(username)
+    _cancel_room_cleanup(room.room_id)
     ws_hub.set_user_room(username, room.room_id)
     # #region agent log
     _debug_session_log(
@@ -486,6 +557,7 @@ async def join_room_api(room_id: str, request: Request):
         )
         # #endregion
         return JSONResponse({"success": False, "message": err or "加入失败"}, status_code=400)
+    _cancel_room_cleanup(room.room_id)
     ws_hub.set_user_room(username, room.room_id)
     # #region agent log
     _debug_session_log(

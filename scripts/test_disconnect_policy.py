@@ -15,8 +15,6 @@ import rooms
 import server
 from server import app, room_manager, ws_hub
 
-LOG = ROOT / "debug-2b39ab.log"
-
 
 def _register_login(client: TestClient, username: str) -> None:
     client.post("/api/register", json={"username": username, "password": "x"})
@@ -82,14 +80,10 @@ def test_skip_turn_when_current_offline() -> None:
 
 
 def main() -> None:
-    if LOG.exists():
-        LOG.unlink()
     test_host_transfer()
     test_all_offline_destroy()
     test_skip_turn_when_current_offline()
     print("DISCONNECT_POLICY_OK")
-    if LOG.exists():
-        print(LOG.read_text(encoding="utf-8")[-800:])
 
 
 if __name__ == "__main__":

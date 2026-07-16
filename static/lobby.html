@@ -173,9 +173,6 @@
                         setStatus(data.message || '创建失败', 'error');
                         return;
                     }
-                    // #region agent log
-                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2bc8fb'},body:JSON.stringify({sessionId:'2bc8fb',runId:'initial',hypothesisId:'H1',location:'static/lobby.html:createRoom',message:'create room response before redirect',data:{roomId:data.room?.room_id||null,success:!!data.success},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     window.location.href = '/room/' + data.room.room_id;
                 } catch (e) {
                     if (e.message !== 'unauthorized') setStatus('网络错误', 'error');

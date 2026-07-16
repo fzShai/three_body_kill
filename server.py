@@ -40,49 +40,6 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
 
-# #region agent log
-_DEBUG_LOG = BASE_DIR / "debug-2b39ab.log"
-_DEBUG_LOG_SESSION = BASE_DIR / "debug-2bc8fb.log"
-
-
-def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
-    try:
-        import time
-
-        payload = {
-            "sessionId": "2b39ab",
-            "runId": "room-leak",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-def _debug_session_log(hypothesis_id: str, location: str, message: str, data: dict | None = None, run_id: str = "initial") -> None:
-    try:
-        payload = {
-            "sessionId": "2bc8fb",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data or {},
-            "timestamp": int(time.time() * 1000),
-        }
-        with _DEBUG_LOG_SESSION.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# #endregion
-
 _host_transfer_deadlines: dict[str, float] = {}
 ROOM_OFFLINE_GRACE_SECONDS = 3.0
 _room_cleanup_deadlines: dict[str, float] = {}
@@ -96,14 +53,6 @@ def _schedule_host_transfer(room_id: str) -> None:
     key = room_id.upper()
     deadline = time.monotonic() + HOST_TRANSFER_SECONDS
     _host_transfer_deadlines[key] = deadline
-    # #region agent log
-    _agent_log(
-        "H",
-        "server.py:host_transfer",
-        "host transfer scheduled",
-        {"room_id": key, "deadline_in_sec": HOST_TRANSFER_SECONDS},
-    )
-    # #endregion
 
 
 def _cancel_room_cleanup(room_id: str) -> None:
@@ -113,15 +62,6 @@ def _cancel_room_cleanup(room_id: str) -> None:
 def _schedule_room_cleanup(room_id: str) -> None:
     key = room_id.upper()
     _room_cleanup_deadlines[key] = time.monotonic() + ROOM_OFFLINE_GRACE_SECONDS
-    # #region agent log
-    _debug_session_log(
-        "H2",
-        "server.py:room_cleanup",
-        "room cleanup scheduled",
-        {"room_id": key, "deadline_in_sec": ROOM_OFFLINE_GRACE_SECONDS},
-        run_id="post-fix",
-    )
-    # #endregion
 
 
 async def _process_due_host_transfers() -> None:
@@ -130,18 +70,6 @@ async def _process_due_host_transfers() -> None:
     for rid in due:
         _host_transfer_deadlines.pop(rid, None)
         room = room_manager.transfer_host_if_still_offline(rid)
-        # #region agent log
-        _agent_log(
-            "H",
-            "server.py:host_transfer",
-            "host transfer timer fired",
-            {
-                "room_id": rid,
-                "new_host": room.host if room else None,
-                "transferred": bool(room and room.find_player(room.host)),
-            },
-        )
-        # #endregion
         if room:
             await _broadcast_room_state(room)
 
@@ -155,29 +83,7 @@ async def _process_due_room_cleanups() -> None:
         if not room:
             continue
         if not room_manager.all_players_offline(room):
-            # #region agent log
-            _debug_session_log(
-                "H2",
-                "server.py:room_cleanup",
-                "room cleanup cancelled by reconnect",
-                {"room_id": rid, "players_online": [p.username for p in room.players if p.connected]},
-                run_id="post-fix",
-            )
-            # #endregion
             continue
-        # #region agent log
-        _debug_session_log(
-            "H2",
-            "server.py:room_cleanup",
-            "room cleanup timer fired",
-            {
-                "room_id": rid,
-                "room_status": room.status,
-                "players": [{"username": p.username, "connected": p.connected} for p in room.players],
-            },
-            run_id="post-fix",
-        )
-        # #endregion
         await _destroy_room_all_offline(rid)
 
 
@@ -190,35 +96,11 @@ async def _host_transfer_poller() -> None:
 
 async def _destroy_room_all_offline(room_id: str) -> None:
     key = room_id.upper()
-    room = room_manager.get(key)
-    # #region agent log
-    _debug_session_log(
-        "H2",
-        "server.py:_destroy_room_all_offline",
-        "destroy room all offline",
-        {
-            "room_id": key,
-            "players": [
-                {"username": p.username, "connected": p.connected}
-                for p in (room.players if room else [])
-            ],
-            "rooms_before": list(room_manager._rooms.keys()),
-        },
-    )
-    # #endregion
     _cancel_host_transfer(key)
     _cancel_room_cleanup(key)
     names = room_manager.delete_room(key)
     for name in names:
         ws_hub.set_user_room(name, None)
-    # #region agent log
-    _agent_log(
-        "G",
-        "server.py:destroy_all_offline",
-        "room destroyed (all offline)",
-        {"room_id": key, "players": names, "total_rooms": len(room_manager._rooms)},
-    )
-    # #endregion
 
 
 async def _handle_player_online(username: str, room_id: str) -> None:
@@ -226,23 +108,6 @@ async def _handle_player_online(username: str, room_id: str) -> None:
     if not room:
         return
     _cancel_room_cleanup(room_id)
-    # #region agent log
-    _debug_session_log(
-        "H5",
-        "server.py:_handle_player_online",
-        "player marked online",
-        {
-            "username": username,
-            "room_id": room_id.upper(),
-            "player_states": [
-                {"username": p.username, "connected": p.connected}
-                for p in room.players
-            ],
-            "ws_online": ws_hub.online(username),
-        },
-        run_id="post-fix",
-    )
-    # #endregion
     if room.host == username and room.status == "waiting":
         _cancel_host_transfer(room_id)
     room_manager.sync_game_online(room)
@@ -253,49 +118,16 @@ async def _handle_player_online(username: str, room_id: str) -> None:
 
 
 async def _handle_player_offline(username: str, room_id: str) -> None:
-    # #region agent log
-    _debug_session_log(
-        "H5",
-        "server.py:_handle_player_offline",
-        "player offline handler entered",
-        {
-            "username": username,
-            "room_id": room_id.upper(),
-            "ws_online_before_mark": ws_hub.online(username),
-            "mapped_room": ws_hub.get_user_room(username),
-        },
-        run_id="post-fix",
-    )
-    # #endregion
     room = room_manager.mark_player_offline(room_id, username)
     if not room:
         return
 
     was_host = room.host == username
-    turn_skipped = False
 
     if room.status == "playing" and room.game:
         room_manager.sync_game_online(room)
         room.game.mark_disconnected(username)
-        turn_skipped = room.game.skip_current_if_offline(username)
-        # #region agent log
-        _debug_session_log(
-            "H6",
-            "server.py:_handle_player_offline",
-            "playing room offline effects applied",
-            {
-                "username": username,
-                "room_id": room_id.upper(),
-                "turn_skipped": turn_skipped,
-                "phase_after_skip": room.game.phase,
-                "current_player_after_skip": room.game.current_player() if room.game.phase != "ended" else None,
-                "winner": room.game.winner,
-                "winner_faction": room.game.winner_faction,
-                "online_map": dict(room.game.player_online),
-            },
-            run_id="post-fix",
-        )
-        # #endregion
+        room.game.skip_current_if_offline(username)
         if room.game.phase == "ended":
             room.status = "ended"
     elif was_host and room.status == "waiting":
@@ -304,43 +136,9 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
     if room_manager.all_players_offline(room):
         if room.status == "waiting":
             _schedule_room_cleanup(room_id)
-            # #region agent log
-            _debug_session_log(
-                "H2",
-                "server.py:disconnect",
-                "all offline in waiting room, grace period started",
-                {"username": username, "room_id": room_id.upper()},
-                run_id="post-fix",
-            )
-            # #endregion
         else:
             await _destroy_room_all_offline(room_id)
-            # #region agent log
-            _agent_log(
-                "F",
-                "server.py:disconnect",
-                "player offline -> all offline destroy",
-                {"username": username, "room_id": room_id.upper()},
-            )
-            # #endregion
         return
-
-    # #region agent log
-    _agent_log(
-        "F",
-        "server.py:disconnect",
-        "player marked offline (kept in room)",
-        {
-            "username": username,
-            "room_id": room_id.upper(),
-            "room_status": room.status,
-            "was_host": was_host,
-            "turn_skipped": turn_skipped,
-            "host": room.host,
-            "offline_count": sum(1 for p in room.players if not p.connected),
-        },
-    )
-    # #endregion
 
     if room.status == "playing" and room.game:
         await _broadcast_game_state(room)
@@ -458,9 +256,6 @@ async def login(request: Request):
 @app.post("/api/logout")
 async def logout(request: Request):
     username = getattr(request.state, "username", None) or auth.get_username_from_request(request)
-    rid_before = ws_hub.get_user_room(username) if username else None
-    rooms_before = len(room_manager._rooms)
-    left_rooms: list[str] = []
     if username:
         left_rooms = room_manager.leave_all(username)
         ws_hub.set_user_room(username, None)
@@ -468,20 +263,6 @@ async def logout(request: Request):
             room = room_manager.get(rid)
             if room:
                 await _broadcast_room_state(room)
-    # #region agent log
-    _agent_log(
-        "B",
-        "server.py:logout",
-        "logout called",
-        {
-            "username": username,
-            "room_id_before": rid_before,
-            "left_rooms": left_rooms,
-            "total_rooms_after": len(room_manager._rooms),
-            "rooms_before": rooms_before,
-        },
-    )
-    # #endregion
     token = auth.get_session_token_from_request(request)
     auth.revoke_session(token)
     resp = JSONResponse({"success": True, "message": "已退出"})
@@ -529,20 +310,6 @@ async def leave_room_api(room_id: str, request: Request):
 @app.get("/api/rooms")
 async def list_rooms():
     rooms = room_manager.list_rooms()
-    # #region agent log
-    _agent_log(
-        "E",
-        "server.py:list_rooms",
-        "room list requested",
-        {
-            "count": len(rooms),
-            "rooms": [
-                {"id": r["room_id"], "players": r["player_count"], "status": r["status"]}
-                for r in rooms
-            ],
-        },
-    )
-    # #endregion
     return JSONResponse({"success": True, "rooms": rooms})
 
 
@@ -554,19 +321,6 @@ async def create_room(request: Request):
     room = room_manager.create_room(username)
     _cancel_room_cleanup(room.room_id)
     ws_hub.set_user_room(username, room.room_id)
-    # #region agent log
-    _debug_session_log(
-        "H1",
-        "server.py:create_room",
-        "create room success",
-        {
-            "username": username,
-            "room_id": room.room_id,
-            "room_exists_after_create": bool(room_manager.get(room.room_id)),
-            "rooms_after_create": list(room_manager._rooms.keys()),
-        },
-    )
-    # #endregion
     await _broadcast_room_state(room)
     return JSONResponse({"success": True, "room": room.to_public()})
 
@@ -576,50 +330,11 @@ async def join_room_api(room_id: str, request: Request):
     username = getattr(request.state, "username", None) or auth.get_username_from_request(request)
     if not username:
         return JSONResponse({"success": False, "message": "请先登录"}, status_code=401)
-    # #region agent log
-    _debug_session_log(
-        "H1",
-        "server.py:join_room_api",
-        "join room requested",
-        {
-            "username": username,
-            "requested_room_id": room_id,
-            "normalized_room_id": room_id.upper(),
-            "room_exists_before_join": bool(room_manager.get(room_id)),
-            "rooms_before_join": list(room_manager._rooms.keys()),
-        },
-    )
-    # #endregion
     room, err = room_manager.join_room(room_id, username)
     if err or not room:
-        # #region agent log
-        _debug_session_log(
-            "H3",
-            "server.py:join_room_api",
-            "join room failed",
-            {
-                "username": username,
-                "requested_room_id": room_id,
-                "error": err or "join returned no room",
-                "rooms_at_failure": list(room_manager._rooms.keys()),
-            },
-        )
-        # #endregion
         return JSONResponse({"success": False, "message": err or "加入失败"}, status_code=400)
     _cancel_room_cleanup(room.room_id)
     ws_hub.set_user_room(username, room.room_id)
-    # #region agent log
-    _debug_session_log(
-        "H1",
-        "server.py:join_room_api",
-        "join room success",
-        {
-            "username": username,
-            "room_id": room.room_id,
-            "player_count": len(room.players),
-        },
-    )
-    # #endregion
     await _broadcast_room_state(room)
     return JSONResponse({"success": True, "room": room.to_public()})
 
@@ -640,19 +355,6 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     await ws_hub.connect(username, websocket)
-    # #region agent log
-    _debug_session_log(
-        "H5",
-        "server.py:websocket_endpoint",
-        "websocket connected",
-        {
-            "username": username,
-            "mapped_room_on_connect": ws_hub.get_user_room(username),
-            "ws_online_after_connect": ws_hub.online(username),
-        },
-        run_id="post-fix",
-    )
-    # #endregion
     await ws_hub.send_to(username, make_message("hello", {"username": username}))
 
     # Re-sync room if already seated
@@ -678,37 +380,8 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         disconnected_active = ws_hub.disconnect(username, websocket)
         rid = ws_hub.get_user_room(username)
-        # #region agent log
-        _debug_session_log(
-            "H5",
-            "server.py:websocket_endpoint.finally",
-            "websocket closing",
-            {
-                "username": username,
-                "user_room_mapping": rid,
-                "rooms_before_offline": list(room_manager._rooms.keys()),
-                "disconnected_active": disconnected_active,
-                "ws_online_after_disconnect_call": ws_hub.online(username),
-            },
-            run_id="post-fix",
-        )
-        # #endregion
         if rid and disconnected_active:
             await _handle_player_offline(username, rid)
-        elif rid:
-            # #region agent log
-            _debug_session_log(
-                "H5",
-                "server.py:websocket_endpoint.finally",
-                "stale websocket close ignored",
-                {
-                    "username": username,
-                    "room_id": rid,
-                    "ws_still_online": ws_hub.online(username),
-                },
-                run_id="post-fix",
-            )
-            # #endregion
         print(f"[ws] {username} disconnected")
 
 
@@ -767,21 +440,6 @@ async def _handle_ws_message(username: str, data: dict[str, Any]) -> None:
         if err or not room:
             await ws_hub.send_to(username, make_message("error", {"message": err or "无法开始"}))
             return
-        # #region agent log
-        _debug_session_log(
-            "H6",
-            "server.py:_handle_ws_message.start_game",
-            "game started",
-            {
-                "room_id": room.room_id,
-                "players": [p.username for p in room.players],
-                "room_status": room.status,
-                "current_player": room.game.current_player() if room.game else None,
-                "online_map": dict(room.game.player_online) if room.game else {},
-            },
-            run_id="post-fix",
-        )
-        # #endregion
         await _broadcast_room_state(room)
         await ws_hub.broadcast_room(
             room.room_id,
@@ -802,38 +460,8 @@ async def _handle_ws_message(username: str, data: dict[str, Any]) -> None:
     if msg_type == "get_game_state":
         room = room_manager.get(room_id)
         if not room or not room.game:
-            # #region agent log
-            _debug_session_log(
-                "H7",
-                "server.py:_handle_ws_message.get_game_state",
-                "get_game_state failed",
-                {
-                    "username": username,
-                    "room_id": room_id,
-                    "room_exists": bool(room),
-                    "has_game": bool(room and room.game),
-                    "rooms": list(room_manager._rooms.keys()),
-                },
-                run_id="post-fix",
-            )
-            # #endregion
             await ws_hub.send_to(username, make_message("error", {"message": "对局不存在"}))
             return
-        # #region agent log
-        _debug_session_log(
-            "H7",
-            "server.py:_handle_ws_message.get_game_state",
-            "get_game_state success",
-            {
-                "username": username,
-                "room_id": room_id,
-                "phase": room.game.phase,
-                "winner": room.game.winner,
-                "online_map": dict(room.game.player_online),
-            },
-            run_id="post-fix",
-        )
-        # #endregion
         snap = room.game.snapshot_for(username)
         await ws_hub.send_to(username, make_message("game_state", snap, room_id=room.room_id, seq=snap["seq"]))
         return

@@ -141,16 +141,10 @@
             sock.on('_open', async () => {
                 // Ensure we are in the room then request state
                 try {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2bc8fb'},body:JSON.stringify({sessionId:'2bc8fb',runId:'initial',hypothesisId:'H4',location:'static/room.html:sock_open',message:'room page join attempt',data:{roomIdFromPage:roomId,path:location.pathname},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     const { data } = await TBK.api('/api/rooms/' + encodeURIComponent(roomId) + '/join', {
                         method: 'POST',
                         body: '{}',
                     });
-                    // #region agent log
-                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2bc8fb'},body:JSON.stringify({sessionId:'2bc8fb',runId:'initial',hypothesisId:'H4',location:'static/room.html:sock_open',message:'room page join response',data:{roomIdFromPage:roomId,success:!!data.success,message:data.message||null,responseRoomId:data.room?.room_id||null},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
                     if (!data.success) {
                         setStatus(data.message || '无法进入房间', 'error');
                         return;

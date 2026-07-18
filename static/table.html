@@ -39,6 +39,11 @@
         .badge-off { font-size: 11px; color: #ff8a8a; margin-left: 4px; }
         .player-chip .n { font-weight: 700; font-size: 14px; }
         .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
+        .player-chip .eq {
+            margin-top: 6px; font-size: 11px; line-height: 1.4;
+            color: rgba(180,210,230,0.55);
+        }
+        .player-chip .eq .filled { color: #9fd9ff; }
         .role {
             display: inline-block; margin-bottom: 10px;
             padding: 8px 12px; border-radius: 6px;
@@ -142,8 +147,29 @@
                 statusMsg.className = 'status' + (kind ? ' ' + kind : '');
             }
 
+            const SLOT_LABEL = {
+                stellar_track: '恒星航迹',
+                stability_system: '维稳系统',
+            };
+
             function needsTarget(card) {
                 return ['probe', 'sophon', 'dark_forest', 'droplet', 'dimensions'].includes(card.id);
+            }
+
+            function equipLine(equipment, slot) {
+                const card = equipment && equipment[slot];
+                const label = SLOT_LABEL[slot] || slot;
+                if (card && card.name) {
+                    return `<div class="filled">${label}：${card.name}</div>`;
+                }
+                return `<div>${label}：空</div>`;
+            }
+
+            function cardTypeLabel(c) {
+                if (c.type === 'equipment') {
+                    return `装备 · ${SLOT_LABEL[c.slot] || c.slot || '?'} · 费${c.cost}`;
+                }
+                return `${c.type} · 费${c.cost}`;
             }
 
             setInterval(() => {
@@ -167,6 +193,10 @@
                     <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'} ${p.online === false ? 'offline' : ''}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
                         <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.skip_next ? ' · 锁死' : ''}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="eq">
+                            ${equipLine(p.equipment, 'stellar_track')}
+                            ${equipLine(p.equipment, 'stability_system')}
+                        </div>
                     </div>
                 `).join('');
 
@@ -180,7 +210,7 @@
                 handEl.innerHTML = hand.map((c) => `
                     <div class="card ${selectedId === c.instance_id ? 'selected' : ''}" data-id="${c.instance_id}">
                         <div class="cname">${c.name}</div>
-                        <div class="ctype">${c.type} · 费${c.cost}</div>
+                        <div class="ctype">${cardTypeLabel(c)}</div>
                         <div class="ctext">${c.text}</div>
                     </div>
                 `).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';

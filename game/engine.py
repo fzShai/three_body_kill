@@ -11,6 +11,15 @@ from typing import Any
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TURN_SECONDS = 12.0
+EQUIP_SLOTS = ("stellar_track", "stability_system")
+SLOT_LABELS = {
+    "stellar_track": "恒星航迹",
+    "stability_system": "维稳系统",
+}
+
+
+def _empty_equipment() -> dict[str, Any | None]:
+    return {slot: None for slot in EQUIP_SLOTS}
 
 
 def load_cards() -> list[dict[str, Any]]:
@@ -51,6 +60,7 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
             "alive": True,
             "skip_next": False,
             "hand": [],
+            "equipment": _empty_equipment(),
         }
     return assigned
 
@@ -278,12 +288,19 @@ class GameSession:
             if idx is None:
                 return False, "手牌中没有这张牌"
             card = hand.pop(idx)
-            ok, msg = self._resolve_card(username, card, target)
-            if not ok:
-                hand.insert(idx, card)
-                return False, msg
-            self.discard.append(card)
-            self._log(f"{username} 打出 {card['name']}：{msg}")
+            if card.get("type") == "equipment":
+                ok, msg = self._equip_card(username, card)
+                if not ok:
+                    hand.insert(idx, card)
+                    return False, msg
+                self._log(f"{username} {msg}")
+            else:
+                ok, msg = self._resolve_card(username, card, target)
+                if not ok:
+                    hand.insert(idx, card)
+                    return False, msg
+                self.discard.append(card)
+                self._log(f"{username} 打出 {card['name']}：{msg}")
             self.refresh_turn_timer()
             if self._check_win():
                 self.seq += 1
@@ -292,6 +309,35 @@ class GameSession:
             return True, msg
 
         return False, f"未知行动: {act}"
+
+    def _equip_card(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
+        slot = str(card.get("slot", "")).strip()
+        if slot not in EQUIP_SLOTS:
+            return False, "无效的装备栏"
+        player = self.players[username]
+        old = player["equipment"].get(slot)
+        player["equipment"][slot] = card
+        label = SLOT_LABELS[slot]
+        if old:
+            self.discard.append(old)
+            return True, f"装备 {card['name']} 至{label}，弃置 {old['name']}"
+        return True, f"装备 {card['name']} 至{label}"
+
+    def _discard_equipment(self, username: str) -> None:
+        player = self.players[username]
+        for slot in EQUIP_SLOTS:
+            card = player["equipment"].get(slot)
+            if card:
+                self.discard.append(card)
+                player["equipment"][slot] = None
+
+    def _eliminate_player(self, username: str) -> None:
+        t = self.players[username]
+        t["alive"] = False
+        t["hp"] = 0
+        self.discard.extend(t["hand"])
+        t["hand"] = []
+        self._discard_equipment(username)
 
     def _resolve_card(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
         cid = card["id"]
@@ -345,10 +391,7 @@ class GameSession:
             t["hp"] -= dmg
             msg = f"{target} 受到 {dmg} 点损伤（HP {t['hp']}）"
             if t["hp"] <= 0:
-                t["alive"] = False
-                t["hp"] = 0
-                self.discard.extend(t["hand"])
-                t["hand"] = []
+                self._eliminate_player(target)
                 msg += f"，{target} 出局"
             return True, msg
 
@@ -364,6 +407,7 @@ class GameSession:
             "hand_count": len(p["hand"]),
             "skip_next": p["skip_next"],
             "online": self.player_online.get(name, True),
+            "equipment": deepcopy(p["equipment"]),
             "faction": p["faction"] if self.phase == "ended" else None,
             "role_name": p["role_name"] if self.phase == "ended" else None,
         }

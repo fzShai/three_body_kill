@@ -147,6 +147,11 @@
                 attack: '攻击',
                 defense: '防御',
                 ultimate: '终极',
+                equipment: '装备',
+            };
+            const SLOT_LABEL = {
+                stellar_track: '恒星航迹',
+                stability_system: '维稳系统',
             };
 
             document.querySelectorAll('.tab').forEach((tab) => {
@@ -220,6 +225,7 @@
                             <div class="meta">
                                 <span>类型：${escapeHtml(TYPE_LABEL[c.type] || c.type)}</span>
                                 <span>费用：${escapeHtml(c.cost)}</span>
+                                ${c.slot ? `<span>栏位：${escapeHtml(SLOT_LABEL[c.slot] || c.slot)}</span>` : ''}
                             </div>
                             <div class="text">${escapeHtml(c.text)}</div>
                         </div>

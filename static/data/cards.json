@@ -55,6 +55,38 @@
       "type": "ultimate",
       "cost": 4,
       "text": "对目标造成 3 点损伤。"
+    },
+    {
+      "id": "star_trail",
+      "name": "星轨锚定",
+      "type": "equipment",
+      "slot": "stellar_track",
+      "cost": 1,
+      "text": "装备到「恒星航迹」（占位，暂无额外效果）。"
+    },
+    {
+      "id": "orbit_shield",
+      "name": "轨道护盾",
+      "type": "equipment",
+      "slot": "stellar_track",
+      "cost": 2,
+      "text": "装备到「恒星航迹」（占位，暂无额外效果）。"
+    },
+    {
+      "id": "stabilizer",
+      "name": "维稳核心",
+      "type": "equipment",
+      "slot": "stability_system",
+      "cost": 1,
+      "text": "装备到「维稳系统」（占位，暂无额外效果）。"
+    },
+    {
+      "id": "chaos_dampener",
+      "name": "混沌抑制器",
+      "type": "equipment",
+      "slot": "stability_system",
+      "cost": 2,
+      "text": "装备到「维稳系统」（占位，暂无额外效果）。"
     }
   ]
 }

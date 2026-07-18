@@ -40,6 +40,64 @@ def main() -> None:
     assert all(c.get("instance_id") for c in snap_a["you"]["hand"])
     # hands are private — sizes can differ after actions
     assert "hand" not in snap_a["players"][0]
+    assert "equipment" in snap_a["players"][0]
+    assert snap_a["players"][0]["equipment"]["stellar_track"] is None
+    assert snap_a["players"][0]["equipment"]["stability_system"] is None
+
+    # equipment: equip into slot, replace discards old
+    eg = GameSession.create("EQUIP", ["cara", "dan"])
+    cara = eg.players["cara"]
+    star_a = {
+        "id": "star_trail",
+        "name": "星轨锚定",
+        "type": "equipment",
+        "slot": "stellar_track",
+        "cost": 1,
+        "text": "test",
+        "instance_id": "star_trail-test-1",
+    }
+    star_b = {
+        "id": "orbit_shield",
+        "name": "轨道护盾",
+        "type": "equipment",
+        "slot": "stellar_track",
+        "cost": 2,
+        "text": "test",
+        "instance_id": "orbit_shield-test-1",
+    }
+    stab = {
+        "id": "stabilizer",
+        "name": "维稳核心",
+        "type": "equipment",
+        "slot": "stability_system",
+        "cost": 1,
+        "text": "test",
+        "instance_id": "stabilizer-test-1",
+    }
+    cara["hand"] = [star_a, star_b, stab]
+    eg.turn_index = eg.player_order.index("cara")
+    eg.phase = "turn"
+    discard_before = len(eg.discard)
+
+    ok, msg = eg.apply_action("cara", {"action": "play_card", "instance_id": star_a["instance_id"]})
+    assert ok, msg
+    assert cara["equipment"]["stellar_track"]["instance_id"] == star_a["instance_id"]
+    assert len(eg.discard) == discard_before  # equipped card stays out of discard
+
+    eg.turn_index = eg.player_order.index("cara")
+    ok, msg = eg.apply_action("cara", {"action": "play_card", "instance_id": star_b["instance_id"]})
+    assert ok, msg
+    assert cara["equipment"]["stellar_track"]["instance_id"] == star_b["instance_id"]
+    assert any(c.get("instance_id") == star_a["instance_id"] for c in eg.discard)
+
+    eg.turn_index = eg.player_order.index("cara")
+    ok, msg = eg.apply_action("cara", {"action": "play_card", "instance_id": stab["instance_id"]})
+    assert ok, msg
+    assert cara["equipment"]["stability_system"]["instance_id"] == stab["instance_id"]
+    pub = eg.snapshot_for("dan")["players"]
+    cara_pub = next(p for p in pub if p["username"] == "cara")
+    assert cara_pub["equipment"]["stellar_track"]["name"] == "轨道护盾"
+    assert cara_pub["equipment"]["stability_system"]["name"] == "维稳核心"
 
     c1 = TestClient(app)
     c2 = TestClient(app)

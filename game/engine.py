@@ -16,6 +16,8 @@ SLOT_LABELS = {
     "stellar_track": "恒星航迹",
     "stability_system": "维稳系统",
 }
+STATUS_LOCKED = "locked"
+STATUS_KINDS = ("positive", "negative")
 
 
 def _empty_equipment() -> dict[str, Any | None]:
@@ -58,9 +60,9 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
             "hp": role["hp"],
             "max_hp": role["hp"],
             "alive": True,
-            "skip_next": False,
             "hand": [],
             "equipment": _empty_equipment(),
+            "statuses": [],
         }
     return assigned
 
@@ -224,8 +226,8 @@ class GameSession:
             if not self.player_online.get(name, True):
                 self._log(f"{name} 离线，跳过回合")
                 continue
-            if self.players[name]["skip_next"]:
-                self.players[name]["skip_next"] = False
+            if self._has_status(name, STATUS_LOCKED):
+                self._remove_status(name, STATUS_LOCKED)
                 self._log(f"{name} 被锁死，跳过回合")
                 continue
             self._draw(name, 1)
@@ -338,6 +340,30 @@ class GameSession:
         self.discard.extend(t["hand"])
         t["hand"] = []
         self._discard_equipment(username)
+        t["statuses"] = []
+
+    def _has_status(self, username: str, status_id: str) -> bool:
+        return any(s.get("id") == status_id for s in self.players[username]["statuses"])
+
+    def _apply_status(self, username: str, status_id: str, name: str, kind: str) -> bool:
+        if kind not in STATUS_KINDS:
+            return False
+        if self._has_status(username, status_id):
+            return False
+        self.players[username]["statuses"].append({
+            "id": status_id,
+            "name": name,
+            "kind": kind,
+        })
+        return True
+
+    def _remove_status(self, username: str, status_id: str) -> bool:
+        statuses = self.players[username]["statuses"]
+        for i, s in enumerate(statuses):
+            if s.get("id") == status_id:
+                statuses.pop(i)
+                return True
+        return False
 
     def _resolve_card(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
         cid = card["id"]
@@ -378,8 +404,9 @@ class GameSession:
             if not ok:
                 return False, err
             assert target is not None
-            self.players[target]["skip_next"] = True
-            return True, f"{target} 下回合将被跳过"
+            if self._apply_status(target, STATUS_LOCKED, "锁死", "negative"):
+                return True, f"{target} 获得负面状态「锁死」"
+            return True, f"{target} 已有「锁死」，未叠加"
 
         if cid in {"dark_forest", "droplet", "dimensions"}:
             ok, err = need_alive_target()
@@ -405,9 +432,9 @@ class GameSession:
             "max_hp": p["max_hp"],
             "alive": p["alive"],
             "hand_count": len(p["hand"]),
-            "skip_next": p["skip_next"],
             "online": self.player_online.get(name, True),
             "equipment": deepcopy(p["equipment"]),
+            "statuses": deepcopy(p["statuses"]),
             "faction": p["faction"] if self.phase == "ended" else None,
             "role_name": p["role_name"] if self.phase == "ended" else None,
         }

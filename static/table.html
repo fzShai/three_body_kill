@@ -39,11 +39,13 @@
         .badge-off { font-size: 11px; color: #ff8a8a; margin-left: 4px; }
         .player-chip .n { font-weight: 700; font-size: 14px; }
         .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
-        .player-chip .eq {
+        .player-chip .eq, .player-chip .st {
             margin-top: 6px; font-size: 11px; line-height: 1.4;
             color: rgba(180,210,230,0.55);
         }
         .player-chip .eq .filled { color: #9fd9ff; }
+        .player-chip .st .pos { color: #8fd9a8; }
+        .player-chip .st .neg { color: #ff9a8a; }
         .role {
             display: inline-block; margin-bottom: 10px;
             padding: 8px 12px; border-radius: 6px;
@@ -172,6 +174,18 @@
                 return `${c.type} · 费${c.cost}`;
             }
 
+            function statusLines(statuses) {
+                const list = statuses || [];
+                const pos = list.filter((s) => s.kind === 'positive').map((s) => s.name);
+                const neg = list.filter((s) => s.kind === 'negative').map((s) => s.name);
+                const posText = pos.length ? pos.join('、') : '无';
+                const negText = neg.length ? neg.join('、') : '无';
+                return `
+                    <div class="pos">正面：${posText}</div>
+                    <div class="neg">负面：${negText}</div>
+                `;
+            }
+
             setInterval(() => {
                 if (!turnDeadlineMs || !state || state.phase !== 'turn') {
                     turnTimerEl.textContent = '—';
@@ -192,11 +206,12 @@
                 playersEl.innerHTML = (snap.players || []).map((p) => `
                     <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'} ${p.online === false ? 'offline' : ''}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.skip_next ? ' · 锁死' : ''}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.alive ? '' : ' · 出局'}</div>
                         <div class="eq">
                             ${equipLine(p.equipment, 'stellar_track')}
                             ${equipLine(p.equipment, 'stability_system')}
                         </div>
+                        <div class="st">${statusLines(p.statuses)}</div>
                     </div>
                 `).join('');
 

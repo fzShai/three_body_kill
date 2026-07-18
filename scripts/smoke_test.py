@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from fastapi.testclient import TestClient
 
-from game.engine import GameSession
+from game.engine import STATUS_LOCKED, GameSession
 from rooms import room_manager
 from server import app
 
@@ -98,6 +98,27 @@ def main() -> None:
     cara_pub = next(p for p in pub if p["username"] == "cara")
     assert cara_pub["equipment"]["stellar_track"]["name"] == "轨道护盾"
     assert cara_pub["equipment"]["stability_system"]["name"] == "维稳核心"
+
+    # statuses: no stack same id, different ids coexist, locked clears on skip
+    sg = GameSession.create("STATUS", ["erin", "finn"])
+    erin = sg.players["erin"]
+    assert erin["statuses"] == []
+    assert "skip_next" not in erin
+    assert sg._apply_status("erin", STATUS_LOCKED, "锁死", "negative")
+    assert not sg._apply_status("erin", STATUS_LOCKED, "锁死", "negative")
+    assert len(erin["statuses"]) == 1
+    assert sg._apply_status("erin", "focus", "专注", "positive")
+    assert len(erin["statuses"]) == 2
+    erin_pub = next(p for p in sg.snapshot_for("finn")["players"] if p["username"] == "erin")
+    assert any(s["id"] == STATUS_LOCKED for s in erin_pub["statuses"])
+    assert any(s["id"] == "focus" and s["kind"] == "positive" for s in erin_pub["statuses"])
+    # make it finn's turn then pass so advance lands on locked erin and clears it
+    sg.turn_index = sg.player_order.index("finn")
+    sg.phase = "turn"
+    ok, msg = sg.apply_action("finn", {"action": "pass"})
+    assert ok, msg
+    assert not sg._has_status("erin", STATUS_LOCKED)
+    assert sg._has_status("erin", "focus")
 
     c1 = TestClient(app)
     c2 = TestClient(app)

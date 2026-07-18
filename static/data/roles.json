@@ -1,0 +1,39 @@
+{
+  "roles": [
+    {
+      "id": "wallfacer",
+      "name": "面壁者",
+      "faction": "earth",
+      "hp": 4,
+      "win": "淘汰所有三体相关阵营玩家"
+    },
+    {
+      "id": "eto",
+      "name": "地球三体组织",
+      "faction": "eto",
+      "hp": 3,
+      "win": "三体阵营或ETO存活且面壁者全灭"
+    },
+    {
+      "id": "trisolaran",
+      "name": "三体人",
+      "faction": "trisolaris",
+      "hp": 4,
+      "win": "消灭所有地球阵营"
+    },
+    {
+      "id": "swordsman",
+      "name": "执剑人",
+      "faction": "earth",
+      "hp": 5,
+      "win": "作为地球阵营存活到最后"
+    },
+    {
+      "id": "observer",
+      "name": "观察者",
+      "faction": "neutral",
+      "hp": 3,
+      "win": "存活到仅剩两名玩家时你仍存活"
+    }
+  ]
+}

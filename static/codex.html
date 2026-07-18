@@ -167,11 +167,23 @@
                     .replace(/"/g, '&quot;');
             }
 
+            async function fetchJson(apiPath, staticPath) {
+                try {
+                    const { data } = await TBK.api(apiPath);
+                    return data;
+                } catch (e) {
+                    if (e.message === 'unauthorized') throw e;
+                }
+                const res = await fetch(staticPath, { credentials: 'same-origin' });
+                if (!res.ok) throw new Error('load_failed');
+                return res.json();
+            }
+
             async function loadRoles() {
                 const list = document.getElementById('rolesList');
                 const status = document.getElementById('rolesStatus');
                 try {
-                    const { data } = await TBK.api('/api/codex/roles');
+                    const data = await fetchJson('/api/codex/roles', '/static/data/roles.json');
                     const roles = data.roles || [];
                     if (!roles.length) {
                         list.innerHTML = '<div class="empty">暂无角色数据</div>';
@@ -196,7 +208,7 @@
                 const list = document.getElementById('cardsList');
                 const status = document.getElementById('cardsStatus');
                 try {
-                    const { data } = await TBK.api('/api/codex/cards');
+                    const data = await fetchJson('/api/codex/cards', '/static/data/cards.json');
                     const cards = data.cards || [];
                     if (!cards.length) {
                         list.innerHTML = '<div class="empty">暂无卡牌数据</div>';

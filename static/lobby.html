@@ -13,7 +13,7 @@
             color: #e8f4ff;
             padding: 32px 16px 48px;
         }
-        .wrap { max-width: 880px; margin: 0 auto; }
+        .wrap { max-width: 560px; margin: 0 auto; }
         h1 {
             font-size: 36px;
             background: linear-gradient(135deg, #00e5ff, #6aa8ff);
@@ -23,17 +23,16 @@
             margin-bottom: 6px;
         }
         .sub { color: rgba(255,255,255,0.35); letter-spacing: 3px; font-size: 13px; margin-bottom: 28px; }
-        .user-info { color: rgba(255,255,255,0.55); margin-bottom: 20px; }
-        .user-info span { color: #00e5ff; }
-        .panel {
-            background: rgba(12, 22, 36, 0.72);
-            border: 1px solid rgba(0, 200, 255, 0.18);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 16px;
+        .user-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 28px;
+            color: rgba(255,255,255,0.55);
         }
-        .panel h2 { font-size: 16px; color: #9fd9ff; margin-bottom: 14px; font-weight: 700; }
-        .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .user-bar span { color: #00e5ff; }
         .btn {
             padding: 12px 22px;
             border-radius: 8px;
@@ -43,6 +42,8 @@
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
         }
         .btn:hover { filter: brightness(1.08); }
         .btn-outline {
@@ -51,170 +52,76 @@
             color: rgba(255,255,255,0.7);
         }
         .btn-outline:hover { border-color: #00e5ff; color: #00e5ff; }
-        input {
-            padding: 12px 14px;
-            border-radius: 8px;
-            border: 1px solid rgba(0,180,220,0.25);
-            background: rgba(0,40,60,0.4);
-            color: #cfefff;
-            font-size: 15px;
-            outline: none;
-            min-width: 140px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+        .hub {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
         }
-        .status { font-size: 13px; color: rgba(180,210,230,0.7); min-height: 20px; margin-top: 10px; }
-        .status.error { color: #ff8a8a; }
-        .status.ok { color: #6ad8ff; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        th { color: rgba(160,200,230,0.55); font-weight: 600; }
-        td .join { padding: 6px 12px; font-size: 13px; }
-        .empty { color: rgba(255,255,255,0.25); padding: 16px 0; text-align: center; }
-        .ws-dot {
-            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-            background: #666; margin-right: 6px; vertical-align: middle;
+        .hub-btn {
+            display: block;
+            width: 100%;
+            padding: 28px 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 200, 255, 0.22);
+            background: rgba(12, 22, 36, 0.72);
+            color: #e8f4ff;
+            text-decoration: none;
+            text-align: center;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
         }
-        .ws-dot.on { background: #3dffa8; box-shadow: 0 0 8px rgba(61,255,168,0.5); }
+        .hub-btn:hover {
+            border-color: #00e5ff;
+            background: rgba(0, 60, 90, 0.35);
+            transform: translateY(-1px);
+        }
+        .hub-btn .title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #9fd9ff;
+            margin-bottom: 6px;
+        }
+        .hub-btn .desc {
+            font-size: 13px;
+            color: rgba(255,255,255,0.35);
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
     <div class="wrap">
         <h1>三体杀</h1>
         <div class="sub">✦ 大厅 · 集结 ✦</div>
-        <div class="user-info">
-            <span class="ws-dot" id="wsDot"></span>
-            欢迎，<span id="usernameDisplay"></span>
-            · <span id="wsLabel">连接中…</span>
+        <div class="user-bar">
+            <div>欢迎，<span id="usernameDisplay"></span></div>
+            <button class="btn btn-outline" id="logoutBtn" type="button">退出登录</button>
         </div>
 
-        <div class="panel">
-            <h2>房间</h2>
-            <div class="row">
-                <button class="btn" id="createRoomBtn">创建房间</button>
-                <input id="joinCode" maxlength="8" placeholder="输入房号" />
-                <button class="btn btn-outline" id="joinRoomBtn">加入房间</button>
-                <button class="btn btn-outline" id="logoutBtn">退出登录</button>
-            </div>
-            <div class="status" id="statusMsg"></div>
-        </div>
-
-        <div class="panel">
-            <h2>房间列表 <button class="btn btn-outline" id="refreshBtn" style="padding:6px 12px;font-size:12px;margin-left:8px;">刷新</button></h2>
-            <div id="roomListWrap">
-                <div class="empty">加载中…</div>
-            </div>
-        </div>
+        <nav class="hub" aria-label="大厅入口">
+            <a class="hub-btn" href="/battle">
+                <div class="title">对战</div>
+                <div class="desc">创建或加入房间</div>
+            </a>
+            <a class="hub-btn" href="/codex">
+                <div class="title">图鉴</div>
+                <div class="desc">角色 · 卡牌 · 成就</div>
+            </a>
+            <a class="hub-btn" href="/about">
+                <div class="title">关于</div>
+                <div class="desc">内容筹备中</div>
+            </a>
+        </nav>
     </div>
     <script src="/static/app.js"></script>
     <script>
         const username = TBK.requireLogin();
-        if (!username) { /* redirecting */ }
-        else {
+        if (username) {
             document.getElementById('usernameDisplay').textContent = username;
-            const statusMsg = document.getElementById('statusMsg');
-            const wsDot = document.getElementById('wsDot');
-            const wsLabel = document.getElementById('wsLabel');
-            const sock = new TBK.GameSocket();
-
-            function setStatus(text, kind) {
-                statusMsg.textContent = text || '';
-                statusMsg.className = 'status' + (kind ? ' ' + kind : '');
-            }
-
-            sock.on('_open', () => {
-                wsDot.classList.add('on');
-                wsLabel.textContent = '已连接';
-            });
-            sock.on('_close', () => {
-                wsDot.classList.remove('on');
-                wsLabel.textContent = '重连中…';
-            });
-            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
-            sock.connect();
-
-            async function loadRooms() {
-                try {
-                    const { data } = await TBK.api('/api/rooms');
-                    const rooms = data.rooms || [];
-                    const wrap = document.getElementById('roomListWrap');
-                    if (!rooms.length) {
-                        wrap.innerHTML = '<div class="empty">暂无房间 · 创建一个吧</div>';
-                        return;
-                    }
-                    wrap.innerHTML = `
-                        <table>
-                            <thead><tr><th>房号</th><th>房主</th><th>人数</th><th>状态</th><th></th></tr></thead>
-                            <tbody>
-                                ${rooms.map((r) => `
-                                    <tr>
-                                        <td><strong>${r.room_id}</strong></td>
-                                        <td>${r.host}</td>
-                                        <td>${r.player_count}/${r.max_players}</td>
-                                        <td>${r.status}</td>
-                                        <td>${r.can_join ? `<button class="btn join" data-id="${r.room_id}">加入</button>` : '—'}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>`;
-                    wrap.querySelectorAll('button.join').forEach((btn) => {
-                        btn.addEventListener('click', () => joinRoom(btn.getAttribute('data-id')));
-                    });
-                } catch (e) {
-                    if (e.message !== 'unauthorized') setStatus('加载房间列表失败', 'error');
-                }
-            }
-
-            async function createRoom() {
-                setStatus('创建中…');
-                try {
-                    const { data } = await TBK.api('/api/rooms', { method: 'POST', body: '{}' });
-                    if (!data.success) {
-                        setStatus(data.message || '创建失败', 'error');
-                        return;
-                    }
-                    window.location.href = '/room/' + data.room.room_id;
-                } catch (e) {
-                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
-                }
-            }
-
-            async function joinRoom(code) {
-                const id = (code || '').trim().toUpperCase();
-                if (!id) {
-                    setStatus('请输入房号', 'error');
-                    return;
-                }
-                setStatus('加入中…');
-                try {
-                    const { data } = await TBK.api('/api/rooms/' + encodeURIComponent(id) + '/join', {
-                        method: 'POST',
-                        body: '{}',
-                    });
-                    if (!data.success) {
-                        setStatus(data.message || '加入失败', 'error');
-                        return;
-                    }
-                    window.location.href = '/room/' + data.room.room_id;
-                } catch (e) {
-                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
-                }
-            }
-
-            document.getElementById('createRoomBtn').addEventListener('click', createRoom);
-            document.getElementById('joinRoomBtn').addEventListener('click', () => {
-                joinRoom(document.getElementById('joinCode').value);
-            });
-            document.getElementById('joinCode').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') joinRoom(document.getElementById('joinCode').value);
-            });
-            document.getElementById('refreshBtn').addEventListener('click', loadRooms);
             document.getElementById('logoutBtn').addEventListener('click', async () => {
                 try { await TBK.api('/api/logout', { method: 'POST', body: '{}' }); } catch (e) {}
                 localStorage.removeItem('username');
                 window.location.href = '/';
             });
-            setInterval(loadRooms, 5000);
         }
     </script>
 </body>

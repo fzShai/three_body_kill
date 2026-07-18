@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三体杀 - 对战</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0a1220 0%, #122033 50%, #1a2838 100%);
+            color: #e8f4ff;
+            padding: 32px 16px 48px;
+        }
+        .wrap { max-width: 880px; margin: 0 auto; }
+        h1 {
+            font-size: 36px;
+            background: linear-gradient(135deg, #00e5ff, #6aa8ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .sub { color: rgba(255,255,255,0.35); letter-spacing: 3px; font-size: 13px; margin-bottom: 28px; }
+        .user-info { color: rgba(255,255,255,0.55); margin-bottom: 20px; }
+        .user-info span { color: #00e5ff; }
+        .panel {
+            background: rgba(12, 22, 36, 0.72);
+            border: 1px solid rgba(0, 200, 255, 0.18);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .panel h2 { font-size: 16px; color: #9fd9ff; margin-bottom: 14px; font-weight: 700; }
+        .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .btn {
+            padding: 12px 22px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #00e5ff, #0077ff);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { filter: brightness(1.08); }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.18);
+            color: rgba(255,255,255,0.7);
+        }
+        .btn-outline:hover { border-color: #00e5ff; color: #00e5ff; }
+        input {
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,180,220,0.25);
+            background: rgba(0,40,60,0.4);
+            color: #cfefff;
+            font-size: 15px;
+            outline: none;
+            min-width: 140px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .status { font-size: 13px; color: rgba(180,210,230,0.7); min-height: 20px; margin-top: 10px; }
+        .status.error { color: #ff8a8a; }
+        .status.ok { color: #6ad8ff; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        th { color: rgba(160,200,230,0.55); font-weight: 600; }
+        td .join { padding: 6px 12px; font-size: 13px; }
+        .empty { color: rgba(255,255,255,0.25); padding: 16px 0; text-align: center; }
+        .ws-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #666; margin-right: 6px; vertical-align: middle;
+        }
+        .ws-dot.on { background: #3dffa8; box-shadow: 0 0 8px rgba(61,255,168,0.5); }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>三体杀</h1>
+        <div class="sub">✦ 对战 · 房间 ✦</div>
+        <div class="user-info">
+            <span class="ws-dot" id="wsDot"></span>
+            欢迎，<span id="usernameDisplay"></span>
+            · <span id="wsLabel">连接中…</span>
+        </div>
+
+        <div class="panel">
+            <h2>房间</h2>
+            <div class="row">
+                <button class="btn" id="createRoomBtn">创建房间</button>
+                <input id="joinCode" maxlength="8" placeholder="输入房号" />
+                <button class="btn btn-outline" id="joinRoomBtn">加入房间</button>
+                <a class="btn btn-outline" href="/lobby">返回入口</a>
+            </div>
+            <div class="status" id="statusMsg"></div>
+        </div>
+
+        <div class="panel">
+            <h2>房间列表 <button class="btn btn-outline" id="refreshBtn" style="padding:6px 12px;font-size:12px;margin-left:8px;">刷新</button></h2>
+            <div id="roomListWrap">
+                <div class="empty">加载中…</div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+    <script>
+        const username = TBK.requireLogin();
+        if (!username) { /* redirecting */ }
+        else {
+            document.getElementById('usernameDisplay').textContent = username;
+            const statusMsg = document.getElementById('statusMsg');
+            const wsDot = document.getElementById('wsDot');
+            const wsLabel = document.getElementById('wsLabel');
+            const sock = new TBK.GameSocket();
+
+            function setStatus(text, kind) {
+                statusMsg.textContent = text || '';
+                statusMsg.className = 'status' + (kind ? ' ' + kind : '');
+            }
+
+            sock.on('_open', () => {
+                wsDot.classList.add('on');
+                wsLabel.textContent = '已连接';
+            });
+            sock.on('_close', () => {
+                wsDot.classList.remove('on');
+                wsLabel.textContent = '重连中…';
+            });
+            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
+            sock.connect();
+
+            async function loadRooms() {
+                try {
+                    const { data } = await TBK.api('/api/rooms');
+                    const rooms = data.rooms || [];
+                    const wrap = document.getElementById('roomListWrap');
+                    if (!rooms.length) {
+                        wrap.innerHTML = '<div class="empty">暂无房间 · 创建一个吧</div>';
+                        return;
+                    }
+                    wrap.innerHTML = `
+                        <table>
+                            <thead><tr><th>房号</th><th>房主</th><th>人数</th><th>状态</th><th></th></tr></thead>
+                            <tbody>
+                                ${rooms.map((r) => `
+                                    <tr>
+                                        <td><strong>${r.room_id}</strong></td>
+                                        <td>${r.host}</td>
+                                        <td>${r.player_count}/${r.max_players}</td>
+                                        <td>${r.status}</td>
+                                        <td>${r.can_join ? `<button class="btn join" data-id="${r.room_id}">加入</button>` : '—'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>`;
+                    wrap.querySelectorAll('button.join').forEach((btn) => {
+                        btn.addEventListener('click', () => joinRoom(btn.getAttribute('data-id')));
+                    });
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('加载房间列表失败', 'error');
+                }
+            }
+
+            async function createRoom() {
+                setStatus('创建中…');
+                try {
+                    const { data } = await TBK.api('/api/rooms', { method: 'POST', body: '{}' });
+                    if (!data.success) {
+                        setStatus(data.message || '创建失败', 'error');
+                        return;
+                    }
+                    window.location.href = '/room/' + data.room.room_id;
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
+                }
+            }
+
+            async function joinRoom(code) {
+                const id = (code || '').trim().toUpperCase();
+                if (!id) {
+                    setStatus('请输入房号', 'error');
+                    return;
+                }
+                setStatus('加入中…');
+                try {
+                    const { data } = await TBK.api('/api/rooms/' + encodeURIComponent(id) + '/join', {
+                        method: 'POST',
+                        body: '{}',
+                    });
+                    if (!data.success) {
+                        setStatus(data.message || '加入失败', 'error');
+                        return;
+                    }
+                    window.location.href = '/room/' + data.room.room_id;
+                } catch (e) {
+                    if (e.message !== 'unauthorized') setStatus('网络错误', 'error');
+                }
+            }
+
+            document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+            document.getElementById('joinRoomBtn').addEventListener('click', () => {
+                joinRoom(document.getElementById('joinCode').value);
+            });
+            document.getElementById('joinCode').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') joinRoom(document.getElementById('joinCode').value);
+            });
+            document.getElementById('refreshBtn').addEventListener('click', loadRooms);
+            loadRooms();
+            setInterval(loadRooms, 5000);
+        }
+    </script>
+</body>
+</html>

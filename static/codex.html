@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>三体杀 - 图鉴</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0a1220 0%, #122033 50%, #1a2838 100%);
+            color: #e8f4ff;
+            padding: 32px 16px 48px;
+        }
+        .wrap { max-width: 880px; margin: 0 auto; }
+        h1 {
+            font-size: 36px;
+            background: linear-gradient(135deg, #00e5ff, #6aa8ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .sub { color: rgba(255,255,255,0.35); letter-spacing: 3px; font-size: 13px; margin-bottom: 20px; }
+        .top-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px 22px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #00e5ff, #0077ff);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { filter: brightness(1.08); }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.18);
+            color: rgba(255,255,255,0.7);
+        }
+        .btn-outline:hover { border-color: #00e5ff; color: #00e5ff; }
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tab {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.14);
+            background: transparent;
+            color: rgba(255,255,255,0.55);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .tab.active {
+            border-color: rgba(0, 229, 255, 0.55);
+            color: #9fd9ff;
+            background: rgba(0, 60, 90, 0.35);
+        }
+        .panel {
+            background: rgba(12, 22, 36, 0.72);
+            border: 1px solid rgba(0, 200, 255, 0.18);
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+        }
+        .panel.active { display: block; }
+        .panel h2 { font-size: 16px; color: #9fd9ff; margin-bottom: 14px; font-weight: 700; }
+        .empty { color: rgba(255,255,255,0.25); padding: 24px 0; text-align: center; }
+        .item {
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .item:last-child { border-bottom: none; }
+        .item .name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e8f4ff;
+            margin-bottom: 6px;
+        }
+        .meta {
+            font-size: 13px;
+            color: rgba(160,200,230,0.65);
+            margin-bottom: 6px;
+        }
+        .meta span { margin-right: 12px; }
+        .text { font-size: 14px; color: rgba(220,235,255,0.75); line-height: 1.5; }
+        .status { font-size: 13px; color: #ff8a8a; margin-top: 10px; min-height: 18px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>三体杀</h1>
+        <div class="sub">✦ 图鉴 ✦</div>
+        <div class="top-row">
+            <a class="btn btn-outline" href="/lobby">返回入口</a>
+        </div>
+
+        <div class="tabs" role="tablist">
+            <button class="tab active" type="button" data-tab="roles">角色图鉴</button>
+            <button class="tab" type="button" data-tab="cards">卡牌图鉴</button>
+            <button class="tab" type="button" data-tab="achievements">成就图鉴</button>
+        </div>
+
+        <section class="panel active" id="panel-roles">
+            <h2>角色图鉴</h2>
+            <div id="rolesList"><div class="empty">加载中…</div></div>
+            <div class="status" id="rolesStatus"></div>
+        </section>
+
+        <section class="panel" id="panel-cards">
+            <h2>卡牌图鉴</h2>
+            <div id="cardsList"><div class="empty">加载中…</div></div>
+            <div class="status" id="cardsStatus"></div>
+        </section>
+
+        <section class="panel" id="panel-achievements">
+            <h2>成就图鉴</h2>
+            <div class="empty">敬请期待</div>
+        </section>
+    </div>
+    <script src="/static/app.js"></script>
+    <script>
+        const username = TBK.requireLogin();
+        if (username) {
+            const FACTION_LABEL = {
+                earth: '地球',
+                eto: 'ETO',
+                trisolaris: '三体',
+                neutral: '中立',
+            };
+            const TYPE_LABEL = {
+                action: '行动',
+                attack: '攻击',
+                defense: '防御',
+                ultimate: '终极',
+            };
+
+            document.querySelectorAll('.tab').forEach((tab) => {
+                tab.addEventListener('click', () => {
+                    const id = tab.getAttribute('data-tab');
+                    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
+                    document.querySelectorAll('.panel').forEach((p) => {
+                        p.classList.toggle('active', p.id === 'panel-' + id);
+                    });
+                });
+            });
+
+            function escapeHtml(s) {
+                return String(s ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            async function loadRoles() {
+                const list = document.getElementById('rolesList');
+                const status = document.getElementById('rolesStatus');
+                try {
+                    const { data } = await TBK.api('/api/codex/roles');
+                    const roles = data.roles || [];
+                    if (!roles.length) {
+                        list.innerHTML = '<div class="empty">暂无角色数据</div>';
+                        return;
+                    }
+                    list.innerHTML = roles.map((r) => `
+                        <div class="item">
+                            <div class="name">${escapeHtml(r.name)}</div>
+                            <div class="meta">
+                                <span>阵营：${escapeHtml(FACTION_LABEL[r.faction] || r.faction)}</span>
+                                <span>HP：${escapeHtml(r.hp)}</span>
+                            </div>
+                            <div class="text">胜利条件：${escapeHtml(r.win)}</div>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    if (e.message !== 'unauthorized') status.textContent = '加载角色图鉴失败';
+                }
+            }
+
+            async function loadCards() {
+                const list = document.getElementById('cardsList');
+                const status = document.getElementById('cardsStatus');
+                try {
+                    const { data } = await TBK.api('/api/codex/cards');
+                    const cards = data.cards || [];
+                    if (!cards.length) {
+                        list.innerHTML = '<div class="empty">暂无卡牌数据</div>';
+                        return;
+                    }
+                    list.innerHTML = cards.map((c) => `
+                        <div class="item">
+                            <div class="name">${escapeHtml(c.name)}</div>
+                            <div class="meta">
+                                <span>类型：${escapeHtml(TYPE_LABEL[c.type] || c.type)}</span>
+                                <span>费用：${escapeHtml(c.cost)}</span>
+                            </div>
+                            <div class="text">${escapeHtml(c.text)}</div>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    if (e.message !== 'unauthorized') status.textContent = '加载卡牌图鉴失败';
+                }
+            }
+
+            loadRoles();
+            loadCards();
+        }
+    </script>
+</body>
+</html>

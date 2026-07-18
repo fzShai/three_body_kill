@@ -20,10 +20,16 @@ from ws_hub import make_message, ws_hub
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
+DATA_DIR = BASE_DIR / "data"
 LOGIN_PAGE = STATIC_DIR / "login.html"
 LOBBY_PAGE = STATIC_DIR / "lobby.html"
+BATTLE_PAGE = STATIC_DIR / "battle.html"
+CODEX_PAGE = STATIC_DIR / "codex.html"
+ABOUT_PAGE = STATIC_DIR / "about.html"
 ROOM_PAGE = STATIC_DIR / "room.html"
 TABLE_PAGE = STATIC_DIR / "table.html"
+ROLES_DATA = DATA_DIR / "roles.json"
+CARDS_DATA = DATA_DIR / "cards.json"
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -39,7 +45,7 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title="三体杀", lifespan=_lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-PROTECTED_PREFIXES = ("/lobby", "/room", "/table", "/api/rooms")
+PROTECTED_PREFIXES = ("/lobby", "/battle", "/codex", "/about", "/room", "/table", "/api/rooms", "/api/codex")
 
 _host_transfer_deadlines: dict[str, float] = {}
 ROOM_OFFLINE_GRACE_SECONDS = 3.0
@@ -195,13 +201,20 @@ def _unauthorized_html() -> HTMLResponse:
 
 
 def _path_needs_auth(path: str) -> bool:
-    if path in {"/lobby", "/lobby/"}:
+    if path in {"/lobby", "/lobby/", "/battle", "/battle/", "/codex", "/codex/", "/about", "/about/"}:
         return True
     if path.startswith("/room") or path.startswith("/table"):
         return True
-    if path.startswith("/api/rooms"):
+    if path.startswith("/api/rooms") or path.startswith("/api/codex"):
         return True
     return False
+
+
+def _load_json_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
 
 
 @app.middleware("http")
@@ -303,6 +316,43 @@ async def lobby():
     if LOBBY_PAGE.exists():
         return FileResponse(LOBBY_PAGE)
     return JSONResponse({"error": "找不到大厅页面"}, status_code=404)
+
+
+@app.get("/battle")
+async def battle():
+    if BATTLE_PAGE.exists():
+        return FileResponse(BATTLE_PAGE)
+    return JSONResponse({"error": "找不到对战页面"}, status_code=404)
+
+
+@app.get("/codex")
+async def codex():
+    if CODEX_PAGE.exists():
+        return FileResponse(CODEX_PAGE)
+    return JSONResponse({"error": "找不到图鉴页面"}, status_code=404)
+
+
+@app.get("/about")
+async def about():
+    if ABOUT_PAGE.exists():
+        return FileResponse(ABOUT_PAGE)
+    return JSONResponse({"error": "找不到关于页面"}, status_code=404)
+
+
+@app.get("/api/codex/roles")
+async def api_codex_roles():
+    data = _load_json_file(ROLES_DATA)
+    if data is None:
+        return JSONResponse({"success": False, "message": "找不到角色数据"}, status_code=404)
+    return JSONResponse(data)
+
+
+@app.get("/api/codex/cards")
+async def api_codex_cards():
+    data = _load_json_file(CARDS_DATA)
+    if data is None:
+        return JSONResponse({"success": False, "message": "找不到卡牌数据"}, status_code=404)
+    return JSONResponse(data)
 
 
 @app.get("/room")

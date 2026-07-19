@@ -26,6 +26,31 @@ SLOT_LABELS = {
     "temp_ascend": "临时飞升",
 }
 
+# #region agent log
+_DEBUG_LOG = Path(__file__).resolve().parent.parent / "debug-2b39ab.log"
+
+
+def _dbg(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
+    try:
+        import json
+
+        payload = {
+            "sessionId": "2b39ab",
+            "runId": "offline-play",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# #endregion
+
 
 def load_roles() -> list[dict[str, Any]]:
     import json
@@ -163,6 +188,15 @@ class GameSession:
                 self.player_online[name] = online_map[name]
 
     def skip_current_if_offline(self, username: str) -> bool:
+        # #region agent log
+        _dbg("A", "engine.py:skip_current_if_offline:entry", "skip offline check", {
+            "username": username,
+            "phase": self.phase,
+            "current": self.current_player() if self.phase != "ended" else None,
+            "online": dict(self.player_online),
+            "turn_index": self.turn_index,
+        })
+        # #endregion
         if self.player_online.get(username, True):
             return False
         if self.phase == "prompt" and self.prompt and self.prompt.get("to") == username:
@@ -171,11 +205,28 @@ class GameSession:
             self.seq += 1
             return True
         if self.phase != "turn" or self.current_player() != username:
+            # #region agent log
+            _dbg("C", "engine.py:skip_current_if_offline:no_skip", "offline but not current turn", {
+                "username": username,
+                "phase": self.phase,
+                "current": self.current_player() if self.phase != "ended" else None,
+            })
+            # #endregion
             return False
         self._log(f"{username} 离线，自动跳过回合")
         self._advance_turn()
         self._check_win()
         self.seq += 1
+        # #region agent log
+        _dbg("A", "engine.py:skip_current_if_offline:after", "after skip offline", {
+            "username": username,
+            "phase": self.phase,
+            "current": self.current_player() if self.phase != "ended" else None,
+            "online": dict(self.player_online),
+            "winner": self.winner,
+            "turn_phase": self.turn_phase,
+        })
+        # #endregion
         return True
 
     def _alive_players(self) -> list[str]:
@@ -227,6 +278,11 @@ class GameSession:
                 continue
             if not self.player_online.get(nxt, True):
                 self._log(f"{nxt} 离线，跳过回合")
+                # #region agent log
+                _dbg("A", "engine.py:_advance_turn:skip_offline", "advance skipped offline seat", {
+                    "nxt": nxt, "turn_index": self.turn_index, "online": dict(self.player_online),
+                })
+                # #endregion
                 continue
             if self._has_status(nxt, STATUS_LOCKED):
                 self._remove_status(nxt, STATUS_LOCKED)
@@ -237,7 +293,18 @@ class GameSession:
             self._run_draw_phase()
             self._start_turn_timer()
             self._log(f"轮到 {nxt}")
+            # #region agent log
+            _dbg("A", "engine.py:_advance_turn:landed", "turn landed on player", {
+                "nxt": nxt, "phase": self.phase, "turn_phase": self.turn_phase,
+            })
+            # #endregion
             return
+        # #region agent log
+        _dbg("A", "engine.py:_advance_turn:ended", "no eligible player, phase ended", {
+            "online": dict(self.player_online),
+            "alive": {n: self.players[n]["alive"] for n in self.player_order},
+        })
+        # #endregion
         self.phase = "ended"
 
     def _auto_discard(self, username: str) -> None:
@@ -356,6 +423,11 @@ class GameSession:
 
     def apply_action(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
         if self.phase == "ended":
+            # #region agent log
+            _dbg("B", "engine.py:apply_action:ended", "reject: game ended", {
+                "username": username, "action": action.get("action"), "winner": self.winner,
+            })
+            # #endregion
             return False, "对局已结束"
         if username not in self.players:
             return False, "你不在对局中"
@@ -373,11 +445,29 @@ class GameSession:
             return self._apply_prompt_action(username, action)
 
         if self.phase != "turn":
+            # #region agent log
+            _dbg("E", "engine.py:apply_action:bad_phase", "reject: not turn phase", {
+                "username": username, "phase": self.phase, "action": act,
+            })
+            # #endregion
             return False, "当前无法行动"
 
         if self.current_player() != username:
+            # #region agent log
+            _dbg("C", "engine.py:apply_action:not_turn", "reject: not your turn", {
+                "username": username,
+                "current": self.current_player(),
+                "online": dict(self.player_online),
+                "action": act,
+            })
+            # #endregion
             return False, "还没轮到你"
         if not self.player_online.get(username, True):
+            # #region agent log
+            _dbg("D", "engine.py:apply_action:self_offline", "reject: actor offline", {
+                "username": username, "online": dict(self.player_online), "action": act,
+            })
+            # #endregion
             return False, "你已离线"
 
         if act == "end_play":

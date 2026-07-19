@@ -47,6 +47,29 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 PROTECTED_PREFIXES = ("/lobby", "/battle", "/codex", "/about", "/room", "/table", "/api/rooms", "/api/codex")
 
+# #region agent log
+_DEBUG_LOG = BASE_DIR / "debug-2b39ab.log"
+
+
+def _agent_log(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
+    try:
+        payload = {
+            "sessionId": "2b39ab",
+            "runId": "offline-play",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        with _DEBUG_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# #endregion
+
 _host_transfer_deadlines: dict[str, float] = {}
 ROOM_OFFLINE_GRACE_SECONDS = 3.0
 _room_cleanup_deadlines: dict[str, float] = {}
@@ -148,7 +171,22 @@ async def _handle_player_offline(username: str, room_id: str) -> None:
     if room.status == "playing" and room.game:
         room_manager.sync_game_online(room)
         room.game.mark_disconnected(username)
-        room.game.skip_current_if_offline(username)
+        skipped = room.game.skip_current_if_offline(username)
+        # #region agent log
+        _agent_log(
+            "A",
+            "server.py:_handle_player_offline",
+            "after offline in playing room",
+            {
+                "username": username,
+                "skipped": skipped,
+                "phase": room.game.phase,
+                "current": room.game.current_player() if room.game.phase != "ended" else None,
+                "online": dict(room.game.player_online),
+                "room_status": room.status,
+            },
+        )
+        # #endregion
         if room.game.phase == "ended":
             room.status = "ended"
     elif was_host and room.status == "waiting":
@@ -551,6 +589,22 @@ async def _handle_ws_message(username: str, data: dict[str, Any]) -> None:
             await ws_hub.send_to(username, make_message("error", {"message": "对局不存在"}))
             return
         ok, message = room.game.apply_action(username, payload)
+        # #region agent log
+        _agent_log(
+            "C",
+            "server.py:game_action",
+            "game_action result",
+            {
+                "username": username,
+                "action": (payload or {}).get("action"),
+                "ok": ok,
+                "message": message,
+                "phase": room.game.phase,
+                "current": room.game.current_player() if room.game.phase != "ended" else None,
+                "online": dict(room.game.player_online),
+            },
+        )
+        # #endregion
         if not ok:
             await ws_hub.send_to(username, make_message("error", {"message": message}))
             return

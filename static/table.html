@@ -34,8 +34,14 @@
             background: rgba(0,40,70,0.35);
         }
         .player-chip.turn { border-color: #00e5ff; box-shadow: 0 0 12px rgba(0,229,255,0.2); }
+        .player-chip.dying-victim { border-color: #ff8a8a; box-shadow: 0 0 12px rgba(255,120,120,0.25); }
+        .player-chip.dying-current { border-color: #ffcc66; box-shadow: 0 0 12px rgba(255,200,100,0.25); }
         .player-chip.dead { opacity: 0.4; }
         .player-chip.offline { opacity: 0.65; border-color: rgba(255,120,120,0.35); }
+        .banner.dying {
+            background: rgba(255, 100, 80, 0.14); border-color: rgba(255,120,100,0.4);
+        }
+        .card.dim { opacity: 0.35; cursor: not-allowed; }
         .badge-off { font-size: 11px; color: #ff8a8a; margin-left: 4px; }
         .player-chip .n { font-weight: 700; font-size: 14px; }
         .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
@@ -116,6 +122,7 @@
                         <select id="targetSelect"></select>
                         <button class="btn" id="playBtn">出牌</button>
                         <button class="btn btn-outline" id="passBtn">过牌</button>
+                        <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结束救援</button>
                         <button class="btn btn-outline" id="placeholderBtn">占位出牌</button>
                     </div>
                     <div class="status" id="statusMsg"></div>
@@ -187,7 +194,7 @@
             }
 
             setInterval(() => {
-                if (!turnDeadlineMs || !state || state.phase !== 'turn') {
+                if (!turnDeadlineMs || !state || (state.phase !== 'turn' && state.phase !== 'dying')) {
                     turnTimerEl.textContent = '—';
                     return;
                 }
@@ -200,20 +207,32 @@
                 turnDeadlineMs = snap.turn_deadline_ms || null;
                 document.getElementById('deckCount').textContent = snap.deck_count;
                 document.getElementById('discardCount').textContent = snap.discard_count;
+                const dying = snap.dying;
+                const isDying = snap.phase === 'dying' && dying;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
+                const myDying = isDying && dying.current === username;
 
                 const playersEl = document.getElementById('players');
-                playersEl.innerHTML = (snap.players || []).map((p) => `
-                    <div class="player-chip ${p.username === snap.current_player ? 'turn' : ''} ${p.alive ? '' : 'dead'} ${p.online === false ? 'offline' : ''}">
+                playersEl.innerHTML = (snap.players || []).map((p) => {
+                    const chipClass = [
+                        (!isDying && p.username === snap.current_player) ? 'turn' : '',
+                        (isDying && p.username === dying.victim) ? 'dying-victim' : '',
+                        (isDying && p.username === dying.current) ? 'dying-current' : '',
+                        p.alive ? '' : 'dead',
+                        p.online === false ? 'offline' : '',
+                    ].filter(Boolean).join(' ');
+                    const dyingTag = (isDying && p.username === dying.victim) ? ' · 濒死' : '';
+                    return `
+                    <div class="player-chip ${chipClass}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${dyingTag}${p.alive ? '' : ' · 出局'}</div>
                         <div class="eq">
                             ${equipLine(p.equipment, 'stellar_track')}
                             ${equipLine(p.equipment, 'stability_system')}
                         </div>
                         <div class="st">${statusLines(p.statuses)}</div>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
 
                 const role = snap.you?.role;
                 document.getElementById('roleBox').textContent = role
@@ -222,38 +241,58 @@
 
                 const hand = snap.you?.hand || [];
                 const handEl = document.getElementById('hand');
-                handEl.innerHTML = hand.map((c) => `
-                    <div class="card ${selectedId === c.instance_id ? 'selected' : ''}" data-id="${c.instance_id}">
+                handEl.innerHTML = hand.map((c) => {
+                    const dim = isDying && c.type !== 'heal' ? 'dim' : '';
+                    return `
+                    <div class="card ${selectedId === c.instance_id ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-type="${c.type}">
                         <div class="cname">${c.name}</div>
                         <div class="ctype">${cardTypeLabel(c)}</div>
                         <div class="ctext">${c.text}</div>
-                    </div>
-                `).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';
+                    </div>`;
+                }).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';
                 handEl.querySelectorAll('.card').forEach((el) => {
                     el.addEventListener('click', () => {
+                        if (isDying && el.getAttribute('data-type') !== 'heal') {
+                            setStatus('濒死阶段只能选择治疗牌', 'error');
+                            return;
+                        }
                         selectedId = el.getAttribute('data-id');
                         render(state);
                     });
                 });
 
                 const sel = document.getElementById('targetSelect');
-                const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
-                sel.innerHTML = '<option value=\"\">（无目标）</option>' +
-                    targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                if (isDying) {
+                    sel.innerHTML = `<option value="${dying.victim}">${dying.victim}（濒死者）</option>`;
+                    sel.disabled = true;
+                } else {
+                    sel.disabled = false;
+                    const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                    sel.innerHTML = '<option value=\"\">（无目标）</option>' +
+                        targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                }
 
-                document.getElementById('playBtn').disabled = !myTurn || !selectedId;
-                document.getElementById('passBtn').disabled = !myTurn;
-                document.getElementById('placeholderBtn').disabled = !myTurn;
+                const canPlay = (myTurn || myDying) && !!selectedId;
+                document.getElementById('playBtn').disabled = !canPlay;
+                document.getElementById('passBtn').disabled = !myTurn || isDying;
+                document.getElementById('placeholderBtn').disabled = !myTurn || isDying;
+                const dyingPassBtn = document.getElementById('dyingPassBtn');
+                dyingPassBtn.style.display = isDying ? 'inline-block' : 'none';
+                dyingPassBtn.disabled = !myDying;
 
                 const logEl = document.getElementById('log');
                 logEl.innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
 
                 const banner = document.getElementById('endBanner');
+                banner.classList.remove('dying');
                 if (snap.phase === 'ended') {
                     banner.classList.add('show');
                     banner.textContent = snap.winner
                         ? `对局结束 · 胜者 ${snap.winner}（${snap.winner_faction || ''}）`
                         : '对局结束';
+                } else if (isDying) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${dying.victim} 濒死 · 等待 ${dying.current || '—'} 救援`;
                 } else {
                     banner.classList.remove('show');
                 }
@@ -273,8 +312,14 @@
             document.getElementById('playBtn').addEventListener('click', () => {
                 if (!selectedId || !state) return;
                 const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
-                const target = document.getElementById('targetSelect').value || null;
-                if (card && needsTarget(card) && !target) {
+                let target = document.getElementById('targetSelect').value || null;
+                if (state.phase === 'dying') {
+                    if (!card || card.type !== 'heal') {
+                        setStatus('濒死阶段只能打出治疗牌', 'error');
+                        return;
+                    }
+                    target = state.dying?.victim || null;
+                } else if (card && needsTarget(card) && !target) {
                     setStatus('该牌需要选择目标', 'error');
                     return;
                 }
@@ -287,6 +332,9 @@
             });
             document.getElementById('passBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'pass' }, roomId);
+            });
+            document.getElementById('dyingPassBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'dying_pass' }, roomId);
             });
             document.getElementById('placeholderBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'play_placeholder' }, roomId);

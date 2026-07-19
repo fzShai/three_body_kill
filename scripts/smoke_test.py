@@ -120,6 +120,100 @@ def main() -> None:
     assert not sg._has_status("erin", STATUS_LOCKED)
     assert sg._has_status("erin", "focus")
 
+    # heal card peach: normal self-heal only
+    hg = GameSession.create("HEAL", ["gina", "hank"])
+    gina = hg.players["gina"]
+    peach = {
+        "id": "peach",
+        "name": "桃",
+        "type": "heal",
+        "cost": 1,
+        "heal": 2,
+        "text": "test",
+        "instance_id": "peach-self-1",
+    }
+    gina["hand"] = [peach]
+    gina["hp"] = 2
+    hg.turn_index = hg.player_order.index("gina")
+    hg.phase = "turn"
+    ok, msg = hg.apply_action("gina", {"action": "play_card", "instance_id": peach["instance_id"], "target": "hank"})
+    assert not ok
+    ok, msg = hg.apply_action("gina", {"action": "play_card", "instance_id": peach["instance_id"]})
+    assert ok, msg
+    assert gina["hp"] == 4
+
+    # dying: enter dying, self-save with peach, full circle then alive
+    dg = GameSession.create("DYING", ["ivy", "jade"])
+    ivy, jade = dg.players["ivy"], dg.players["jade"]
+    ivy["hp"] = 1
+    jade["hp"] = 4
+    peach_a = {**peach, "instance_id": "peach-dying-1"}
+    peach_b = {**peach, "instance_id": "peach-dying-2"}
+    ivy["hand"] = [peach_a, peach_b]
+    jade["hand"] = []
+    dg.turn_index = dg.player_order.index("jade")
+    dg.phase = "turn"
+    atk = {
+        "id": "droplet",
+        "name": "水滴",
+        "type": "attack",
+        "cost": 2,
+        "text": "test",
+        "instance_id": "droplet-dying-1",
+    }
+    jade["hand"] = [atk]
+    ok, msg = dg.apply_action("jade", {"action": "play_card", "instance_id": atk["instance_id"], "target": "ivy"})
+    assert ok, msg
+    assert dg.phase == "dying"
+    assert dg.dying is not None and dg.dying["victim"] == "ivy"
+    snap_d = dg.snapshot_for("jade")
+    assert snap_d["dying"]["victim"] == "ivy"
+    assert snap_d["dying"]["current"] == "ivy"
+    assert ivy["alive"] and ivy["hp"] <= 0
+
+    ok, msg = dg.apply_action("ivy", {"action": "play_card", "instance_id": peach_a["instance_id"]})
+    assert ok, msg
+    assert ivy["hp"] == 2
+    # can play another peach in same response window
+    ok, msg = dg.apply_action("ivy", {"action": "play_card", "instance_id": peach_b["instance_id"]})
+    assert ok, msg
+    assert ivy["hp"] == 4
+    ok, msg = dg.apply_action("ivy", {"action": "dying_pass"})
+    assert ok, msg
+    # jade's turn to respond then end circle
+    assert dg.phase == "dying"
+    assert dg._dying_current() == "jade"
+    ok, msg = dg.apply_action("jade", {"action": "dying_pass"})
+    assert ok, msg
+    assert dg.phase == "turn"
+    assert ivy["alive"] and ivy["hp"] == 4
+
+    # dying: everyone passes -> death
+    dg2 = GameSession.create("DYING2", ["kate", "liam"])
+    kate, liam = dg2.players["kate"], dg2.players["liam"]
+    kate["hp"] = 1
+    kate["hand"] = []
+    liam["hand"] = [{
+        "id": "droplet",
+        "name": "水滴",
+        "type": "attack",
+        "cost": 2,
+        "text": "test",
+        "instance_id": "droplet-dying-2",
+    }]
+    dg2.turn_index = dg2.player_order.index("liam")
+    dg2.phase = "turn"
+    ok, msg = dg2.apply_action("liam", {"action": "play_card", "instance_id": "droplet-dying-2", "target": "kate"})
+    assert ok, msg
+    assert dg2.phase == "dying"
+    while dg2.phase == "dying":
+        cur = dg2._dying_current()
+        assert cur
+        ok, msg = dg2.apply_action(cur, {"action": "dying_pass"})
+        assert ok, msg
+    assert not kate["alive"]
+    assert kate["hp"] == 0
+
     c1 = TestClient(app)
     c2 = TestClient(app)
     for u in ("smoke_a", "smoke_b"):

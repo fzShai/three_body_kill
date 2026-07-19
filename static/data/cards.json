@@ -87,6 +87,14 @@
       "slot": "stability_system",
       "cost": 2,
       "text": "装备到「维稳系统」（占位，暂无额外效果）。"
+    },
+    {
+      "id": "peach",
+      "name": "桃",
+      "type": "heal",
+      "cost": 1,
+      "heal": 2,
+      "text": "对自己使用，回复 2 点生命。濒死结算时可将目标改为濒死者。"
     }
   ]
 }

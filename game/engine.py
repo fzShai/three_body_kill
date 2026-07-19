@@ -73,7 +73,7 @@ class GameSession:
     def __init__(self, room_id: str, player_names: list[str]) -> None:
         self.room_id = room_id
         self.player_order = list(player_names)
-        self.phase = "dealing"  # dealing | turn | ended
+        self.phase = "dealing"  # dealing | turn | dying | ended
         self.turn_index = 0
         self.seq = 0
         self.log: list[str] = []
@@ -86,6 +86,7 @@ class GameSession:
         self.winner_faction: str | None = None
         self.player_online: dict[str, bool] = {name: True for name in player_names}
         self.turn_deadline_at = 0.0
+        self.dying: dict[str, Any] | None = None
         self._deal_initial()
         self.phase = "turn"
         self._start_turn_timer()
@@ -107,14 +108,21 @@ class GameSession:
         self.turn_deadline_at = time.time() + TURN_SECONDS
 
     def refresh_turn_timer(self) -> None:
-        if self.phase == "turn":
+        if self.phase in {"turn", "dying"}:
             self._start_turn_timer()
 
     def expire_turn_if_due(self) -> bool:
-        """Auto-end current turn when the 12s timer expires."""
-        if self.phase != "turn":
-            return False
+        """Auto-end current turn / dying response when the timer expires."""
         if time.time() < self.turn_deadline_at:
+            return False
+        if self.phase == "dying":
+            name = self._dying_current()
+            if name:
+                self._log(f"{name} 濒死救援超时，自动跳过")
+            self._advance_dying_responder()
+            self.seq += 1
+            return True
+        if self.phase != "turn":
             return False
         name = self.current_player()
         self._log(f"{name} 出牌超时，自动结束回合")
@@ -155,12 +163,17 @@ class GameSession:
                 self.player_online[name] = online_map[name]
 
     def skip_current_if_offline(self, username: str) -> bool:
-        """If it's this player's turn and they are offline, auto-skip."""
+        """If it's this player's turn / dying response and they are offline, auto-skip."""
+        if self.player_online.get(username, True):
+            return False
+        if self.phase == "dying" and self._dying_current() == username:
+            self._log(f"{username} 离线，跳过濒死救援")
+            self._advance_dying_responder()
+            self.seq += 1
+            return True
         if self.phase != "turn":
             return False
         if self.current_player() != username:
-            return False
-        if self.player_online.get(username, True):
             return False
         self._log(f"{username} 离线，自动跳过出牌阶段")
         self._advance_turn()
@@ -249,6 +262,9 @@ class GameSession:
         if act == "ping":
             return True, "pong"
 
+        if self.phase == "dying":
+            return self._apply_dying_action(username, action)
+
         if act == "pass":
             if self.current_player() != username:
                 return False, "还没轮到你"
@@ -304,13 +320,116 @@ class GameSession:
                 self.discard.append(card)
                 self._log(f"{username} 打出 {card['name']}：{msg}")
             self.refresh_turn_timer()
-            if self._check_win():
+            if self.phase != "dying" and self._check_win():
                 self.seq += 1
                 return True, msg
             self.seq += 1
             return True, msg
 
         return False, f"未知行动: {act}"
+
+    def _dying_order(self, victim: str) -> list[str]:
+        n = len(self.player_order)
+        start = self.player_order.index(victim)
+        order: list[str] = []
+        for i in range(n):
+            name = self.player_order[(start + i) % n]
+            if self.players[name]["alive"]:
+                order.append(name)
+        return order
+
+    def _dying_current(self) -> str | None:
+        if not self.dying:
+            return None
+        order = self.dying["order"]
+        idx = self.dying["index"]
+        if idx < 0 or idx >= len(order):
+            return None
+        return order[idx]
+
+    def _begin_dying(self, victim: str) -> str:
+        order = self._dying_order(victim)
+        if not order:
+            self._eliminate_player(victim)
+            return f"{victim} 出局"
+        self.phase = "dying"
+        self.dying = {"victim": victim, "order": order, "index": -1}
+        self._log(f"{victim} 进入濒死")
+        self._advance_dying_responder()
+        return f"{victim} 濒死，等待救援"
+
+    def _advance_dying_responder(self) -> None:
+        if not self.dying:
+            return
+        self.dying["index"] += 1
+        while self.dying["index"] < len(self.dying["order"]):
+            name = self.dying["order"][self.dying["index"]]
+            if not self.players[name]["alive"]:
+                self.dying["index"] += 1
+                continue
+            if not self.player_online.get(name, True):
+                self._log(f"{name} 离线，跳过濒死救援")
+                self.dying["index"] += 1
+                continue
+            self._start_turn_timer()
+            self._log(f"濒死救援：轮到 {name}")
+            return
+        self._resolve_dying()
+
+    def _resolve_dying(self) -> None:
+        if not self.dying:
+            return
+        victim = self.dying["victim"]
+        self.dying = None
+        if self.players[victim]["hp"] > 0:
+            self.phase = "turn"
+            self._start_turn_timer()
+            self._log(f"{victim} 脱离濒死（HP {self.players[victim]['hp']}）")
+            return
+        self._eliminate_player(victim)
+        self._log(f"{victim} 濒死求援失败，出局")
+        if self._check_win():
+            return
+        self.phase = "turn"
+        self._start_turn_timer()
+
+    def _apply_dying_action(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        act = str(action.get("action", "")).strip()
+        current = self._dying_current()
+        if act == "dying_pass":
+            if current != username:
+                return False, "还没轮到你救援"
+            self._log(f"{username} 结束濒死救援")
+            self._advance_dying_responder()
+            self.seq += 1
+            return True, "已结束救援"
+
+        if act == "play_card":
+            if current != username:
+                return False, "还没轮到你救援"
+            if not self.dying:
+                return False, "当前不在濒死结算"
+            instance_id = str(action.get("instance_id", "")).strip()
+            hand = self.players[username]["hand"]
+            idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
+            if idx is None:
+                return False, "手牌中没有这张牌"
+            card = hand.pop(idx)
+            if card.get("type") != "heal":
+                hand.insert(idx, card)
+                return False, "濒死阶段只能打出治疗牌"
+            victim = self.dying["victim"]
+            ok, msg = self._resolve_card(username, card, victim)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.discard.append(card)
+            self._log(f"{username} 打出 {card['name']}：{msg}")
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
+        return False, "濒死阶段只能出治疗牌或结束救援"
 
     def _equip_card(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
         slot = str(card.get("slot", "")).strip()
@@ -391,6 +510,20 @@ class GameSession:
             p["hp"] = min(p["max_hp"], p["hp"] + 1)
             return True, f"恢复至 {p['hp']} HP"
 
+        if card.get("type") == "heal":
+            amount = int(card.get("heal", 0))
+            if self.phase == "dying" and self.dying:
+                heal_target = self.dying["victim"]
+            else:
+                heal_target = target or username
+                if heal_target != username:
+                    return False, "正常情况下只能对自己使用治疗牌"
+            if heal_target not in self.players or not self.players[heal_target]["alive"]:
+                return False, "目标无效"
+            ht = self.players[heal_target]
+            ht["hp"] = min(ht["max_hp"], ht["hp"] + amount)
+            return True, f"{heal_target} 恢复至 {ht['hp']} HP"
+
         if cid == "probe":
             ok, err = need_alive_target()
             if not ok:
@@ -418,8 +551,7 @@ class GameSession:
             t["hp"] -= dmg
             msg = f"{target} 受到 {dmg} 点损伤（HP {t['hp']}）"
             if t["hp"] <= 0:
-                self._eliminate_player(target)
-                msg += f"，{target} 出局"
+                msg += "，" + self._begin_dying(target)
             return True, msg
 
         return True, "效果已结算"
@@ -450,7 +582,15 @@ class GameSession:
                 "role_name": me["role_name"],
                 "faction": me["faction"],
             }
-        remaining = max(0.0, self.turn_deadline_at - time.time()) if self.phase == "turn" else 0.0
+        timed = self.phase in {"turn", "dying"}
+        remaining = max(0.0, self.turn_deadline_at - time.time()) if timed else 0.0
+        dying_view = None
+        if self.dying:
+            dying_view = {
+                "victim": self.dying["victim"],
+                "current": self._dying_current(),
+                "order": list(self.dying["order"]),
+            }
         return {
             "room_id": self.room_id,
             "phase": self.phase,
@@ -465,7 +605,8 @@ class GameSession:
             "winner_faction": self.winner_faction,
             "turn_seconds": TURN_SECONDS,
             "turn_remaining": remaining,
-            "turn_deadline_ms": int(self.turn_deadline_at * 1000) if self.phase == "turn" else None,
+            "turn_deadline_ms": int(self.turn_deadline_at * 1000) if timed else None,
+            "dying": dying_view,
             "you": {
                 "username": viewer,
                 "hand": private_hand,

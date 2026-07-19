@@ -1,4 +1,5 @@
-# Game package
-from game.engine import GameSession
+"""Game package public API."""
 
-__all__ = ["GameSession"]
+from game.engine import STATUS_LOCKED, GameSession
+
+__all__ = ["GameSession", "STATUS_LOCKED"]

@@ -1,0 +1,12 @@
+{
+  "ships": [
+    { "id": "blue_space", "name": "蓝色空间号", "text": "你获得1点伤害加成", "phase": "B" },
+    { "id": "gravity", "name": "万有引力号", "text": "你的牌被响应时，你可弃两张手牌，使其仍然生效", "phase": "B" },
+    { "id": "natural_selection", "name": "自然选择号", "text": "血量上限+3，装备时回复两点血量", "phase": "B" },
+    { "id": "bronze_age", "name": "青铜时代号", "text": "科技等级+1，每回合开始时回复一点生命", "phase": "B" },
+    { "id": "quantum", "name": "量子号", "text": "每回合获得一张三阶杀，出杀上限+1", "phase": "B" },
+    { "id": "tang", "name": "唐号", "text": "此装备进入或离开装备区时摸两张牌", "phase": "B" },
+    { "id": "star_ring", "name": "星环号", "text": "无法成为基本牌目标；受锦囊伤害后失去此装备", "phase": "B" },
+    { "id": "ultimate_law", "name": "终极规律号", "text": "每回合限一次观看并复制一张手牌", "phase": "B" }
+  ]
+}

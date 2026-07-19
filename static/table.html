@@ -103,7 +103,7 @@
 <body>
     <div class="wrap">
         <h1>黑暗森林 · 对局桌</h1>
-        <div class="meta">房号 <span id="roomIdDisplay"></span> · 牌库 <span id="deckCount">0</span> · 弃牌 <span id="discardCount">0</span> · 倒计时 <span id="turnTimer">—</span></div>
+        <div class="meta">房号 <span id="roomIdDisplay"></span> · 阶段 <span id="phaseLabel">—</span> · 弃牌堆 <span id="discardCount">0</span> · 倒计时 <span id="turnTimer">—</span></div>
         <div class="banner" id="endBanner"></div>
 
         <div class="grid">
@@ -121,9 +121,11 @@
                         <label style="font-size:12px;color:rgba(255,255,255,0.45);">目标</label>
                         <select id="targetSelect"></select>
                         <button class="btn" id="playBtn">出牌</button>
-                        <button class="btn btn-outline" id="passBtn">过牌</button>
-                        <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结束救援</button>
-                        <button class="btn btn-outline" id="placeholderBtn">占位出牌</button>
+                        <button class="btn btn-outline" id="endPlayBtn">结束出牌</button>
+                        <button class="btn btn-outline" id="passBtn">结束回合</button>
+                        <button class="btn btn-outline" id="respondPassBtn" style="display:none;">不响应</button>
+                        <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结算濒死</button>
+                        <button class="btn btn-outline" id="recastBtn">重铸</button>
                     </div>
                     <div class="status" id="statusMsg"></div>
                 </div>
@@ -159,10 +161,13 @@
             const SLOT_LABEL = {
                 stellar_track: '恒星航迹',
                 stability_system: '维稳系统',
+                ship: '船',
+                armor: '甲',
+                temp_ascend: '临时飞升',
             };
 
             function needsTarget(card) {
-                return ['probe', 'sophon', 'dark_forest', 'droplet', 'dimensions'].includes(card.id);
+                return card && (card.subtype === 'kill' || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3');
             }
 
             function equipLine(equipment, slot) {
@@ -175,26 +180,23 @@
             }
 
             function cardTypeLabel(c) {
-                if (c.type === 'equipment') {
-                    return `装备 · ${SLOT_LABEL[c.slot] || c.slot || '?'} · 费${c.cost}`;
-                }
-                return `${c.type} · 费${c.cost}`;
+                if (c.subtype === 'kill') return `${c.tier || '?'}阶杀`;
+                if (c.subtype === 'dodge') return `${c.tier || '?'}阶闪`;
+                if (c.subtype === 'heal') return `桃 · 回复${c.heal || 2}`;
+                if (c.subtype === 'visitor') return '基本 · 天外来客';
+                if (c.type === 'equipment') return `装备 · ${SLOT_LABEL[c.slot] || c.slot || ''}`;
+                return c.type || '牌';
             }
 
             function statusLines(statuses) {
                 const list = statuses || [];
                 const pos = list.filter((s) => s.kind === 'positive').map((s) => s.name);
                 const neg = list.filter((s) => s.kind === 'negative').map((s) => s.name);
-                const posText = pos.length ? pos.join('、') : '无';
-                const negText = neg.length ? neg.join('、') : '无';
-                return `
-                    <div class="pos">正面：${posText}</div>
-                    <div class="neg">负面：${negText}</div>
-                `;
+                return `<div class="pos">正面：${pos.length ? pos.join('、') : '无'}</div><div class="neg">负面：${neg.length ? neg.join('、') : '无'}</div>`;
             }
 
             setInterval(() => {
-                if (!turnDeadlineMs || !state || (state.phase !== 'turn' && state.phase !== 'dying')) {
+                if (!turnDeadlineMs || !state || !['turn', 'prompt', 'dying'].includes(state.phase)) {
                     turnTimerEl.textContent = '—';
                     return;
                 }
@@ -205,94 +207,93 @@
             function render(snap) {
                 state = snap;
                 turnDeadlineMs = snap.turn_deadline_ms || null;
-                document.getElementById('deckCount').textContent = snap.deck_count;
-                document.getElementById('discardCount').textContent = snap.discard_count;
+                document.getElementById('discardCount').textContent = snap.discard_count ?? 0;
+                const phaseMap = { turn: '回合', prompt: '响应', dying: '濒死', ended: '结束' };
+                const tp = snap.turn_phase ? ({ draw: '摸牌', play: '出牌', discard: '弃牌' }[snap.turn_phase] || snap.turn_phase) : '';
+                document.getElementById('phaseLabel').textContent = (phaseMap[snap.phase] || snap.phase) + (tp ? '/' + tp : '');
+
+                const prompt = snap.prompt;
                 const dying = snap.dying;
+                const isPrompt = snap.phase === 'prompt' && prompt;
                 const isDying = snap.phase === 'dying' && dying;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
-                const myDying = isDying && dying.current === username;
+                const myPrompt = isPrompt && prompt.to === username;
+                const myDying = isDying && dying.victim === username;
 
                 const playersEl = document.getElementById('players');
                 playersEl.innerHTML = (snap.players || []).map((p) => {
-                    const chipClass = [
-                        (!isDying && p.username === snap.current_player) ? 'turn' : '',
+                    const cls = [
+                        (!isPrompt && !isDying && p.username === snap.current_player) ? 'turn' : '',
                         (isDying && p.username === dying.victim) ? 'dying-victim' : '',
-                        (isDying && p.username === dying.current) ? 'dying-current' : '',
+                        (isPrompt && p.username === prompt.to) ? 'dying-current' : '',
                         p.alive ? '' : 'dead',
                         p.online === false ? 'offline' : '',
                     ].filter(Boolean).join(' ');
-                    const dyingTag = (isDying && p.username === dying.victim) ? ' · 濒死' : '';
-                    return `
-                    <div class="player-chip ${chipClass}">
+                    const vis = p.vision_exposed ? ' · 视野暴露' : '';
+                    return `<div class="player-chip ${cls}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        <div class="s">HP ${p.hp}/${p.max_hp} · 手牌 ${p.hand_count}${dyingTag}${p.alive ? '' : ' · 出局'}</div>
-                        <div class="eq">
-                            ${equipLine(p.equipment, 'stellar_track')}
-                            ${equipLine(p.equipment, 'stability_system')}
-                        </div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}${equipLine(p.equipment, 'temp_ascend')}</div>
                         <div class="st">${statusLines(p.statuses)}</div>
                     </div>`;
                 }).join('');
 
                 const role = snap.you?.role;
+                const you = snap.you || {};
                 document.getElementById('roleBox').textContent = role
-                    ? `${role.role_name}（${role.faction}） · HP ${snap.you.hp}`
+                    ? `${role.role_name}（${role.faction}） · HP ${you.hp} · 科技${you.tech_level ?? 1} · 手牌上限${you.hand_limit ?? '—'}`
                     : '—';
 
-                const hand = snap.you?.hand || [];
+                const hand = you.hand || [];
                 const handEl = document.getElementById('hand');
                 handEl.innerHTML = hand.map((c) => {
-                    const dim = isDying && c.type !== 'heal' ? 'dim' : '';
-                    return `
-                    <div class="card ${selectedId === c.instance_id ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-type="${c.type}">
+                    let dim = '';
+                    if (isPrompt) dim = c.subtype === 'dodge' ? '' : 'dim';
+                    if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
+                    return `<div class="card ${selectedId === c.instance_id ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}">
                         <div class="cname">${c.name}</div>
                         <div class="ctype">${cardTypeLabel(c)}</div>
-                        <div class="ctext">${c.text}</div>
+                        <div class="ctext">${c.text || ''}</div>
                     </div>`;
                 }).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';
                 handEl.querySelectorAll('.card').forEach((el) => {
                     el.addEventListener('click', () => {
-                        if (isDying && el.getAttribute('data-type') !== 'heal') {
-                            setStatus('濒死阶段只能选择治疗牌', 'error');
-                            return;
-                        }
                         selectedId = el.getAttribute('data-id');
                         render(state);
                     });
                 });
 
                 const sel = document.getElementById('targetSelect');
-                if (isDying) {
-                    sel.innerHTML = `<option value="${dying.victim}">${dying.victim}（濒死者）</option>`;
-                    sel.disabled = true;
-                } else {
-                    sel.disabled = false;
-                    const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
-                    sel.innerHTML = '<option value=\"\">（无目标）</option>' +
-                        targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
-                }
+                sel.disabled = false;
+                const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                sel.innerHTML = '<option value="">（无目标）</option>' +
+                    targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
 
-                const canPlay = (myTurn || myDying) && !!selectedId;
-                document.getElementById('playBtn').disabled = !canPlay;
-                document.getElementById('passBtn').disabled = !myTurn || isDying;
-                document.getElementById('placeholderBtn').disabled = !myTurn || isDying;
+                const canPlay = (myTurn && snap.turn_phase === 'play') || myPrompt || myDying;
+                document.getElementById('playBtn').disabled = !canPlay || !selectedId;
+                document.getElementById('endPlayBtn').disabled = !(myTurn && snap.turn_phase === 'play');
+                document.getElementById('passBtn').disabled = !(myTurn && (snap.turn_phase === 'play' || snap.turn_phase === 'discard'));
+                document.getElementById('recastBtn').disabled = !(myTurn && snap.turn_phase === 'play' && selectedId);
+                const respondPassBtn = document.getElementById('respondPassBtn');
+                respondPassBtn.style.display = isPrompt ? 'inline-block' : 'none';
+                respondPassBtn.disabled = !myPrompt;
                 const dyingPassBtn = document.getElementById('dyingPassBtn');
                 dyingPassBtn.style.display = isDying ? 'inline-block' : 'none';
                 dyingPassBtn.disabled = !myDying;
 
-                const logEl = document.getElementById('log');
-                logEl.innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
+                document.getElementById('log').innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
 
                 const banner = document.getElementById('endBanner');
                 banner.classList.remove('dying');
                 if (snap.phase === 'ended') {
                     banner.classList.add('show');
-                    banner.textContent = snap.winner
-                        ? `对局结束 · 胜者 ${snap.winner}（${snap.winner_faction || ''}）`
-                        : '对局结束';
+                    banner.textContent = snap.winner ? `对局结束 · 胜者 ${snap.winner}` : '对局结束';
+                } else if (isPrompt) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.from} 对 ${prompt.to} 使用${prompt.card_name || '杀'} · 等待闪响应`;
                 } else if (isDying) {
                     banner.classList.add('show', 'dying');
-                    banner.textContent = `${dying.victim} 濒死 · 等待 ${dying.current || '—'} 救援`;
+                    banner.textContent = `${dying.victim} 濒死 · 使用桃或结算濒死`;
                 } else {
                     banner.classList.remove('show');
                 }
@@ -312,32 +313,36 @@
             document.getElementById('playBtn').addEventListener('click', () => {
                 if (!selectedId || !state) return;
                 const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
-                let target = document.getElementById('targetSelect').value || null;
-                if (state.phase === 'dying') {
-                    if (!card || card.type !== 'heal') {
-                        setStatus('濒死阶段只能打出治疗牌', 'error');
+                const target = document.getElementById('targetSelect').value || null;
+                if (state.phase === 'prompt') {
+                    sock.send('game_action', { action: 'respond_dodge', instance_id: selectedId }, roomId);
+                } else if (state.phase === 'dying') {
+                    sock.send('game_action', { action: 'play_card', instance_id: selectedId }, roomId);
+                } else {
+                    if (needsTarget(card) && !target) {
+                        setStatus('该牌需要选择目标', 'error');
                         return;
                     }
-                    target = state.dying?.victim || null;
-                } else if (card && needsTarget(card) && !target) {
-                    setStatus('该牌需要选择目标', 'error');
-                    return;
+                    sock.send('game_action', { action: 'play_card', instance_id: selectedId, target }, roomId);
                 }
-                sock.send('game_action', {
-                    action: 'play_card',
-                    instance_id: selectedId,
-                    target,
-                }, roomId);
                 selectedId = null;
             });
+            document.getElementById('endPlayBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'end_play' }, roomId);
+            });
             document.getElementById('passBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'pass' }, roomId);
+                sock.send('game_action', { action: 'discard_done' }, roomId);
+            });
+            document.getElementById('respondPassBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'respond_pass' }, roomId);
             });
             document.getElementById('dyingPassBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'dying_pass' }, roomId);
+                sock.send('game_action', { action: 'dying_resolve' }, roomId);
             });
-            document.getElementById('placeholderBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'play_placeholder' }, roomId);
+            document.getElementById('recastBtn').addEventListener('click', () => {
+                if (!selectedId) return;
+                sock.send('game_action', { action: 'recast', instance_id: selectedId }, roomId);
+                selectedId = null;
             });
             document.getElementById('backLobbyLink')?.addEventListener('click', () => {
                 window.location.href = '/lobby';

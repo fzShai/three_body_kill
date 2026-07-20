@@ -10,6 +10,13 @@ from typing import Any
 from game.catalog import load_card_defs
 from game.combat import can_dodge, compute_kill_damage
 from game.draw import DrawSystem
+from game.equipment import (
+    ALL_SLOTS,
+    SLOT_LABELS,
+    apply_equip_bonuses,
+    empty_equipment,
+    resolve_slot,
+)
 from game.stats import initial_combat_fields
 from game.turn import hand_limit
 
@@ -17,14 +24,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TURN_SECONDS = 20.0
 STATUS_LOCKED = "locked"
 STATUS_KINDS = ("positive", "negative")
-EQUIP_SLOTS = ("stellar_track", "stability_system", "ship", "armor", "temp_ascend")
-SLOT_LABELS = {
-    "stellar_track": "恒星航迹",
-    "stability_system": "维稳系统",
-    "ship": "船",
-    "armor": "甲",
-    "temp_ascend": "临时飞升",
-}
+EQUIP_SLOTS = ALL_SLOTS
 
 
 def load_roles() -> list[dict[str, Any]]:
@@ -36,7 +36,7 @@ def load_roles() -> list[dict[str, Any]]:
 
 
 def _empty_equipment() -> dict[str, Any | None]:
-    return {slot: None for slot in EQUIP_SLOTS}
+    return empty_equipment()
 
 
 def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -57,6 +57,10 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
             "hand": [],
             "equipment": _empty_equipment(),
             "statuses": [],
+            "extra_draw": 0,
+            "kill_limit_bonus": 0,
+            "vision_clear_at_turn_end": False,
+            "red_coast_used": False,
             **initial_combat_fields(),
         }
     return assigned
@@ -123,11 +127,66 @@ class GameSession:
         n = 3
         if p.get("ascension") == "psychic":
             n += 1
+        n += int(p.get("extra_draw", 0))
         drawn = self.draw_sys.draw_n(p["tech_level"], n)
         p["hand"].extend(drawn)
         self.turn_phase = "play"
         p["kills_used_this_turn"] = 0
+        p["red_coast_used"] = False
+        if p.get("bronze_age_regen"):
+            self._heal(name, 1)
+            self._log(f"{name} 青铜时代号：回合开始回复 1 点")
+        ship = (p.get("equipment") or {}).get("ship")
+        if ship and (ship.get("id") == "quantum" or ship.get("ship_id") == "quantum"):
+            kill = {
+                "id": "kill_t3",
+                "name": "3阶杀",
+                "type": "basic",
+                "subtype": "kill",
+                "tier": 3,
+                "instance_id": f"quantum-kill-{self.seq}-{name}",
+                "implemented": True,
+                "text": "量子号补给：三阶杀。",
+            }
+            p["hand"].append(kill)
+            self._log(f"{name} 量子号：获得一张三阶杀")
         self._log(f"{name} 摸牌阶段摸了 {len(drawn)} 张")
+
+    def _clear_vision_if_due(self, username: str) -> None:
+        p = self.players[username]
+        if p.get("vision_clear_at_turn_end") and p.get("vision_exposed"):
+            p["vision_exposed"] = False
+            p["vision_clear_at_turn_end"] = False
+            self._log(f"{username} 的视野暴露结束")
+
+    def _advance_turn(self) -> None:
+        if self.phase == "ended":
+            return
+        name = self.current_player()
+        if self.players[name].get("ascension") == "gene" and self.players[name]["alive"]:
+            self._heal(name, 2)
+            self._log(f"{name} 基因飞升：回合结束回复 2 点")
+        self._clear_vision_if_due(name)
+        n = len(self.player_order)
+        for _ in range(n):
+            self.turn_index = (self.turn_index + 1) % n
+            nxt = self.current_player()
+            if not self.players[nxt]["alive"]:
+                continue
+            if not self.player_online.get(nxt, True):
+                self._log(f"{nxt} 离线，跳过回合")
+                continue
+            if self._has_status(nxt, STATUS_LOCKED):
+                self._remove_status(nxt, STATUS_LOCKED)
+                self._log(f"{nxt} 被锁死，跳过回合")
+                continue
+            self.phase = "turn"
+            self.turn_phase = "draw"
+            self._run_draw_phase()
+            self._start_turn_timer()
+            self._log(f"轮到 {nxt}")
+            return
+        self.phase = "ended"
 
     def expire_turn_if_due(self) -> bool:
         if time.time() < self.turn_deadline_at:
@@ -212,34 +271,6 @@ class GameSession:
             return True
         return False
 
-    def _advance_turn(self) -> None:
-        if self.phase == "ended":
-            return
-        name = self.current_player()
-        if self.players[name].get("ascension") == "gene" and self.players[name]["alive"]:
-            self._heal(name, 2)
-            self._log(f"{name} 基因飞升：回合结束回复 2 点")
-        n = len(self.player_order)
-        for _ in range(n):
-            self.turn_index = (self.turn_index + 1) % n
-            nxt = self.current_player()
-            if not self.players[nxt]["alive"]:
-                continue
-            if not self.player_online.get(nxt, True):
-                self._log(f"{nxt} 离线，跳过回合")
-                continue
-            if self._has_status(nxt, STATUS_LOCKED):
-                self._remove_status(nxt, STATUS_LOCKED)
-                self._log(f"{nxt} 被锁死，跳过回合")
-                continue
-            self.phase = "turn"
-            self.turn_phase = "draw"
-            self._run_draw_phase()
-            self._start_turn_timer()
-            self._log(f"轮到 {nxt}")
-            return
-        self.phase = "ended"
-
     def _auto_discard(self, username: str) -> None:
         p = self.players[username]
         limit = hand_limit(p["max_hp"])
@@ -265,10 +296,6 @@ class GameSession:
                 statuses.pop(i)
                 return True
         return False
-
-    def _heal(self, username: str, amount: int) -> None:
-        p = self.players[username]
-        p["hp"] = min(p["max_hp"], p["hp"] + amount)
 
     def _raise_tech(self, username: str, by: int = 1) -> None:
         p = self.players[username]
@@ -306,19 +333,39 @@ class GameSession:
         self.discard.extend(t["hand"])
         t["hand"] = []
         for slot in EQUIP_SLOTS:
-            card = t["equipment"].get(slot)
-            if card:
-                self.discard.append(card)
-                t["equipment"][slot] = None
+            if t["equipment"].get(slot):
+                self._unequip_slot(username, slot, to_discard=True)
         t["statuses"] = []
+
+    def _incoming_damage(self, target: str, amount: int) -> int:
+        """Apply armor / equipment modifiers to incoming final damage."""
+        t = self.players[target]
+        dmg = max(0, int(amount))
+        if t.get("deep_sea") and not t.get("vision_exposed"):
+            dmg = max(0, dmg - 1)
+        if t.get("eco_bottle") and dmg > 3:
+            dmg = 3
+        if t.get("lightspeed_stacks") is not None:
+            stacks = int(t.get("lightspeed_stacks", 0))
+            red = min(3, stacks)
+            dmg = max(0, dmg - red)
+            t["lightspeed_stacks"] = min(3, stacks + 1)
+            t["lightspeed_reduction"] = min(3, stacks + 1)
+        return dmg
 
     def _deal_damage(self, source: str, target: str, final: int) -> str:
         t = self.players[target]
+        final = self._incoming_damage(target, final)
         t["hp"] -= final
         msg = f"{target} 受到 {final} 点最终伤害（HP {t['hp']}）"
         if t["hp"] <= 0:
             msg += "，" + self._begin_dying(target)
         return msg
+
+    def _heal(self, username: str, amount: int) -> None:
+        p = self.players[username]
+        bonus = 1 if p.get("deep_sea") and not p.get("vision_exposed") else 0
+        p["hp"] = min(p["max_hp"], p["hp"] + amount + bonus)
 
     def _begin_dying(self, victim: str) -> str:
         self.phase = "dying"
@@ -459,12 +506,95 @@ class GameSession:
             return True, "濒死已结算"
         return False, "濒死阶段行动无效"
 
+    def _alive_others(self, username: str) -> list[str]:
+        return [n for n in self.player_order if n != username and self.players[n]["alive"]]
+
+    def _card_implemented(self, card: dict[str, Any]) -> bool:
+        if "implemented" in card:
+            return bool(card["implemented"])
+        cid = card.get("id") or card.get("ship_id") or card.get("armor_id")
+        defs = self.card_defs.get(str(cid or ""), {})
+        if "implemented" in defs:
+            return bool(defs["implemented"])
+        if card.get("ship_id") or card.get("armor_id") or card.get("slot") in {"ship", "armor", "temp_ascend"}:
+            known = {
+                "blue_space", "natural_selection", "bronze_age", "quantum", "tang",
+                "nano_center", "chip_workshop", "stars_plan",
+                "deep_sea", "eco_bottle", "lightspeed_2",
+            }
+            return str(cid) in known
+        return False
+
+    def _card_has_legal_play(self, username: str, card: dict[str, Any]) -> bool:
+        subtype = card.get("subtype")
+        ctype = card.get("type")
+        cid = card.get("id")
+
+        if subtype == "dodge":
+            return False
+        if subtype == "kill":
+            return bool(self._alive_others(username))
+        if subtype == "heal" or cid == "peach":
+            return True
+        if subtype == "visitor" or cid == "visitor":
+            return True
+        if cid == "ladder_plan" or cid == "red_coast":
+            if not self._card_implemented(card):
+                return False
+            if cid == "ladder_plan":
+                return bool(self._alive_others(username))
+            return True
+        if ctype == "equipment" or resolve_slot(card):
+            return self._card_implemented(card) and resolve_slot(card) is not None
+        return False
+
+    def _unequip_slot(self, username: str, slot: str, *, to_discard: bool = True) -> dict[str, Any] | None:
+        p = self.players[username]
+        old = p["equipment"].get(slot)
+        if not old:
+            return None
+        notes = apply_equip_bonuses(p, old, equipping=False)
+        p["equipment"][slot] = None
+        if to_discard:
+            self.discard.append(old)
+        if old.get("id") == "tang" or old.get("ship_id") == "tang":
+            drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+            p["hand"].extend(drawn)
+            self._log(f"{username} 唐号离场：摸 {len(drawn)} 张")
+        if notes:
+            self._log(f"{username} 卸下 {old.get('name')}（{', '.join(notes)}）")
+        return old
+
+    def _equip_card(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
+        slot = resolve_slot(card)
+        if not slot:
+            return False, "无法识别装备栏位"
+        if not self._card_implemented(card):
+            return False, "该装备效果尚未实装，可尝试重铸"
+        p = self.players[username]
+        self._unequip_slot(username, slot)
+        p["equipment"][slot] = card
+        notes = apply_equip_bonuses(p, card, equipping=True)
+        if card.get("id") == "tang" or card.get("ship_id") == "tang":
+            drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+            p["hand"].extend(drawn)
+            self._log(f"{username} 唐号入场：摸 {len(drawn)} 张")
+        label = SLOT_LABELS.get(slot, slot)
+        note = f"（{', '.join(notes)}）" if notes else ""
+        self._log(f"{username} 装备[{label}] {card.get('name')}{note}")
+        return True, f"已装备 {card.get('name')}"
+
     def _recast(self, username: str, instance_id: str) -> tuple[bool, str]:
+        if self.turn_phase != "play":
+            return False, "现在不是出牌阶段"
         hand = self.players[username]["hand"]
         idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
         if idx is None:
             return False, "手牌中没有这张牌"
-        card = hand.pop(idx)
+        card = hand[idx]
+        if self._card_has_legal_play(username, card):
+            return False, "该牌有合法打法，不能重铸"
+        hand.pop(idx)
         self.discard.append(card)
         drawn = self.draw_sys.draw_one(self.players[username]["tech_level"])
         hand.append(drawn)
@@ -485,6 +615,7 @@ class GameSession:
         card = hand.pop(idx)
         subtype = card.get("subtype")
         ctype = card.get("type")
+        cid = card.get("id")
 
         if subtype == "kill":
             ok, msg = self._play_kill(username, card, target)
@@ -500,7 +631,7 @@ class GameSession:
             hand.insert(idx, card)
             return False, "闪只能在响应时打出"
 
-        if subtype == "heal" or card.get("id") == "peach":
+        if subtype == "heal" or cid == "peach":
             if target and target != username:
                 hand.insert(idx, card)
                 return False, "正常情况下桃只能对自己使用"
@@ -513,7 +644,7 @@ class GameSession:
             self.seq += 1
             return True, f"回复至 {self.players[username]['hp']} HP"
 
-        if subtype == "visitor" or card.get("id") == "visitor":
+        if subtype == "visitor" or cid == "visitor":
             self.discard.append(card)
             self._note_basic_used(username)
             self._raise_tech(username, 1)
@@ -522,16 +653,69 @@ class GameSession:
             self.seq += 1
             return True, f"科技等级 {self.players[username]['tech_level']}"
 
-        # Phase A: unimplemented tricks — allow recast hint
+        if cid == "ladder_plan":
+            ok, msg = self._play_ladder_plan(username, card, target)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
+        if cid == "red_coast":
+            ok, msg = self._play_red_coast(username, card)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
+        if ctype == "equipment" or resolve_slot(card):
+            ok, msg = self._equip_card(username, card)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
         hand.insert(idx, card)
-        if ctype == "trick" or ctype == "equipment":
-            return False, "该牌效果尚未实装，可尝试重铸"
-        return False, "无法使用该牌"
+        needs = card.get("needs") or self.card_defs.get(str(cid or ""), {}).get("needs") or []
+        if needs:
+            return False, f"该牌未实装（依赖：{', '.join(needs)}），可尝试重铸"
+        return False, "该牌效果尚未实装，可尝试重铸"
+
+    def _play_ladder_plan(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
+        if not target or target not in self.players:
+            return False, "阶梯计划需要指定目标"
+        if target == username:
+            return False, "不能以自己为目标"
+        if not self.players[target]["alive"]:
+            return False, "目标已淘汰"
+        t = self.players[target]
+        t["vision_exposed"] = True
+        t["vision_clear_at_turn_end"] = True
+        self.discard.append(card)
+        self._log(f"{username} 对 {target} 使用阶梯计划：视野暴露至其回合结束")
+        return True, f"{target} 视野已暴露"
+
+    def _play_red_coast(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
+        p = self.players[username]
+        if p.get("red_coast_used"):
+            return False, "红岸计划每回合限一次"
+        drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+        p["hand"].extend(drawn)
+        p["red_coast_used"] = True
+        self.discard.append(card)
+        self._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
+        return True, f"摸了 {len(drawn)} 张"
 
     def _play_kill(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
         p = self.players[username]
-        if p["kills_used_this_turn"] >= 2:
-            return False, "本回合出杀已达上限（2）"
+        kill_limit = 2 + int(p.get("kill_limit_bonus", 0))
+        if p["kills_used_this_turn"] >= kill_limit:
+            return False, f"本回合出杀已达上限（{kill_limit}）"
         if not target or target not in self.players:
             return False, "杀需要指定目标"
         if target == username:

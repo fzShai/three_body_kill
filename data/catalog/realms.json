@@ -1,10 +1,64 @@
 {
   "realms": [
-    { "id": "finale", "name": "终末", "text": "目标伤害+3、多摸2、解负面并免疫场地，其下回合结束后死亡", "phase": "D" },
-    { "id": "reckoning", "name": "清算", "text": "你与目标生命值均扣至1", "phase": "D" },
-    { "id": "illusion", "name": "幻梦", "text": "全员弃光手牌并受到等于弃牌数的最终伤害", "phase": "D" },
-    { "id": "cold_silence", "name": "冷寂", "text": "全员科技降至1且无法改变", "phase": "D" },
-    { "id": "myriad", "name": "万象", "text": "（文档未完整，占位）", "phase": "D" },
-    { "id": "afterglow", "name": "回光", "text": "（文档未完整，占位）", "phase": "D" }
+    {
+      "id": "finale",
+      "name": "终末",
+      "text": "目标伤害+3、多摸2、解负面并免疫场地，其下回合结束后死亡",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "reckoning",
+      "name": "清算",
+      "text": "你与目标生命值均扣至1",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "illusion",
+      "name": "幻梦",
+      "text": "全员弃光手牌并受到等于弃牌数的最终伤害",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "cold_silence",
+      "name": "冷寂",
+      "text": "全员科技降至1且无法改变",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "myriad",
+      "name": "万象",
+      "text": "（文档未完整，占位）",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "afterglow",
+      "name": "回光",
+      "text": "（文档未完整，占位）",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    }
   ]
 }

@@ -1,9 +1,55 @@
 {
   "armors": [
-    { "id": "deep_sea", "name": "深海液", "text": "视野未暴露时，伤害减免+1且治疗量加成+1", "phase": "B" },
-    { "id": "curvature", "name": "曲率引擎", "text": "需闪/杀响应时可判定，1则视为出闪", "phase": "B" },
-    { "id": "eco_bottle", "name": "生态瓶", "text": "受到伤害若大于3改为3", "phase": "B" },
-    { "id": "solar_observe", "name": "太阳系观测单元", "text": "回合内每使用四张牌摸一张", "phase": "B" },
-    { "id": "lightspeed_2", "name": "光速2号", "text": "受到伤害减免可成长，最多-3", "phase": "B" }
+    {
+      "id": "deep_sea",
+      "name": "深海液",
+      "text": "视野未暴露时，伤害减免+1且治疗量加成+1",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "curvature",
+      "name": "曲率引擎",
+      "text": "需闪/杀响应时可判定，1则视为出闪",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "judge"
+      ],
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "eco_bottle",
+      "name": "生态瓶",
+      "text": "受到伤害若大于3改为3",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "solar_observe",
+      "name": "太阳系观测单元",
+      "text": "回合内每使用四张牌摸一张",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "cards_used_counter"
+      ],
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "lightspeed_2",
+      "name": "光速2号",
+      "text": "受到伤害减免可成长，最多-3",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    }
   ]
 }

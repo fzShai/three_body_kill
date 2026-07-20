@@ -42,6 +42,10 @@ class DrawSystem:
                 "name": ship["name"],
                 "text": ship.get("text", ""),
                 "ship_id": ship["id"],
+                "type": "equipment",
+                "slot": "ship",
+                "implemented": bool(ship.get("implemented", False)),
+                "needs": list(ship.get("needs") or []),
             }
         elif key == "armor_bucket" and self.armors:
             armor = random.choice(self.armors)
@@ -51,6 +55,10 @@ class DrawSystem:
                 "name": armor["name"],
                 "text": armor.get("text", ""),
                 "armor_id": armor["id"],
+                "type": "equipment",
+                "slot": "armor",
+                "implemented": bool(armor.get("implemented", False)),
+                "needs": list(armor.get("needs") or []),
             }
         elif key == "realm_bucket" and self.realms:
             realm = random.choice(self.realms)
@@ -60,6 +68,8 @@ class DrawSystem:
                 "name": realm["name"],
                 "text": realm.get("text", ""),
                 "realm_id": realm["id"],
+                "implemented": bool(realm.get("implemented", False)),
+                "needs": list(realm.get("needs") or []),
             }
 
         subtype = base.get("subtype")

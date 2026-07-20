@@ -149,10 +149,15 @@
                 ultimate: '终极',
                 equipment: '装备',
                 heal: '治疗',
+                basic: '基本',
+                trick: '锦囊',
             };
             const SLOT_LABEL = {
                 stellar_track: '恒星航迹',
                 stability_system: '维稳系统',
+                ship: '船',
+                armor: '甲',
+                temp_ascend: '临时飞升',
             };
 
             document.querySelectorAll('.tab').forEach((tab) => {
@@ -215,22 +220,40 @@
                 const status = document.getElementById('cardsStatus');
                 try {
                     const data = await fetchJson('/api/codex/cards', '/static/data/cards.json');
-                    const cards = data.cards || [];
-                    if (!cards.length) {
+                    let cards = data.cards || [];
+                    if (!Array.isArray(cards)) {
+                        cards = Object.values(cards);
+                    }
+                    const ships = data.ships || [];
+                    const armors = data.armors || [];
+                    const realms = data.realms || [];
+                    const extra = [
+                        ...ships.map((s) => ({ ...s, type: s.type || 'equipment', slot: s.slot || 'ship' })),
+                        ...armors.map((a) => ({ ...a, type: a.type || 'equipment', slot: a.slot || 'armor' })),
+                        ...realms.map((r) => ({ ...r, type: r.type || 'trick' })),
+                    ];
+                    const all = [...cards, ...extra];
+                    if (!all.length) {
                         list.innerHTML = '<div class="empty">暂无卡牌数据</div>';
                         return;
                     }
-                    list.innerHTML = cards.map((c) => `
+                    list.innerHTML = all.map((c) => {
+                        const impl = c.implemented === true ? '已实装' : (c.implemented === false ? '未实装' : '');
+                        const needs = (c.needs && c.needs.length) ? `依赖：${c.needs.join('、')}` : '';
+                        return `
                         <div class="item">
                             <div class="name">${escapeHtml(c.name)}</div>
                             <div class="meta">
-                                <span>类型：${escapeHtml(TYPE_LABEL[c.type] || c.type)}</span>
-                                <span>费用：${escapeHtml(c.cost)}</span>
+                                <span>类型：${escapeHtml(TYPE_LABEL[c.type] || c.type || '—')}</span>
+                                ${c.phase ? `<span>批次：${escapeHtml(c.phase)}</span>` : ''}
+                                ${c.cost != null ? `<span>费用：${escapeHtml(c.cost)}</span>` : ''}
                                 ${c.slot ? `<span>栏位：${escapeHtml(SLOT_LABEL[c.slot] || c.slot)}</span>` : ''}
+                                ${impl ? `<span>${escapeHtml(impl)}</span>` : ''}
+                                ${needs ? `<span>${escapeHtml(needs)}</span>` : ''}
                             </div>
                             <div class="text">${escapeHtml(c.text)}</div>
-                        </div>
-                    `).join('');
+                        </div>`;
+                    }).join('');
                 } catch (e) {
                     if (e.message !== 'unauthorized') status.textContent = '加载卡牌图鉴失败';
                 }

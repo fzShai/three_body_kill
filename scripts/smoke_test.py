@@ -41,6 +41,7 @@ def main() -> None:
         "instance_id": "peach-t1",
     }
     g.players[cur]["hp"] = 2
+    g.players[cur]["max_hp"] = 5
     _give(g.players[cur], peach)
     ok, msg = g.apply_action(cur, {"action": "play_card", "instance_id": "peach-t1"})
     assert ok, msg
@@ -108,6 +109,96 @@ def main() -> None:
     ok, msg = kg2.apply_action("finn", {"action": "respond_pass"})
     assert ok, msg
     assert finn["hp"] == 1
+
+    # ladder_plan exposes vision; vision boosts kill damage; clears at target turn end
+    vg = GameSession.create("VISION", ["nora", "owen"])
+    nora, owen = vg.players["nora"], vg.players["owen"]
+    vg.turn_index = vg.player_order.index("nora")
+    vg.phase = "turn"
+    vg.turn_phase = "play"
+    ladder = {
+        "id": "ladder_plan",
+        "name": "阶梯计划",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "ladder-1",
+        "text": "暴露视野",
+    }
+    _give(nora, ladder)
+    ok, msg = vg.apply_action("nora", {"action": "play_card", "instance_id": "ladder-1", "target": "owen"})
+    assert ok, msg
+    assert owen["vision_exposed"] is True
+    kill_v = {**kill, "instance_id": "kill-v", "tier": 1}
+    _give(nora, kill_v)
+    owen["hp"] = 4
+    ok, msg = vg.apply_action("nora", {"action": "play_card", "instance_id": "kill-v", "target": "owen"})
+    assert ok, msg
+    ok, msg = vg.apply_action("owen", {"action": "respond_pass"})
+    assert ok, msg
+    assert owen["hp"] == 2  # base1 + vision1
+    # end nora turn then owen turn end should clear owen vision
+    ok, msg = vg.apply_action("nora", {"action": "discard_done"})
+    assert ok, msg
+    assert vg.current_player() == "owen"
+    assert owen["vision_exposed"] is True
+    ok, msg = vg.apply_action("owen", {"action": "discard_done"})
+    assert ok, msg
+    assert owen["vision_exposed"] is False
+
+    # illegal recast: peach has legal play
+    rg = GameSession.create("RECAST", ["paul", "quinn"])
+    cur = rg.current_player()
+    peach_r = {**peach, "instance_id": "peach-r"}
+    _give(rg.players[cur], peach_r)
+    ok, msg = rg.apply_action(cur, {"action": "recast", "instance_id": "peach-r"})
+    assert not ok and "不能重铸" in msg, msg
+    # unimplemented trick can recast
+    stub = {
+        "id": "wallfacer_plan",
+        "name": "面壁计划",
+        "type": "trick",
+        "implemented": False,
+        "needs": ["discard_from_target"],
+        "instance_id": "stub-1",
+    }
+    _give(rg.players[cur], stub)
+    ok, msg = rg.apply_action(cur, {"action": "recast", "instance_id": "stub-1"})
+    assert ok, msg
+
+    # equip blue_space: damage bonus
+    eqg = GameSession.create("EQUIP", ["rita", "sam"])
+    rita, sam = eqg.players["rita"], eqg.players["sam"]
+    eqg.turn_index = eqg.player_order.index("rita")
+    eqg.phase = "turn"
+    eqg.turn_phase = "play"
+    ship = {
+        "id": "blue_space",
+        "name": "蓝色空间号",
+        "type": "equipment",
+        "slot": "ship",
+        "ship_id": "blue_space",
+        "implemented": True,
+        "instance_id": "ship-1",
+        "text": "伤害+1",
+    }
+    _give(rita, ship)
+    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "ship-1"})
+    assert ok, msg
+    assert rita["equipment"]["ship"]["id"] == "blue_space"
+    assert rita["damage_bonus"] == 1
+    temp = {
+        "id": "stars_plan",
+        "name": "群星计划",
+        "type": "equipment",
+        "slot": "temp_ascend",
+        "implemented": True,
+        "instance_id": "temp-1",
+    }
+    _give(rita, temp)
+    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-1"})
+    assert ok, msg
+    assert rita["equipment"]["temp_ascend"]["id"] == "stars_plan"
+    assert rita["damage_bonus"] == 2
 
     # dying: force peach
     dg = GameSession.create("DIE", ["gina", "hank"])

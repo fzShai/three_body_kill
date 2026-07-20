@@ -29,7 +29,7 @@ ABOUT_PAGE = STATIC_DIR / "about.html"
 ROOM_PAGE = STATIC_DIR / "room.html"
 TABLE_PAGE = STATIC_DIR / "table.html"
 ROLES_DATA = DATA_DIR / "roles.json"
-CARDS_DATA = DATA_DIR / "cards.json"
+CARDS_DATA = DATA_DIR / "cards.json"  # legacy placeholder; codex uses catalog
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -349,10 +349,26 @@ async def api_codex_roles():
 
 @app.get("/api/codex/cards")
 async def api_codex_cards():
-    data = _load_json_file(CARDS_DATA)
-    if data is None:
+    try:
+        from game.catalog import load_armors, load_card_defs, load_realms, load_ships
+
+        cards_map = load_card_defs()
+        cards = sorted(cards_map.values(), key=lambda c: str(c.get("id", "")))
+        return JSONResponse(
+            {
+                "success": True,
+                "source": "catalog",
+                "cards": cards,
+                "ships": load_ships(),
+                "armors": load_armors(),
+                "realms": load_realms(),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        legacy = _load_json_file(CARDS_DATA)
+        if legacy is not None:
+            return JSONResponse({**legacy, "source": "legacy", "warning": str(exc)})
         return JSONResponse({"success": False, "message": "找不到卡牌数据"}, status_code=404)
-    return JSONResponse(data)
 
 
 @app.get("/room")

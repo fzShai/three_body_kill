@@ -167,8 +167,19 @@
             };
 
             function needsTarget(card) {
-                return card && (card.subtype === 'kill' || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3');
+                return card && (
+                    card.subtype === 'kill'
+                    || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3'
+                    || card.id === 'ladder_plan'
+                );
             }
+
+            const ASCENSION_LABEL = {
+                mech: '机械飞升',
+                cyber: '义体飞升',
+                gene: '基因飞升',
+                psychic: '灵能飞升',
+            };
 
             function equipLine(equipment, slot) {
                 const card = equipment && equipment[slot];
@@ -230,9 +241,10 @@
                         p.online === false ? 'offline' : '',
                     ].filter(Boolean).join(' ');
                     const vis = p.vision_exposed ? ' · 视野暴露' : '';
+                    const asc = p.ascension ? ` · ${ASCENSION_LABEL[p.ascension] || p.ascension}` : '';
                     return `<div class="player-chip ${cls}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${asc}${p.alive ? '' : ' · 出局'}</div>
                         <div class="eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}${equipLine(p.equipment, 'temp_ascend')}</div>
                         <div class="st">${statusLines(p.statuses)}</div>
                     </div>`;

@@ -1,100 +1,736 @@
 {
+  "source": "catalog",
   "cards": [
     {
-      "id": "probe",
-      "name": "智子探测",
-      "type": "action",
-      "cost": 1,
-      "text": "查看一名玩家的一张手牌（占位：揭示其手牌数量）。"
+      "id": "armor_bucket",
+      "name": "甲",
+      "type": "equipment",
+      "slot": "armor",
+      "phase": "B",
+      "text": "抽中后随机一件甲装备",
+      "implemented": true
     },
     {
-      "id": "sophon",
-      "name": "智子锁死",
-      "type": "action",
-      "cost": 2,
-      "text": "目标玩家下回合跳过出牌（占位：标记 skip）。"
+      "id": "ball_lightning",
+      "name": "球状闪电",
+      "type": "trick",
+      "phase": "C",
+      "text": "封锁目标非锁定技（待实现）",
+      "implemented": false,
+      "needs": [
+        "skill_lock_status"
+      ]
     },
     {
-      "id": "dark_forest",
-      "name": "黑暗森林打击",
-      "type": "attack",
-      "cost": 3,
-      "text": "对目标造成 2 点损伤。"
-    },
-    {
-      "id": "wallfacer",
-      "name": "面壁计划",
-      "type": "defense",
-      "cost": 1,
-      "text": "本回合减免 1 点伤害。"
-    },
-    {
-      "id": "escape",
-      "name": "阶梯计划",
-      "type": "action",
-      "cost": 2,
-      "text": "抽 2 张牌。"
+      "id": "black_hole",
+      "name": "黑洞",
+      "type": "equipment",
+      "phase": "B",
+      "text": "累积3张基本牌后复制（待实现）",
+      "implemented": false,
+      "needs": [
+        "equip_hooks"
+      ]
     },
     {
       "id": "broadcast",
-      "name": "文明广播",
-      "type": "action",
-      "cost": 1,
-      "text": "所有存活玩家各抽 1 张牌。"
+      "name": "广播",
+      "type": "trick",
+      "phase": "C",
+      "text": "对未暴露视野者造成伤害并暴露视野（待实现）",
+      "implemented": false,
+      "needs": [
+        "vision_damage"
+      ]
     },
     {
-      "id": "droplet",
-      "name": "水滴",
-      "type": "attack",
-      "cost": 2,
-      "text": "对目标造成 1 点损伤；无法被普通防御抵消（占位按普通攻击结算）。"
+      "id": "chip_workshop",
+      "name": "芯片车间",
+      "type": "equipment",
+      "slot": "temp_ascend",
+      "phase": "B",
+      "text": "临时飞升：每回合摸牌+1",
+      "implemented": true
     },
     {
-      "id": "dimensions",
+      "id": "cosmic_safety",
+      "name": "宇宙安全声明",
+      "type": "trick",
+      "phase": "C",
+      "text": "清除场地/控制效果（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "cradle",
+      "name": "摇篮",
+      "type": "trick",
+      "phase": "C",
+      "text": "获得摇篮反伤效果（待实现）",
+      "implemented": false,
+      "needs": [
+        "reflect_hook"
+      ]
+    },
+    {
+      "id": "crisis_field",
+      "name": "危机",
+      "type": "trick",
+      "field": true,
+      "phase": "C",
+      "text": "场地：回合结束随机最终伤害（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "curse",
+      "name": "咒语",
+      "type": "trick",
+      "phase": "D",
+      "text": "场地翻倍或随机产生场地（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "curtain",
+      "name": "帷幕",
+      "type": "trick",
+      "phase": "C",
+      "text": "清除负面并摸牌或回血（待实现）",
+      "implemented": false,
+      "needs": [
+        "status_clear"
+      ]
+    },
+    {
+      "id": "dark_domain",
+      "name": "黑域",
+      "type": "trick",
+      "field": true,
+      "phase": "C",
+      "text": "全员伤害减免+2（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "dark_forest_field",
+      "name": "黑暗森林",
+      "type": "trick",
+      "field": true,
+      "phase": "D",
+      "text": "场地：全员伤害加成+2（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "deadline",
+      "name": "死线",
+      "type": "trick",
+      "phase": "D",
+      "text": "降低科技并锁定至回合结束（待实现）",
+      "implemented": false,
+      "needs": [
+        "tech_lock_status"
+      ]
+    },
+    {
+      "id": "death_immortal",
+      "name": "死神永生",
+      "type": "equipment",
+      "phase": "D",
+      "text": "即将死亡时回2摸2并移出（待实现）",
+      "implemented": false,
+      "needs": [
+        "death_interrupt"
+      ]
+    },
+    {
+      "id": "deterrence",
+      "name": "威慑",
+      "type": "trick",
+      "phase": "C",
+      "text": "下一张基本牌目标+1（待实现）",
+      "implemented": false,
+      "needs": [
+        "next_card_mod"
+      ]
+    },
+    {
+      "id": "dodge_high",
+      "name": "高阶闪",
+      "type": "basic",
+      "subtype": "dodge",
+      "tier_mode": "high",
+      "phase": "A",
+      "text": "响应杀时打出，阶数须不低于杀。",
+      "implemented": true
+    },
+    {
+      "id": "dodge_low",
+      "name": "低阶闪",
+      "type": "basic",
+      "subtype": "dodge",
+      "tier_mode": "low",
+      "phase": "A",
+      "text": "响应杀时打出，阶数须不低于杀。",
+      "implemented": true
+    },
+    {
+      "id": "dodge_t3",
+      "name": "闪",
+      "type": "basic",
+      "subtype": "dodge",
+      "tier": 3,
+      "phase": "A",
+      "text": "三阶闪。",
+      "implemented": true
+    },
+    {
+      "id": "dual_vector",
       "name": "二向箔",
-      "type": "ultimate",
-      "cost": 4,
-      "text": "对目标造成 3 点损伤。"
+      "type": "trick",
+      "phase": "D",
+      "text": "3点真实伤害；暴露视野则改为当前生命（待实现）",
+      "implemented": false,
+      "needs": [
+        "true_damage"
+      ]
     },
     {
-      "id": "star_trail",
-      "name": "星轨锚定",
-      "type": "equipment",
-      "slot": "stellar_track",
-      "cost": 1,
-      "text": "装备到「恒星航迹」（占位，暂无额外效果）。"
+      "id": "dx3906",
+      "name": "DX3906",
+      "type": "trick",
+      "phase": "C",
+      "text": "获得一张手牌并按类型结算（待实现）",
+      "implemented": false,
+      "needs": [
+        "copy_resolve"
+      ]
     },
     {
-      "id": "orbit_shield",
-      "name": "轨道护盾",
-      "type": "equipment",
-      "slot": "stellar_track",
-      "cost": 2,
-      "text": "装备到「恒星航迹」（占位，暂无额外效果）。"
+      "id": "four_dimension",
+      "name": "四维空间",
+      "type": "trick",
+      "phase": "C",
+      "text": "弃装备并暴露视野（待实现）",
+      "implemented": false,
+      "needs": [
+        "equip_discard",
+        "vision"
+      ]
     },
     {
-      "id": "stabilizer",
-      "name": "维稳核心",
-      "type": "equipment",
-      "slot": "stability_system",
-      "cost": 1,
-      "text": "装备到「维稳系统」（占位，暂无额外效果）。"
+      "id": "great_ravine",
+      "name": "大低谷",
+      "type": "trick",
+      "phase": "C",
+      "text": "翻面并伤害-1（待实现）",
+      "implemented": false,
+      "needs": [
+        "flip_status"
+      ]
     },
     {
-      "id": "chaos_dampener",
-      "name": "混沌抑制器",
+      "id": "guzheng_plan",
+      "name": "古筝计划",
+      "type": "trick",
+      "phase": "C",
+      "text": "弃一张手牌，三选一（待实现）",
+      "implemented": false,
+      "needs": [
+        "choice_prompt"
+      ]
+    },
+    {
+      "id": "hibernation",
+      "name": "冬眠",
+      "type": "trick",
+      "phase": "C",
+      "text": "回合开始可使用进入不可选中（待实现）",
+      "implemented": false,
+      "needs": [
+        "untargetable_status"
+      ]
+    },
+    {
+      "id": "kill_high",
+      "name": "高阶杀",
+      "type": "basic",
+      "subtype": "kill",
+      "tier_mode": "high",
+      "phase": "A",
+      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害。",
+      "implemented": true
+    },
+    {
+      "id": "kill_low",
+      "name": "低阶杀",
+      "type": "basic",
+      "subtype": "kill",
+      "tier_mode": "low",
+      "phase": "A",
+      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害。",
+      "implemented": true
+    },
+    {
+      "id": "kill_t3",
+      "name": "杀",
+      "type": "basic",
+      "subtype": "kill",
+      "tier": 3,
+      "phase": "A",
+      "text": "三阶杀。",
+      "implemented": true
+    },
+    {
+      "id": "killer_52",
+      "name": "Killer.5.2",
+      "type": "trick",
+      "phase": "C",
+      "text": "指定对象与摸牌即用（待实现）",
+      "implemented": false,
+      "needs": [
+        "multi_target_prompt"
+      ]
+    },
+    {
+      "id": "ladder_plan",
+      "name": "阶梯计划",
+      "type": "trick",
+      "phase": "C",
+      "text": "指定一名其他角色：暴露其视野至该角色回合结束。",
+      "implemented": true
+    },
+    {
+      "id": "micro_universe",
+      "name": "小宇宙",
       "type": "equipment",
-      "slot": "stability_system",
-      "cost": 2,
-      "text": "装备到「维稳系统」（占位，暂无额外效果）。"
+      "phase": "D",
+      "text": "获得5点护盾（待实现）",
+      "implemented": false,
+      "needs": [
+        "shield"
+      ]
+    },
+    {
+      "id": "nano_center",
+      "name": "纳米工程中心",
+      "type": "equipment",
+      "slot": "temp_ascend",
+      "phase": "B",
+      "text": "临时飞升：受到伤害-1",
+      "implemented": true
     },
     {
       "id": "peach",
       "name": "桃",
-      "type": "heal",
-      "cost": 1,
+      "type": "basic",
+      "subtype": "heal",
       "heal": 2,
-      "text": "对自己使用，回复 2 点生命。濒死结算时可将目标改为濒死者。"
+      "phase": "A",
+      "text": "对自己使用，回复 2 点生命。濒死时可强制用于自救。",
+      "implemented": true
+    },
+    {
+      "id": "plan_part",
+      "name": "计划的一部分",
+      "type": "equipment",
+      "phase": "B",
+      "text": "下2次受伤减半等（待实现）",
+      "implemented": false,
+      "needs": [
+        "equip_hooks"
+      ]
+    },
+    {
+      "id": "quantum_ghost",
+      "name": "量子幽灵",
+      "type": "equipment",
+      "phase": "D",
+      "text": "创造嘲讽替身（待实现）",
+      "implemented": false,
+      "needs": [
+        "summon"
+      ]
+    },
+    {
+      "id": "realm_bucket",
+      "name": "虚境",
+      "type": "trick",
+      "phase": "D",
+      "text": "抽中后随机一个虚境效果",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "red_coast",
+      "name": "红岸计划",
+      "type": "trick",
+      "phase": "C",
+      "text": "摸两张牌。每回合限一次。",
+      "implemented": true
+    },
+    {
+      "id": "return_motion",
+      "name": "回归运动",
+      "type": "trick",
+      "phase": "D",
+      "text": "任意时刻使非基本牌无效（待实现）",
+      "implemented": false,
+      "needs": [
+        "interrupt_stack"
+      ]
+    },
+    {
+      "id": "ship_bucket",
+      "name": "船",
+      "type": "equipment",
+      "slot": "ship",
+      "phase": "B",
+      "text": "抽中后随机一艘舰船装备",
+      "implemented": true
+    },
+    {
+      "id": "soap",
+      "name": "香皂",
+      "type": "trick",
+      "phase": "C",
+      "text": "与另一角色共回复科技等级点生命（待实现）",
+      "implemented": false,
+      "needs": [
+        "choice_prompt",
+        "shared_heal"
+      ]
+    },
+    {
+      "id": "sophon",
+      "name": "智子",
+      "type": "trick",
+      "phase": "C",
+      "text": "目标下回合科技无法变化（待实现）",
+      "implemented": false,
+      "needs": [
+        "tech_lock_status"
+      ]
+    },
+    {
+      "id": "sophon_blind",
+      "name": "智子盲区",
+      "type": "trick",
+      "field": true,
+      "phase": "C",
+      "text": "场地：无法响应基本牌（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "star_ring_city",
+      "name": "星环城",
+      "type": "trick",
+      "phase": "C",
+      "text": "全员二选一（待实现）",
+      "implemented": false,
+      "needs": [
+        "choice_prompt"
+      ]
+    },
+    {
+      "id": "stars_plan",
+      "name": "群星计划",
+      "type": "equipment",
+      "slot": "temp_ascend",
+      "phase": "B",
+      "text": "临时飞升：造成伤害+1",
+      "implemented": true
+    },
+    {
+      "id": "swordholder",
+      "name": "执剑",
+      "type": "trick",
+      "phase": "C",
+      "text": "下一张伤害牌按最终伤害回血（待实现）",
+      "implemented": false,
+      "needs": [
+        "next_card_mod"
+      ]
+    },
+    {
+      "id": "thought_stamp",
+      "name": "思想钢印",
+      "type": "trick",
+      "phase": "C",
+      "text": "任意时刻使锦囊对某角色无效（待实现）",
+      "implemented": false,
+      "needs": [
+        "interrupt_stack"
+      ]
+    },
+    {
+      "id": "toxic_water",
+      "name": "剧毒之水",
+      "type": "trick",
+      "phase": "C",
+      "text": "对其他角色造成2点基础伤害（待实现）",
+      "implemented": false,
+      "needs": [
+        "response_stack"
+      ]
+    },
+    {
+      "id": "trisolaris_field",
+      "name": "三体",
+      "type": "trick",
+      "field": true,
+      "phase": "C",
+      "text": "场地：恒/乱纪元（待实现）",
+      "implemented": false,
+      "needs": [
+        "field_layer"
+      ]
+    },
+    {
+      "id": "visitor",
+      "name": "天外来客",
+      "type": "basic",
+      "subtype": "visitor",
+      "phase": "A",
+      "text": "提升一级科技等级。",
+      "implemented": true
+    },
+    {
+      "id": "wallfacer_plan",
+      "name": "面壁计划",
+      "type": "trick",
+      "phase": "C",
+      "text": "弃置目标一张牌；若其暴露视野则弃两张（待实现）",
+      "implemented": false,
+      "needs": [
+        "discard_from_target"
+      ]
+    },
+    {
+      "id": "zeroing",
+      "name": "归零",
+      "type": "trick",
+      "phase": "D",
+      "text": "其他角色受伤或降科技（待实现）",
+      "implemented": false,
+      "needs": [
+        "global_effect"
+      ]
+    }
+  ],
+  "ships": [
+    {
+      "id": "blue_space",
+      "name": "蓝色空间号",
+      "text": "你获得1点伤害加成",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "gravity",
+      "name": "万有引力号",
+      "text": "你的牌被响应时，你可弃两张手牌，使其仍然生效",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "response_override"
+      ],
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "natural_selection",
+      "name": "自然选择号",
+      "text": "血量上限+3，装备时回复两点血量",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "bronze_age",
+      "name": "青铜时代号",
+      "text": "科技等级+1，每回合开始时回复一点生命",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "quantum",
+      "name": "量子号",
+      "text": "每回合获得一张三阶杀，出杀上限+1",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "tang",
+      "name": "唐号",
+      "text": "此装备进入或离开装备区时摸两张牌",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "star_ring",
+      "name": "星环号",
+      "text": "无法成为基本牌目标；受锦囊伤害后失去此装备",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "untargetable_basic",
+        "trick_damage_hook"
+      ],
+      "type": "equipment",
+      "slot": "ship"
+    },
+    {
+      "id": "ultimate_law",
+      "name": "终极规律号",
+      "text": "每回合限一次观看并复制一张手牌",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "copy_hand_prompt"
+      ],
+      "type": "equipment",
+      "slot": "ship"
+    }
+  ],
+  "armors": [
+    {
+      "id": "deep_sea",
+      "name": "深海液",
+      "text": "视野未暴露时，伤害减免+1且治疗量加成+1",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "curvature",
+      "name": "曲率引擎",
+      "text": "需闪/杀响应时可判定，1则视为出闪",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "judge"
+      ],
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "eco_bottle",
+      "name": "生态瓶",
+      "text": "受到伤害若大于3改为3",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "solar_observe",
+      "name": "太阳系观测单元",
+      "text": "回合内每使用四张牌摸一张",
+      "phase": "B",
+      "implemented": false,
+      "needs": [
+        "cards_used_counter"
+      ],
+      "type": "equipment",
+      "slot": "armor"
+    },
+    {
+      "id": "lightspeed_2",
+      "name": "光速2号",
+      "text": "受到伤害减免可成长，最多-3",
+      "phase": "B",
+      "implemented": true,
+      "type": "equipment",
+      "slot": "armor"
+    }
+  ],
+  "realms": [
+    {
+      "id": "finale",
+      "name": "终末",
+      "text": "目标伤害+3、多摸2、解负面并免疫场地，其下回合结束后死亡",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "reckoning",
+      "name": "清算",
+      "text": "你与目标生命值均扣至1",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "illusion",
+      "name": "幻梦",
+      "text": "全员弃光手牌并受到等于弃牌数的最终伤害",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "cold_silence",
+      "name": "冷寂",
+      "text": "全员科技降至1且无法改变",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "myriad",
+      "name": "万象",
+      "text": "（文档未完整，占位）",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
+    },
+    {
+      "id": "afterglow",
+      "name": "回光",
+      "text": "（文档未完整，占位）",
+      "phase": "D",
+      "implemented": false,
+      "needs": [
+        "realm_effects"
+      ]
     }
   ]
 }

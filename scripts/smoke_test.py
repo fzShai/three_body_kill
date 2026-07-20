@@ -180,6 +180,34 @@ def main() -> None:
     _give(rg.players[cur], stub)
     ok, msg = rg.apply_action(cur, {"action": "recast", "instance_id": "stub-1"})
     assert ok, msg
+    drawn_name = rg.players[cur]["hand"][0]["name"]
+    assert "重铸为" in msg and drawn_name in msg, msg
+    assert all("摸到" not in line for line in rg.log)
+    assert not any(drawn_name in line and "重铸" in line for line in rg.log)
+
+    # ladder: exposed target invalid; no unexposed others => recastable
+    lg = GameSession.create("LADDER", ["uma", "vic"])
+    uma, vic = lg.players["uma"], lg.players["vic"]
+    lg.turn_index = lg.player_order.index("uma")
+    lg.phase = "turn"
+    lg.turn_phase = "play"
+    ladder_a = {
+        "id": "ladder_plan",
+        "name": "阶梯计划",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "ladder-a",
+    }
+    ladder_b = {**ladder_a, "instance_id": "ladder-b"}
+    _give(uma, ladder_a, ladder_b)
+    ok, msg = lg.apply_action("uma", {"action": "play_card", "instance_id": "ladder-a", "target": "vic"})
+    assert ok, msg
+    assert vic["vision_exposed"] is True
+    ok, msg = lg.apply_action("uma", {"action": "play_card", "instance_id": "ladder-b", "target": "vic"})
+    assert not ok and "已暴露" in msg, msg
+    ok, msg = lg.apply_action("uma", {"action": "recast", "instance_id": "ladder-b"})
+    assert ok, msg
+    assert all("摸到" not in line for line in lg.log)
 
     # equip blue_space: damage bonus
     eqg = GameSession.create("EQUIP", ["rita", "sam"])
@@ -256,6 +284,28 @@ def main() -> None:
     ok, msg = dg.apply_action("hank", {"action": "dying_resolve"})
     assert ok, msg
     assert hank["alive"] and hank["hp"] > 0
+
+    # dying: other player peaches to save
+    dg3 = GameSession.create("DIE3", ["kyle", "lena"])
+    kyle, lena = dg3.players["kyle"], dg3.players["lena"]
+    dg3.turn_index = dg3.player_order.index("kyle")
+    dg3.phase = "turn"
+    dg3.turn_phase = "play"
+    kill5 = {**kill, "instance_id": "kill-5", "tier": 3}
+    peach_save = {**peach, "instance_id": "peach-save"}
+    _give(kyle, kill5, peach_save)
+    _give(lena)
+    lena["hp"] = 1
+    ok, msg = dg3.apply_action("kyle", {"action": "play_card", "instance_id": "kill-5", "target": "lena"})
+    assert ok, msg
+    ok, msg = dg3.apply_action("lena", {"action": "respond_pass"})
+    assert ok, msg
+    assert dg3.phase == "dying"
+    ok, msg = dg3.apply_action("kyle", {"action": "play_card", "instance_id": "peach-save"})
+    assert ok, msg
+    assert dg3.phase == "turn"
+    assert lena["alive"] and lena["hp"] > 0
+    assert any("救人" in line for line in dg3.log)
 
     # dying without peach -> death
     dg2 = GameSession.create("DIE2", ["ivy", "jade"])

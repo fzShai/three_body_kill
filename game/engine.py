@@ -492,42 +492,60 @@ class GameSession:
         return False, f"未知行动: {act}"
 
     def _apply_dying_action(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
-        if not self.dying or self.dying.get("victim") != username:
-            # others cannot act in Phase A dying; victim or timeout resolves
-            if str(action.get("action")) == "dying_resolve":
-                self._auto_resolve_dying()
-                self.seq += 1
-                return True, "濒死已结算"
-            return False, "濒死阶段仅濒死者可结算"
+        if not self.dying:
+            return False, "当前不在濒死阶段"
+        victim = self.dying.get("victim")
+        if victim not in self.players:
+            return False, "濒死目标无效"
+
         act = str(action.get("action", "")).strip()
-        if act in {"dying_resolve", "dying_pass", "play_card"}:
-            # play_card peach manually or force resolve
-            if act == "play_card":
-                instance_id = str(action.get("instance_id", "")).strip()
-                hand = self.players[username]["hand"]
-                idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
-                if idx is None:
-                    return False, "手牌中没有这张牌"
-                card = hand[idx]
-                if card.get("subtype") != "heal" and card.get("id") != "peach":
-                    return False, "濒死只能使用治疗牌"
-                hand.pop(idx)
-                heal = int(card.get("heal", 2))
-                self.players[username]["hp"] = min(self.players[username]["max_hp"], max(1, self.players[username]["hp"] + heal))
-                self.discard.append(card)
-                self.dying = None
-                self.phase = "turn"
-                self._log(f"{username} 濒死使用 {card.get('name')}，HP {self.players[username]['hp']}")
-                self.refresh_turn_timer()
-                self.seq += 1
-                return True, "脱离濒死"
-            self._force_peach_or_die(username)
+
+        # Timeout / resolve: only victim (or anyone via dying_resolve for auto path)
+        # Others must not force-resolve death for the victim.
+        if act in {"dying_resolve", "dying_pass"}:
+            if username != victim:
+                return False, "仅濒死者可结算濒死"
+            self._force_peach_or_die(victim)
             self.seq += 1
             return True, "濒死已结算"
+
+        if act == "play_card":
+            if not self.players[username]["alive"] and username != victim:
+                return False, "你已被淘汰"
+            instance_id = str(action.get("instance_id", "")).strip()
+            hand = self.players[username]["hand"]
+            idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
+            if idx is None:
+                return False, "手牌中没有这张牌"
+            card = hand[idx]
+            if card.get("subtype") != "heal" and card.get("id") != "peach":
+                return False, "濒死只能使用治疗牌"
+            hand.pop(idx)
+            heal = int(card.get("heal", 2))
+            v = self.players[victim]
+            v["hp"] = min(v["max_hp"], max(1, v["hp"] + heal))
+            self.discard.append(card)
+            self.dying = None
+            self.phase = "turn"
+            if username == victim:
+                self._log(f"{username} 濒死使用 {card.get('name')}，HP {v['hp']}")
+            else:
+                self._log(f"{username} 对 {victim} 使用 {card.get('name')} 救人，HP {v['hp']}")
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, "脱离濒死"
+
         return False, "濒死阶段行动无效"
 
     def _alive_others(self, username: str) -> list[str]:
         return [n for n in self.player_order if n != username and self.players[n]["alive"]]
+
+    def _unexposed_others(self, username: str) -> list[str]:
+        return [
+            n
+            for n in self._alive_others(username)
+            if not self.players[n].get("vision_exposed")
+        ]
 
     @staticmethod
     def _is_basic_card(card: dict[str, Any]) -> bool:
@@ -617,7 +635,7 @@ class GameSession:
             if not self._card_implemented(card):
                 return False
             if cid == "ladder_plan":
-                return bool(self._alive_others(username))
+                return bool(self._unexposed_others(username))
             return True
         if is_temp_ascend_card(card):
             if not self._card_implemented(card):
@@ -677,7 +695,7 @@ class GameSession:
         self.discard.append(card)
         drawn = self.draw_sys.draw_one(self.players[username]["tech_level"])
         hand.append(drawn)
-        self._log(f"{username} 重铸 {card.get('name')}，摸到 {drawn.get('name')}")
+        self._log(f"{username} 重铸了 {card.get('name')}")
         self.refresh_turn_timer()
         self.seq += 1
         return True, f"重铸为 {drawn.get('name')}"
@@ -778,6 +796,8 @@ class GameSession:
             return False, "不能以自己为目标"
         if not self.players[target]["alive"]:
             return False, "目标已淘汰"
+        if self.players[target].get("vision_exposed"):
+            return False, "目标视野已暴露"
         t = self.players[target]
         t["vision_exposed"] = True
         t["vision_clear_at_turn_end"] = True

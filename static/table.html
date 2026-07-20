@@ -286,6 +286,7 @@
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
                 const myPrompt = isPrompt && prompt.to === username;
                 const myDying = isDying && dying.victim === username;
+                const canSaveDying = isDying && snap.you?.alive !== false;
                 const inPlay = myTurn && snap.turn_phase === 'play';
                 const inDiscard = myTurn && snap.turn_phase === 'discard';
                 const need = discardNeed(snap);
@@ -297,6 +298,10 @@
                     hint.textContent = need > 0
                         ? `弃牌阶段：还需弃置 ${need} 张（已选 ${selectedIds.size}）`
                         : '手牌已达上限，可点击「完成弃牌」';
+                } else if (isDying) {
+                    hint.textContent = myDying
+                        ? '你濒死：打出桃自救，或点击「结算濒死」'
+                        : `${dying.victim} 濒死：可打出桃救人`;
                 } else if (inPlay) {
                     hint.textContent = '出牌阶段：点选手牌后出牌；可弃置 4 张基本牌升科技';
                 } else {
@@ -374,9 +379,15 @@
                 const sel = document.getElementById('targetSelect');
                 const selectedCard = hand.find((c) => c.instance_id === selectedId);
                 const others = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                const ladderTargets = others.filter((p) => !p.vision_exposed);
                 let options = '';
-                if (isPeach(selectedCard)) {
+                if (isDying && isPeach(selectedCard)) {
+                    options = `<option value="${dying.victim}">${myDying ? '自己（自救）' : dying.victim + '（救人）'}</option>`;
+                } else if (isPeach(selectedCard)) {
                     options = `<option value="${username}">自己</option>`;
+                } else if (selectedCard && selectedCard.id === 'ladder_plan') {
+                    options = '<option value="">（选择目标）</option>' +
+                        ladderTargets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
                 } else if (needsOtherTarget(selectedCard)) {
                     options = '<option value="">（选择目标）</option>' +
                         others.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
@@ -387,16 +398,18 @@
                 sel.innerHTML = options;
                 if (lastTargetValue && [...sel.options].some((o) => o.value === lastTargetValue)) {
                     sel.value = lastTargetValue;
+                } else if (isDying && isPeach(selectedCard)) {
+                    sel.value = dying.victim;
                 } else if (isPeach(selectedCard)) {
                     sel.value = username;
                 }
-                sel.disabled = !(inPlay || myPrompt || myDying) || uiMode === 'tech_discard' || uiMode === 'discard';
+                sel.disabled = !(inPlay || myPrompt || canSaveDying) || uiMode === 'tech_discard' || uiMode === 'discard';
                 sel.onchange = () => { lastTargetValue = sel.value; };
 
-                const canPlay = ((inPlay && uiMode === 'play') || myPrompt || myDying) && selectedId;
+                const canPlay = ((inPlay && uiMode === 'play') || myPrompt || canSaveDying) && selectedId;
                 document.getElementById('playBtn').disabled = !canPlay;
                 document.getElementById('playBtn').textContent =
-                    inDiscard ? '弃置所选' : (uiMode === 'tech_discard' ? '—' : '出牌');
+                    inDiscard ? '弃置所选' : (uiMode === 'tech_discard' ? '—' : (isDying && !myDying ? '救人' : (isDying ? '自救' : '出牌')));
                 if (inDiscard) {
                     document.getElementById('playBtn').disabled = selectedIds.size === 0;
                     document.getElementById('playBtn').textContent = '弃置所选';
@@ -425,7 +438,7 @@
                 respondPassBtn.style.display = isPrompt ? 'inline-block' : 'none';
                 respondPassBtn.disabled = !myPrompt;
                 const dyingPassBtn = document.getElementById('dyingPassBtn');
-                dyingPassBtn.style.display = isDying ? 'inline-block' : 'none';
+                dyingPassBtn.style.display = myDying ? 'inline-block' : 'none';
                 dyingPassBtn.disabled = !myDying;
 
                 document.getElementById('log').innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
@@ -440,7 +453,9 @@
                     banner.textContent = `${prompt.from} 对 ${prompt.to} 使用${prompt.card_name || '杀'} · 等待闪响应`;
                 } else if (isDying) {
                     banner.classList.add('show', 'dying');
-                    banner.textContent = `${dying.victim} 濒死 · 使用桃或结算濒死`;
+                    banner.textContent = myDying
+                        ? `${dying.victim} 濒死 · 打出桃自救或结算濒死`
+                        : `${dying.victim} 濒死 · 可打出桃救人`;
                 } else {
                     banner.classList.remove('show');
                 }

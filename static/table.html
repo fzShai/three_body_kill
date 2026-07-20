@@ -58,6 +58,9 @@
             background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.22);
             font-size: 13px;
         }
+        .mode-hint {
+            font-size: 12px; color: rgba(180,210,230,0.65); margin-bottom: 8px; min-height: 18px;
+        }
         .hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 110px; }
         .card {
             width: 118px; min-height: 140px; padding: 10px;
@@ -116,13 +119,17 @@
                     <h2>你的身份</h2>
                     <div class="role" id="roleBox">—</div>
                     <h2>手牌</h2>
+                    <div class="mode-hint" id="modeHint"></div>
                     <div class="hand" id="hand"></div>
                     <div class="row">
                         <label style="font-size:12px;color:rgba(255,255,255,0.45);">目标</label>
                         <select id="targetSelect"></select>
                         <button class="btn" id="playBtn">出牌</button>
                         <button class="btn btn-outline" id="endPlayBtn">结束出牌</button>
-                        <button class="btn btn-outline" id="passBtn">结束回合</button>
+                        <button class="btn btn-outline" id="discardDoneBtn">完成弃牌</button>
+                        <button class="btn btn-outline" id="techDiscardBtn">弃置升科技</button>
+                        <button class="btn btn-outline" id="techConfirmBtn" style="display:none;">确认升科技</button>
+                        <button class="btn btn-outline" id="techCancelBtn" style="display:none;">取消</button>
                         <button class="btn btn-outline" id="respondPassBtn" style="display:none;">不响应</button>
                         <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结算濒死</button>
                         <button class="btn btn-outline" id="recastBtn">重铸</button>
@@ -149,7 +156,10 @@
             document.getElementById('roomIdDisplay').textContent = roomId;
             let state = null;
             let selectedId = null;
+            let selectedIds = new Set();
+            let uiMode = 'play'; // play | discard | tech_discard
             let turnDeadlineMs = null;
+            let lastTargetValue = null;
             const statusMsg = document.getElementById('statusMsg');
             const turnTimerEl = document.getElementById('turnTimer');
 
@@ -166,12 +176,24 @@
                 temp_ascend: '临时飞升',
             };
 
-            function needsTarget(card) {
+            const TEMP_ASCEND_IDS = new Set(['nano_center', 'chip_workshop', 'stars_plan']);
+
+            function needsOtherTarget(card) {
                 return card && (
                     card.subtype === 'kill'
                     || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3'
                     || card.id === 'ladder_plan'
                 );
+            }
+
+            function isPeach(card) {
+                return card && (card.subtype === 'heal' || card.id === 'peach');
+            }
+
+            function isBasic(card) {
+                if (!card) return false;
+                if (['kill', 'dodge', 'heal', 'visitor'].includes(card.subtype)) return true;
+                return card.id === 'peach' || card.id === 'visitor';
             }
 
             const ASCENSION_LABEL = {
@@ -195,6 +217,7 @@
                 if (c.subtype === 'dodge') return `${c.tier || '?'}阶闪`;
                 if (c.subtype === 'heal') return `桃 · 回复${c.heal || 2}`;
                 if (c.subtype === 'visitor') return '基本 · 天外来客';
+                if (TEMP_ASCEND_IDS.has(c.id) || c.slot === 'temp_ascend') return '临时飞升';
                 if (c.type === 'equipment') return `装备 · ${SLOT_LABEL[c.slot] || c.slot || ''}`;
                 return c.type || '牌';
             }
@@ -204,6 +227,38 @@
                 const pos = list.filter((s) => s.kind === 'positive').map((s) => s.name);
                 const neg = list.filter((s) => s.kind === 'negative').map((s) => s.name);
                 return `<div class="pos">正面：${pos.length ? pos.join('、') : '无'}</div><div class="neg">负面：${neg.length ? neg.join('、') : '无'}</div>`;
+            }
+
+            function syncUiMode(snap) {
+                const myTurn = snap.current_player === username && snap.phase === 'turn';
+                if (!myTurn || snap.phase !== 'turn') {
+                    uiMode = 'play';
+                    selectedIds.clear();
+                    return;
+                }
+                if (snap.turn_phase === 'discard') {
+                    if (uiMode !== 'discard') {
+                        selectedIds.clear();
+                        selectedId = null;
+                    }
+                    uiMode = 'discard';
+                    return;
+                }
+                if (snap.turn_phase === 'play' && uiMode === 'discard') {
+                    uiMode = 'play';
+                    selectedIds.clear();
+                }
+                if (snap.turn_phase !== 'play' && uiMode === 'tech_discard') {
+                    uiMode = 'play';
+                    selectedIds.clear();
+                }
+            }
+
+            function discardNeed(snap) {
+                const you = snap.you || {};
+                const handCount = (you.hand || []).length;
+                const limit = you.hand_limit ?? handCount;
+                return Math.max(0, handCount - limit);
             }
 
             setInterval(() => {
@@ -218,6 +273,7 @@
             function render(snap) {
                 state = snap;
                 turnDeadlineMs = snap.turn_deadline_ms || null;
+                syncUiMode(snap);
                 document.getElementById('discardCount').textContent = snap.discard_count ?? 0;
                 const phaseMap = { turn: '回合', prompt: '响应', dying: '濒死', ended: '结束' };
                 const tp = snap.turn_phase ? ({ draw: '摸牌', play: '出牌', discard: '弃牌' }[snap.turn_phase] || snap.turn_phase) : '';
@@ -230,6 +286,22 @@
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
                 const myPrompt = isPrompt && prompt.to === username;
                 const myDying = isDying && dying.victim === username;
+                const inPlay = myTurn && snap.turn_phase === 'play';
+                const inDiscard = myTurn && snap.turn_phase === 'discard';
+                const need = discardNeed(snap);
+
+                const hint = document.getElementById('modeHint');
+                if (uiMode === 'tech_discard') {
+                    hint.textContent = `弃置升科技：已选 ${selectedIds.size}/4 张基本牌`;
+                } else if (inDiscard) {
+                    hint.textContent = need > 0
+                        ? `弃牌阶段：还需弃置 ${need} 张（已选 ${selectedIds.size}）`
+                        : '手牌已达上限，可点击「完成弃牌」';
+                } else if (inPlay) {
+                    hint.textContent = '出牌阶段：点选手牌后出牌；可弃置 4 张基本牌升科技';
+                } else {
+                    hint.textContent = '';
+                }
 
                 const playersEl = document.getElementById('players');
                 playersEl.innerHTML = (snap.players || []).map((p) => {
@@ -245,7 +317,7 @@
                     return `<div class="player-chip ${cls}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
                         <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${asc}${p.alive ? '' : ' · 出局'}</div>
-                        <div class="eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}${equipLine(p.equipment, 'temp_ascend')}</div>
+                        <div class="eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
                         <div class="st">${statusLines(p.statuses)}</div>
                     </div>`;
                 }).join('');
@@ -258,11 +330,16 @@
 
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');
+                const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard';
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
                     if (isPrompt) dim = c.subtype === 'dodge' ? '' : 'dim';
                     if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
-                    return `<div class="card ${selectedId === c.instance_id ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}">
+                    if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
+                    const selected = multiSelect
+                        ? selectedIds.has(c.instance_id)
+                        : selectedId === c.instance_id;
+                    return `<div class="card ${selected ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}" data-card-id="${c.id || ''}">
                         <div class="cname">${c.name}</div>
                         <div class="ctype">${cardTypeLabel(c)}</div>
                         <div class="ctext">${c.text || ''}</div>
@@ -270,22 +347,80 @@
                 }).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;">无手牌</div>';
                 handEl.querySelectorAll('.card').forEach((el) => {
                     el.addEventListener('click', () => {
-                        selectedId = el.getAttribute('data-id');
+                        if (el.classList.contains('dim')) return;
+                        const id = el.getAttribute('data-id');
+                        if (uiMode === 'discard') {
+                            if (selectedIds.has(id)) selectedIds.delete(id);
+                            else selectedIds.add(id);
+                            selectedId = null;
+                            render(state);
+                            return;
+                        }
+                        if (uiMode === 'tech_discard') {
+                            const card = hand.find((c) => c.instance_id === id);
+                            if (!isBasic(card)) return;
+                            if (selectedIds.has(id)) selectedIds.delete(id);
+                            else if (selectedIds.size < 4) selectedIds.add(id);
+                            selectedId = null;
+                            render(state);
+                            return;
+                        }
+                        selectedId = id;
+                        selectedIds.clear();
                         render(state);
                     });
                 });
 
                 const sel = document.getElementById('targetSelect');
-                sel.disabled = false;
-                const targets = (snap.players || []).filter((p) => p.alive && p.username !== username);
-                sel.innerHTML = '<option value="">（无目标）</option>' +
-                    targets.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                const selectedCard = hand.find((c) => c.instance_id === selectedId);
+                const others = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                let options = '';
+                if (isPeach(selectedCard)) {
+                    options = `<option value="${username}">自己</option>`;
+                } else if (needsOtherTarget(selectedCard)) {
+                    options = '<option value="">（选择目标）</option>' +
+                        others.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                } else {
+                    options = '<option value="">（无需目标）</option>' +
+                        others.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                }
+                sel.innerHTML = options;
+                if (lastTargetValue && [...sel.options].some((o) => o.value === lastTargetValue)) {
+                    sel.value = lastTargetValue;
+                } else if (isPeach(selectedCard)) {
+                    sel.value = username;
+                }
+                sel.disabled = !(inPlay || myPrompt || myDying) || uiMode === 'tech_discard' || uiMode === 'discard';
+                sel.onchange = () => { lastTargetValue = sel.value; };
 
-                const canPlay = (myTurn && snap.turn_phase === 'play') || myPrompt || myDying;
-                document.getElementById('playBtn').disabled = !canPlay || !selectedId;
-                document.getElementById('endPlayBtn').disabled = !(myTurn && snap.turn_phase === 'play');
-                document.getElementById('passBtn').disabled = !(myTurn && (snap.turn_phase === 'play' || snap.turn_phase === 'discard'));
-                document.getElementById('recastBtn').disabled = !(myTurn && snap.turn_phase === 'play' && selectedId);
+                const canPlay = ((inPlay && uiMode === 'play') || myPrompt || myDying) && selectedId;
+                document.getElementById('playBtn').disabled = !canPlay;
+                document.getElementById('playBtn').textContent =
+                    inDiscard ? '弃置所选' : (uiMode === 'tech_discard' ? '—' : '出牌');
+                if (inDiscard) {
+                    document.getElementById('playBtn').disabled = selectedIds.size === 0;
+                    document.getElementById('playBtn').textContent = '弃置所选';
+                }
+
+                document.getElementById('endPlayBtn').disabled = !(inPlay && uiMode === 'play');
+                document.getElementById('endPlayBtn').style.display = (inDiscard || uiMode === 'tech_discard') ? 'none' : '';
+
+                const discardDoneBtn = document.getElementById('discardDoneBtn');
+                discardDoneBtn.style.display = inDiscard ? '' : 'none';
+                discardDoneBtn.disabled = !(inDiscard && need === 0);
+
+                const techDiscardBtn = document.getElementById('techDiscardBtn');
+                const techConfirmBtn = document.getElementById('techConfirmBtn');
+                const techCancelBtn = document.getElementById('techCancelBtn');
+                techDiscardBtn.style.display = (inPlay && uiMode === 'play') ? '' : 'none';
+                techDiscardBtn.disabled = !inPlay;
+                techConfirmBtn.style.display = uiMode === 'tech_discard' ? '' : 'none';
+                techCancelBtn.style.display = uiMode === 'tech_discard' ? '' : 'none';
+                techConfirmBtn.disabled = !(uiMode === 'tech_discard' && selectedIds.size === 4);
+
+                document.getElementById('recastBtn').disabled = !(inPlay && uiMode === 'play' && selectedId);
+                document.getElementById('recastBtn').style.display = (inDiscard || uiMode === 'tech_discard') ? 'none' : '';
+
                 const respondPassBtn = document.getElementById('respondPassBtn');
                 respondPassBtn.style.display = isPrompt ? 'inline-block' : 'none';
                 respondPassBtn.disabled = !myPrompt;
@@ -316,6 +451,10 @@
             sock.on('game_state', (msg) => {
                 if (msg.room_id && msg.room_id !== roomId) return;
                 setStatus('');
+                // Drop selection for cards no longer in hand after server update
+                const handIds = new Set((msg.payload?.you?.hand || []).map((c) => c.instance_id));
+                if (selectedId && !handIds.has(selectedId)) selectedId = null;
+                selectedIds = new Set([...selectedIds].filter((id) => handIds.has(id)));
                 render(msg.payload);
             });
             sock.on('game_started', () => sock.send('get_game_state', {}, roomId));
@@ -323,7 +462,17 @@
             sock.connect();
 
             document.getElementById('playBtn').addEventListener('click', () => {
-                if (!selectedId || !state) return;
+                if (!state) return;
+                if (uiMode === 'discard') {
+                    const ids = [...selectedIds];
+                    if (!ids.length) return;
+                    selectedIds.clear();
+                    for (const id of ids) {
+                        sock.send('game_action', { action: 'discard_card', instance_id: id }, roomId);
+                    }
+                    return;
+                }
+                if (!selectedId) return;
                 const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
                 const target = document.getElementById('targetSelect').value || null;
                 if (state.phase === 'prompt') {
@@ -331,19 +480,48 @@
                 } else if (state.phase === 'dying') {
                     sock.send('game_action', { action: 'play_card', instance_id: selectedId }, roomId);
                 } else {
-                    if (needsTarget(card) && !target) {
+                    if (needsOtherTarget(card) && !target) {
                         setStatus('该牌需要选择目标', 'error');
                         return;
                     }
-                    sock.send('game_action', { action: 'play_card', instance_id: selectedId, target }, roomId);
+                    const payload = { action: 'play_card', instance_id: selectedId };
+                    if (isPeach(card)) {
+                        payload.target = username;
+                    } else if (target) {
+                        payload.target = target;
+                    }
+                    sock.send('game_action', payload, roomId);
                 }
                 selectedId = null;
             });
             document.getElementById('endPlayBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'end_play' }, roomId);
             });
-            document.getElementById('passBtn').addEventListener('click', () => {
+            document.getElementById('discardDoneBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'discard_done' }, roomId);
+            });
+            document.getElementById('techDiscardBtn').addEventListener('click', () => {
+                uiMode = 'tech_discard';
+                selectedId = null;
+                selectedIds.clear();
+                if (state) render(state);
+            });
+            document.getElementById('techConfirmBtn').addEventListener('click', () => {
+                if (selectedIds.size !== 4) {
+                    setStatus('请选择恰好 4 张基本牌', 'error');
+                    return;
+                }
+                sock.send('game_action', {
+                    action: 'discard_for_tech',
+                    instance_ids: [...selectedIds],
+                }, roomId);
+                selectedIds.clear();
+                uiMode = 'play';
+            });
+            document.getElementById('techCancelBtn').addEventListener('click', () => {
+                uiMode = 'play';
+                selectedIds.clear();
+                if (state) render(state);
             });
             document.getElementById('respondPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'respond_pass' }, roomId);

@@ -12,7 +12,6 @@ def initial_combat_fields() -> dict[str, Any]:
         "vision_exposed": False,
         "damage_bonus": 0,
         "damage_reduction": 0,
-        "basic_cards_used": 0,
         "kills_used_this_turn": 0,
         "ascended": False,
         "ascension": None,

@@ -137,10 +137,26 @@ def main() -> None:
     assert ok, msg
     assert owen["hp"] == 2  # base1 + vision1
     # end nora turn then owen turn end should clear owen vision
+    ok, msg = vg.apply_action("nora", {"action": "end_play"})
+    assert ok, msg
+    assert vg.turn_phase == "discard"
+    # ensure under hand limit then finish discard
+    limit_n = max(0, nora["max_hp"] - 2)
+    while len(nora["hand"]) > limit_n:
+        card = nora["hand"][0]
+        ok, msg = vg.apply_action("nora", {"action": "discard_card", "instance_id": card["instance_id"]})
+        assert ok, msg
     ok, msg = vg.apply_action("nora", {"action": "discard_done"})
     assert ok, msg
     assert vg.current_player() == "owen"
     assert owen["vision_exposed"] is True
+    ok, msg = vg.apply_action("owen", {"action": "end_play"})
+    assert ok, msg
+    limit_o = max(0, owen["max_hp"] - 2)
+    while len(owen["hand"]) > limit_o:
+        card = owen["hand"][0]
+        ok, msg = vg.apply_action("owen", {"action": "discard_card", "instance_id": card["instance_id"]})
+        assert ok, msg
     ok, msg = vg.apply_action("owen", {"action": "discard_done"})
     assert ok, msg
     assert owen["vision_exposed"] is False
@@ -197,8 +213,28 @@ def main() -> None:
     _give(rita, temp)
     ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-1"})
     assert ok, msg
-    assert rita["equipment"]["temp_ascend"]["id"] == "stars_plan"
+    assert rita["equipment"]["temp_ascend"] is None
+    assert any(s["id"] == "stars_plan" for s in rita["statuses"])
     assert rita["damage_bonus"] == 2
+    nano = {
+        "id": "nano_center",
+        "name": "纳米工程中心",
+        "type": "equipment",
+        "slot": "temp_ascend",
+        "implemented": True,
+        "instance_id": "temp-2",
+    }
+    _give(rita, nano)
+    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-2"})
+    assert ok, msg
+    status_ids = {s["id"] for s in rita["statuses"]}
+    assert status_ids >= {"stars_plan", "nano_center"}
+    assert rita["damage_reduction"] == 1
+    # same temp ascend cannot stack
+    temp_dup = {**temp, "instance_id": "temp-3"}
+    _give(rita, temp_dup)
+    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-3"})
+    assert not ok, msg
 
     # dying: force peach
     dg = GameSession.create("DIE", ["gina", "hank"])
@@ -243,12 +279,75 @@ def main() -> None:
     # end play + discard
     eg = GameSession.create("END", ["kate", "liam"])
     cur = eg.current_player()
-    ok, msg = eg.apply_action(cur, {"action": "end_play"})
+    # cannot skip discard from play
+    ok, msg = eg.apply_action(cur, {"action": "discard_done"})
+    assert ok and eg.turn_phase == "discard", msg
+    # over-limit hand blocks discard_done
+    p = eg.players[cur]
+    p["max_hp"] = 4
+    extras = [
+        {
+            "id": "peach",
+            "name": "桃",
+            "type": "basic",
+            "subtype": "heal",
+            "heal": 2,
+            "instance_id": f"extra-{i}",
+        }
+        for i in range(6)
+    ]
+    p["hand"] = extras[:]
+    ok, msg = eg.apply_action(cur, {"action": "discard_done"})
+    assert not ok and "还需弃置" in msg, msg
+    # selective discard then finish
+    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-0"})
     assert ok, msg
-    assert eg.turn_phase == "discard"
+    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-1"})
+    assert ok, msg
+    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-2"})
+    assert ok, msg
+    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-3"})
+    assert ok, msg
+    assert len(p["hand"]) == 2
     ok, msg = eg.apply_action(cur, {"action": "discard_done"})
     assert ok, msg
     assert eg.current_player() != cur or eg.phase == "ended" or True
+
+    # discard 4 basics for tech
+    tg = GameSession.create("TECH", ["mona", "neil"])
+    mona = tg.players["mona"]
+    tg.turn_index = tg.player_order.index("mona")
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    mona["tech_level"] = 2
+    basics = [
+        {"id": "peach", "name": "桃", "type": "basic", "subtype": "heal", "heal": 2, "instance_id": "tb-1"},
+        {"id": "dodge_low", "name": "1阶闪", "type": "basic", "subtype": "dodge", "tier": 1, "instance_id": "tb-2"},
+        {"id": "kill_low", "name": "1阶杀", "type": "basic", "subtype": "kill", "tier": 1, "instance_id": "tb-3"},
+        {"id": "visitor", "name": "天外来客", "type": "basic", "subtype": "visitor", "instance_id": "tb-4"},
+    ]
+    _give(mona, *basics)
+    ok, msg = tg.apply_action(
+        "mona",
+        {"action": "discard_for_tech", "instance_ids": ["tb-1", "tb-2", "tb-3", "tb-4"]},
+    )
+    assert ok, msg
+    assert mona["tech_level"] == 3
+    assert len(mona["hand"]) == 0
+    # unlimited per turn
+    more = [
+        {**basics[0], "instance_id": "tb-5"},
+        {**basics[1], "instance_id": "tb-6"},
+        {**basics[2], "instance_id": "tb-7"},
+        {**basics[3], "instance_id": "tb-8"},
+    ]
+    _give(mona, *more)
+    ok, msg = tg.apply_action(
+        "mona",
+        {"action": "discard_for_tech", "instance_ids": ["tb-5", "tb-6", "tb-7", "tb-8"]},
+    )
+    assert ok, msg
+    assert mona["tech_level"] == 4
 
     snap = eg.snapshot_for(eg.current_player())
     assert "tech_level" in snap["you"]

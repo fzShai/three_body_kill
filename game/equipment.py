@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 # Primary document slots (legacy stellar/stability kept empty)
-PRIMARY_SLOTS = ("ship", "armor", "temp_ascend")
+# temp_ascend cards apply as statuses, not equipment slots
+PRIMARY_SLOTS = ("ship", "armor")
 ALL_SLOTS = ("ship", "armor", "temp_ascend", "stellar_track", "stability_system")
+TEMP_ASCEND_IDS = frozenset({"nano_center", "chip_workshop", "stars_plan"})
 SLOT_LABELS = {
     "ship": "船",
     "armor": "甲",
@@ -20,9 +22,20 @@ def empty_equipment() -> dict[str, Any | None]:
     return {slot: None for slot in ALL_SLOTS}
 
 
+def is_temp_ascend_card(card: dict[str, Any]) -> bool:
+    cid = str(card.get("id") or "")
+    return cid in TEMP_ASCEND_IDS or card.get("slot") == "temp_ascend"
+
+
 def resolve_slot(card: dict[str, Any]) -> str | None:
+    """Resolve ship/armor/legacy equipment slot. Temp ascension is not a slot."""
+    if is_temp_ascend_card(card):
+        return None
     if card.get("slot"):
-        return str(card["slot"])
+        slot = str(card["slot"])
+        if slot == "temp_ascend":
+            return None
+        return slot
     if card.get("ship_id") or card.get("type") == "ship":
         return "ship"
     if card.get("armor_id") or card.get("type") == "armor":

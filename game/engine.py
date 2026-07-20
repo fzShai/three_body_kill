@@ -13,8 +13,10 @@ from game.draw import DrawSystem
 from game.equipment import (
     ALL_SLOTS,
     SLOT_LABELS,
+    TEMP_ASCEND_IDS,
     apply_equip_bonuses,
     empty_equipment,
+    is_temp_ascend_card,
     resolve_slot,
 )
 from game.stats import initial_combat_fields
@@ -203,7 +205,7 @@ class GameSession:
         if self.phase != "turn":
             return False
         name = self.current_player()
-        if self.turn_phase == "discard":
+        if self.turn_phase in {"play", "discard"}:
             self._auto_discard(name)
         self._log(f"{name} 超时，结束回合")
         self._advance_turn()
@@ -231,6 +233,8 @@ class GameSession:
             return True
         if self.phase != "turn" or self.current_player() != username:
             return False
+        if self.turn_phase in {"play", "discard"}:
+            self._auto_discard(username)
         self._log(f"{username} 离线，自动跳过回合")
         self._advance_turn()
         self._check_win()
@@ -318,13 +322,17 @@ class GameSession:
             p["damage_reduction"] += 1
         self._log(f"{username} 科技达到 6，获得{labels[choice]}")
 
-    def _note_basic_used(self, username: str) -> None:
+    def _clear_temp_ascend_statuses(self, username: str) -> None:
+        """Reverse temp-ascend bonuses and drop those status entries."""
         p = self.players[username]
-        p["basic_cards_used"] += 1
-        if p["basic_cards_used"] >= 4:
-            p["basic_cards_used"] = 0
-            self._raise_tech(username, 1)
-            self._log(f"{username} 使用满 4 张基本牌，科技等级升至 {p['tech_level']}")
+        remaining: list[dict[str, Any]] = []
+        for s in p["statuses"]:
+            sid = str(s.get("id") or "")
+            if sid in TEMP_ASCEND_IDS:
+                apply_equip_bonuses(p, {"id": sid}, equipping=False)
+            else:
+                remaining.append(s)
+        p["statuses"] = remaining
 
     def _eliminate_player(self, username: str) -> None:
         t = self.players[username]
@@ -335,6 +343,7 @@ class GameSession:
         for slot in EQUIP_SLOTS:
             if t["equipment"].get(slot):
                 self._unequip_slot(username, slot, to_discard=True)
+        self._clear_temp_ascend_statuses(username)
         t["statuses"] = []
 
     def _incoming_damage(self, target: str, amount: int) -> int:
@@ -435,10 +444,18 @@ class GameSession:
             return True, "进入弃牌阶段"
 
         if act == "discard_done" or act == "pass":
-            if self.turn_phase == "play" and act == "pass":
+            if self.turn_phase == "play":
                 self.turn_phase = "discard"
-            if self.turn_phase == "discard":
-                self._auto_discard(username)
+                self._log(f"{username} 进入弃牌阶段")
+                self.refresh_turn_timer()
+                self.seq += 1
+                return True, "进入弃牌阶段"
+            if self.turn_phase != "discard":
+                return False, "现在不是弃牌阶段"
+            limit = hand_limit(self.players[username]["max_hp"])
+            over = len(self.players[username]["hand"]) - limit
+            if over > 0:
+                return False, f"还需弃置 {over} 张牌"
             self._advance_turn()
             self._check_win()
             self.seq += 1
@@ -458,6 +475,9 @@ class GameSession:
             self.refresh_turn_timer()
             self.seq += 1
             return True, "已弃置"
+
+        if act == "discard_for_tech":
+            return self._discard_for_tech(username, action)
 
         if act == "recast":
             return self._recast(username, str(action.get("instance_id", "")).strip())
@@ -509,6 +529,57 @@ class GameSession:
     def _alive_others(self, username: str) -> list[str]:
         return [n for n in self.player_order if n != username and self.players[n]["alive"]]
 
+    @staticmethod
+    def _is_basic_card(card: dict[str, Any]) -> bool:
+        subtype = card.get("subtype")
+        if subtype in {"kill", "dodge", "heal", "visitor"}:
+            return True
+        return card.get("id") in {"peach", "visitor"}
+
+    def _discard_for_tech(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        if self.turn_phase != "play":
+            return False, "现在不是出牌阶段"
+        raw_ids = action.get("instance_ids")
+        if not isinstance(raw_ids, list):
+            return False, "需要提供 instance_ids"
+        ids = [str(x).strip() for x in raw_ids if str(x).strip()]
+        if len(ids) != 4 or len(set(ids)) != 4:
+            return False, "需要弃置恰好 4 张不同的基本牌"
+        hand = self.players[username]["hand"]
+        by_id = {c["instance_id"]: c for c in hand}
+        cards: list[dict[str, Any]] = []
+        for iid in ids:
+            card = by_id.get(iid)
+            if not card:
+                return False, "手牌中没有所选牌"
+            if not self._is_basic_card(card):
+                return False, "只能弃置基本牌升科技"
+            cards.append(card)
+        remove_ids = set(ids)
+        self.players[username]["hand"] = [c for c in hand if c["instance_id"] not in remove_ids]
+        self.discard.extend(cards)
+        self._raise_tech(username, 1)
+        names = "、".join(c.get("name", "?") for c in cards)
+        self._log(f"{username} 弃置 4 张基本牌（{names}）升科技至 {self.players[username]['tech_level']}")
+        self.refresh_turn_timer()
+        self.seq += 1
+        return True, f"科技等级 {self.players[username]['tech_level']}"
+
+    def _apply_temp_ascend(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
+        if not self._card_implemented(card):
+            return False, "该临时飞升效果尚未实装，可尝试重铸"
+        cid = str(card.get("id") or "")
+        name = str(card.get("name") or cid)
+        if self._has_status(username, cid):
+            return False, f"已拥有状态：{name}"
+        if not self._apply_status(username, cid, name, "positive"):
+            return False, f"无法施加状态：{name}"
+        notes = apply_equip_bonuses(self.players[username], card, equipping=True)
+        self.discard.append(card)
+        note = f"（{', '.join(notes)}）" if notes else ""
+        self._log(f"{username} 获得临时飞升：{name}{note}")
+        return True, f"获得临时飞升：{name}"
+
     def _card_implemented(self, card: dict[str, Any]) -> bool:
         if "implemented" in card:
             return bool(card["implemented"])
@@ -516,7 +587,11 @@ class GameSession:
         defs = self.card_defs.get(str(cid or ""), {})
         if "implemented" in defs:
             return bool(defs["implemented"])
-        if card.get("ship_id") or card.get("armor_id") or card.get("slot") in {"ship", "armor", "temp_ascend"}:
+        if is_temp_ascend_card(card) or card.get("ship_id") or card.get("armor_id") or card.get("slot") in {
+            "ship",
+            "armor",
+            "temp_ascend",
+        }:
             known = {
                 "blue_space", "natural_selection", "bronze_age", "quantum", "tang",
                 "nano_center", "chip_workshop", "stars_plan",
@@ -544,6 +619,10 @@ class GameSession:
             if cid == "ladder_plan":
                 return bool(self._alive_others(username))
             return True
+        if is_temp_ascend_card(card):
+            if not self._card_implemented(card):
+                return False
+            return not self._has_status(username, str(cid or ""))
         if ctype == "equipment" or resolve_slot(card):
             return self._card_implemented(card) and resolve_slot(card) is not None
         return False
@@ -622,7 +701,6 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
-            self._note_basic_used(username)
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -638,7 +716,6 @@ class GameSession:
             heal = int(card.get("heal", 2))
             self._heal(username, heal)
             self.discard.append(card)
-            self._note_basic_used(username)
             self._log(f"{username} 使用桃，HP {self.players[username]['hp']}")
             self.refresh_turn_timer()
             self.seq += 1
@@ -646,7 +723,6 @@ class GameSession:
 
         if subtype == "visitor" or cid == "visitor":
             self.discard.append(card)
-            self._note_basic_used(username)
             self._raise_tech(username, 1)
             self._log(f"{username} 使用天外来客，科技等级 {self.players[username]['tech_level']}")
             self.refresh_turn_timer()
@@ -664,6 +740,15 @@ class GameSession:
 
         if cid == "red_coast":
             ok, msg = self._play_red_coast(username, card)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
+        if is_temp_ascend_card(card):
+            ok, msg = self._apply_temp_ascend(username, card)
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
@@ -760,7 +845,6 @@ class GameSession:
                 return False, "闪的阶数不足以响应此杀"
             hand.pop(idx)
             self.discard.append(card)
-            self._note_basic_used(username)
             self._log(f"{username} 打出{card.get('name')}，响应成功")
             self.prompt = None
             self.phase = "turn"

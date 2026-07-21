@@ -409,9 +409,46 @@ def main() -> None:
     assert ok, msg
     assert prey["hp"] == 4
     assert fr.phase == "turn"
+    # 土著桃：双疗
+    fr.players["friss"]["hp"] = 2
+    peach_n = {**peach, "instance_id": "peach-native"}
+    _give(fr.players["friss"], peach_n)
+    ok, msg = fr.apply_action("friss", {"action": "play_card", "instance_id": "peach-native"})
+    assert ok, msg
+    assert fr.players["friss"]["hp"] == 6  # 2 + 2 + 土著再 2
+    assert any("土著" in line and "桃" in line for line in fr.log)
     vis_c = {**visitor, "instance_id": "vis-cohesion"}
     _give(fr.players["friss"], vis_c)
     ok, msg = fr.apply_action("friss", {"action": "recast", "instance_id": "vis-cohesion"})
+    assert ok, msg
+
+    # 甲栏已满时深海液可重铸；空槽时不可重铸
+    eqr = GameSession.create("ARMOR_RECAST", ["arm", "bot"])
+    _blank_skills(eqr, "arm", "bot")
+    eqr.turn_index = eqr.player_order.index("arm")
+    eqr.phase = "turn"
+    eqr.turn_phase = "play"
+    arm = eqr.players["arm"]
+    deep = {
+        "id": "deep_sea",
+        "name": "深海液",
+        "type": "equipment",
+        "slot": "armor",
+        "armor_id": "deep_sea",
+        "implemented": True,
+        "instance_id": "deep-1",
+    }
+    _give(arm, deep)
+    ok, msg = eqr.apply_action("arm", {"action": "recast", "instance_id": "deep-1"})
+    assert not ok and "不能重铸" in msg, msg
+    arm["equipment"]["armor"] = {
+        "id": "eco_bottle",
+        "name": "生态瓶",
+        "slot": "armor",
+        "implemented": True,
+    }
+    _give(arm, {**deep, "instance_id": "deep-2"})
+    ok, msg = eqr.apply_action("arm", {"action": "recast", "instance_id": "deep-2"})
     assert ok, msg
 
     # 球状闪电封印流浪；星舰仍生效；封印在其回合结束清除

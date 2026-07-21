@@ -719,6 +719,19 @@ class GameSession:
             return str(cid) in known
         return False
 
+    @staticmethod
+    def _triggers_native(card: dict[str, Any]) -> bool:
+        """土著：1阶牌，或无阶的桃/天外来客。"""
+        if int(card.get("tier", 0) or 0) == 1:
+            return True
+        subtype = card.get("subtype")
+        cid = card.get("id")
+        if subtype == "heal" or cid == "peach":
+            return True
+        if subtype == "visitor" or cid == "visitor":
+            return True
+        return False
+
     def _card_has_legal_play(self, username: str, card: dict[str, Any]) -> bool:
         subtype = card.get("subtype")
         ctype = card.get("type")
@@ -746,7 +759,13 @@ class GameSession:
                 return False
             return not self._has_status(username, str(cid or ""))
         if ctype == "equipment" or resolve_slot(card):
-            return self._card_implemented(card) and resolve_slot(card) is not None
+            if not self._card_implemented(card):
+                return False
+            slot = resolve_slot(card)
+            if not slot:
+                return False
+            # 槽位已有装备时仍可打出替换，但不算「合法打法」，允许重铸
+            return self.players[username]["equipment"].get(slot) is None
         return False
 
     def _unequip_slot(self, username: str, slot: str, *, to_discard: bool = True) -> dict[str, Any] | None:
@@ -958,7 +977,7 @@ class GameSession:
     ) -> None:
         if is_repeat:
             return
-        if int(card.get("tier", 0) or 0) != 1:
+        if not self._triggers_native(card):
             return
         if not skill_active(self.players[username], SKILL_NATIVE):
             return
@@ -1010,7 +1029,7 @@ class GameSession:
             self.discard.append(card)
         will_repeat = (
             not is_native_repeat
-            and tier == 1
+            and self._triggers_native(card)
             and skill_active(p, SKILL_NATIVE)
         )
         self.prompt = {

@@ -279,10 +279,6 @@
             }, 200);
 
             function render(snap) {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'pre-fix',hypothesisId:'C',location:'table.html:render:entry',message:'render called',data:{hasSnap:!!snap,phase:snap&&snap.phase,handLen:(snap&&snap.you&&snap.you.hand||[]).length,hasRole:!!(snap&&snap.you&&snap.you.role),logLen:(snap&&snap.log||[]).length,players:(snap&&snap.players||[]).length},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                try {
                 state = snap;
                 turnDeadlineMs = snap.turn_deadline_ms || null;
                 syncUiMode(snap);
@@ -308,9 +304,6 @@
                 const inPlay = myTurn && snap.turn_phase === 'play';
                 const inDiscard = myTurn && snap.turn_phase === 'discard';
                 const need = discardNeed(snap);
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'post-fix',hypothesisId:'A',location:'table.html:render:locals',message:'wander locals restored',data:{isWander:!!isWander,myWander:!!myWander,handLen:(snap.you&&snap.you.hand||[]).length,hasRole:!!(snap.you&&snap.you.role),logLen:(snap.log||[]).length},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
 
                 const hint = document.getElementById('modeHint');
                 if (uiMode === 'tech_discard') {
@@ -524,22 +517,11 @@
                 } else {
                     banner.classList.remove('show');
                 }
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'post-fix',hypothesisId:'A',location:'table.html:render:success',message:'render finished ok',data:{roleShown:!!(snap.you&&snap.you.role),handLen:(snap.you&&snap.you.hand||[]).length,logLen:(snap.log||[]).length},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                } catch (err) {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'post-fix',hypothesisId:'A',location:'table.html:render:catch',message:String(err&&err.message||err),data:{name:err&&err.name,stack:(err&&err.stack||'').slice(0,300)},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                throw err;
-                }
             }
 
             const sock = new TBK.GameSocket();
+            sock.on('error', (msg) => setStatus(msg.payload?.message || '错误', 'error'));
             sock.on('game_state', (msg) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'pre-fix',hypothesisId:'B',location:'table.html:game_state',message:'game_state received',data:{msgRoom:msg.room_id,pageRoom:roomId,filtered:!!(msg.room_id&&msg.room_id!==roomId),handLen:(msg.payload&&msg.payload.you&&msg.payload.you.hand||[]).length,hasRole:!!(msg.payload&&msg.payload.you&&msg.payload.you.role),logLen:(msg.payload&&msg.payload.log||[]).length},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 if (msg.room_id && msg.room_id !== roomId) return;
                 setStatus('');
                 // Drop selection for cards no longer in hand after server update
@@ -547,12 +529,6 @@
                 if (selectedId && !handIds.has(selectedId)) selectedId = null;
                 selectedIds = new Set([...selectedIds].filter((id) => handIds.has(id)));
                 render(msg.payload);
-            });
-            sock.on('error', (msg) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'60d9c6'},body:JSON.stringify({sessionId:'60d9c6',runId:'pre-fix',hypothesisId:'D',location:'table.html:ws_error',message:'ws error',data:{payload:msg.payload||{}},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                setStatus(msg.payload?.message || '错误', 'error');
             });
             sock.on('game_started', () => sock.send('get_game_state', {}, roomId));
             sock.on('_open', () => sock.send('get_game_state', {}, roomId));

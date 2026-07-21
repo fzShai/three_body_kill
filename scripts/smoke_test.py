@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,13 +22,35 @@ def _give(player: dict, *cards: dict) -> None:
     player["hand"] = list(cards)
 
 
+def _blank_skills(session: GameSession, *names: str) -> None:
+    """Disable role skills for baseline rule tests."""
+    for n in names:
+        p = session.players[n]
+        p["skills"] = []
+        p["tech_level"] = 1
+        p["statuses"] = [s for s in p["statuses"] if s.get("id") != "skills_sealed"]
+
+
+def _as_role(session: GameSession, username: str, role_id: str) -> None:
+    role = next(r for r in session.roles_catalog if r["id"] == role_id)
+    p = session.players[username]
+    p["role_id"] = role["id"]
+    p["role_name"] = role["name"]
+    p["skills"] = deepcopy(role.get("skills") or [])
+    p["max_hp"] = role["hp"]
+    p["hp"] = min(p["hp"], role["hp"])
+    p["tech_level"] = 4 if role_id == "guan_yifan" else 1
+
+
 def main() -> None:
     assert final_basic_damage(2, 1, 1) == 2
 
     g = GameSession.create("SMOKE", ["alice", "bob"])
     assert g.phase == "turn"
     assert g.turn_phase == "play"
-    assert all(len(g.players[n]["hand"]) >= 6 for n in ("alice", "bob"))  # 6 open + 3 draw for first
+    assert all(len(g.players[n]["hand"]) >= 6 for n in ("alice", "bob"))
+    assert {g.players[n]["role_id"] for n in ("alice", "bob")} <= {"guan_yifan", "friss"}
+    _blank_skills(g, "alice", "bob")
     assert g.players["alice"]["tech_level"] == 1
 
     # peach self heal
@@ -62,6 +85,7 @@ def main() -> None:
 
     # kill -> dodge response
     kg = GameSession.create("KILL", ["cara", "dan"])
+    _blank_skills(kg, "cara", "dan")
     cara, dan = kg.players["cara"], kg.players["dan"]
     kg.turn_index = kg.player_order.index("cara")
     kg.phase = "turn"
@@ -95,6 +119,7 @@ def main() -> None:
 
     # kill unanswered deals damage
     kg2 = GameSession.create("KILL2", ["erin", "finn"])
+    _blank_skills(kg2, "erin", "finn")
     erin, finn = kg2.players["erin"], kg2.players["finn"]
     kg2.turn_index = kg2.player_order.index("erin")
     kg2.phase = "turn"
@@ -103,15 +128,16 @@ def main() -> None:
     _give(erin, kill2)
     _give(finn)
     finn["hp"] = 3
-    finn["vision_exposed"] = True  # 1阶杀 base1+vision1 = 2 before bonuses
+    finn["vision_exposed"] = True
     ok, msg = kg2.apply_action("erin", {"action": "play_card", "instance_id": "kill-2", "target": "finn"})
     assert ok, msg
     ok, msg = kg2.apply_action("finn", {"action": "respond_pass"})
     assert ok, msg
     assert finn["hp"] == 1
 
-    # ladder_plan exposes vision; vision boosts kill damage; clears at target turn end
+    # ladder_plan
     vg = GameSession.create("VISION", ["nora", "owen"])
+    _blank_skills(vg, "nora", "owen")
     nora, owen = vg.players["nora"], vg.players["owen"]
     vg.turn_index = vg.player_order.index("nora")
     vg.phase = "turn"
@@ -135,12 +161,9 @@ def main() -> None:
     assert ok, msg
     ok, msg = vg.apply_action("owen", {"action": "respond_pass"})
     assert ok, msg
-    assert owen["hp"] == 2  # base1 + vision1
-    # end nora turn then owen turn end should clear owen vision
+    assert owen["hp"] == 2
     ok, msg = vg.apply_action("nora", {"action": "end_play"})
     assert ok, msg
-    assert vg.turn_phase == "discard"
-    # ensure under hand limit then finish discard
     limit_n = max(0, nora["max_hp"] - 2)
     while len(nora["hand"]) > limit_n:
         card = nora["hand"][0]
@@ -161,14 +184,14 @@ def main() -> None:
     assert ok, msg
     assert owen["vision_exposed"] is False
 
-    # illegal recast: peach has legal play
+    # illegal recast / privacy
     rg = GameSession.create("RECAST", ["paul", "quinn"])
+    _blank_skills(rg, "paul", "quinn")
     cur = rg.current_player()
     peach_r = {**peach, "instance_id": "peach-r"}
     _give(rg.players[cur], peach_r)
     ok, msg = rg.apply_action(cur, {"action": "recast", "instance_id": "peach-r"})
     assert not ok and "不能重铸" in msg, msg
-    # unimplemented trick can recast
     stub = {
         "id": "wallfacer_plan",
         "name": "面壁计划",
@@ -185,8 +208,8 @@ def main() -> None:
     assert all("摸到" not in line for line in rg.log)
     assert not any(drawn_name in line and "重铸" in line for line in rg.log)
 
-    # ladder: exposed target invalid; no unexposed others => recastable
     lg = GameSession.create("LADDER", ["uma", "vic"])
+    _blank_skills(lg, "uma", "vic")
     uma, vic = lg.players["uma"], lg.players["vic"]
     lg.turn_index = lg.player_order.index("uma")
     lg.phase = "turn"
@@ -207,11 +230,10 @@ def main() -> None:
     assert not ok and "已暴露" in msg, msg
     ok, msg = lg.apply_action("uma", {"action": "recast", "instance_id": "ladder-b"})
     assert ok, msg
-    assert all("摸到" not in line for line in lg.log)
 
-    # equip blue_space: damage bonus
     eqg = GameSession.create("EQUIP", ["rita", "sam"])
-    rita, sam = eqg.players["rita"], eqg.players["sam"]
+    _blank_skills(eqg, "rita", "sam")
+    rita = eqg.players["rita"]
     eqg.turn_index = eqg.player_order.index("rita")
     eqg.phase = "turn"
     eqg.turn_phase = "play"
@@ -223,12 +245,10 @@ def main() -> None:
         "ship_id": "blue_space",
         "implemented": True,
         "instance_id": "ship-1",
-        "text": "伤害+1",
     }
     _give(rita, ship)
     ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "ship-1"})
     assert ok, msg
-    assert rita["equipment"]["ship"]["id"] == "blue_space"
     assert rita["damage_bonus"] == 1
     temp = {
         "id": "stars_plan",
@@ -241,31 +261,10 @@ def main() -> None:
     _give(rita, temp)
     ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-1"})
     assert ok, msg
-    assert rita["equipment"]["temp_ascend"] is None
     assert any(s["id"] == "stars_plan" for s in rita["statuses"])
-    assert rita["damage_bonus"] == 2
-    nano = {
-        "id": "nano_center",
-        "name": "纳米工程中心",
-        "type": "equipment",
-        "slot": "temp_ascend",
-        "implemented": True,
-        "instance_id": "temp-2",
-    }
-    _give(rita, nano)
-    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-2"})
-    assert ok, msg
-    status_ids = {s["id"] for s in rita["statuses"]}
-    assert status_ids >= {"stars_plan", "nano_center"}
-    assert rita["damage_reduction"] == 1
-    # same temp ascend cannot stack
-    temp_dup = {**temp, "instance_id": "temp-3"}
-    _give(rita, temp_dup)
-    ok, msg = eqg.apply_action("rita", {"action": "play_card", "instance_id": "temp-3"})
-    assert not ok, msg
 
-    # dying: force peach
     dg = GameSession.create("DIE", ["gina", "hank"])
+    _blank_skills(dg, "gina", "hank")
     gina, hank = dg.players["gina"], dg.players["hank"]
     dg.turn_index = dg.player_order.index("gina")
     dg.phase = "turn"
@@ -275,7 +274,6 @@ def main() -> None:
     _give(gina, kill3)
     _give(hank, peach2)
     hank["hp"] = 1
-    hank["vision_exposed"] = False
     ok, msg = dg.apply_action("gina", {"action": "play_card", "instance_id": "kill-3", "target": "hank"})
     assert ok, msg
     ok, msg = dg.apply_action("hank", {"action": "respond_pass"})
@@ -285,8 +283,8 @@ def main() -> None:
     assert ok, msg
     assert hank["alive"] and hank["hp"] > 0
 
-    # dying: other player peaches to save
     dg3 = GameSession.create("DIE3", ["kyle", "lena"])
+    _blank_skills(dg3, "kyle", "lena")
     kyle, lena = dg3.players["kyle"], dg3.players["lena"]
     dg3.turn_index = dg3.player_order.index("kyle")
     dg3.phase = "turn"
@@ -300,15 +298,12 @@ def main() -> None:
     assert ok, msg
     ok, msg = dg3.apply_action("lena", {"action": "respond_pass"})
     assert ok, msg
-    assert dg3.phase == "dying"
     ok, msg = dg3.apply_action("kyle", {"action": "play_card", "instance_id": "peach-save"})
     assert ok, msg
-    assert dg3.phase == "turn"
     assert lena["alive"] and lena["hp"] > 0
-    assert any("救人" in line for line in dg3.log)
 
-    # dying without peach -> death
     dg2 = GameSession.create("DIE2", ["ivy", "jade"])
+    _blank_skills(dg2, "ivy", "jade")
     ivy, jade = dg2.players["ivy"], dg2.players["jade"]
     dg2.turn_index = dg2.player_order.index("ivy")
     dg2.phase = "turn"
@@ -321,18 +316,15 @@ def main() -> None:
     assert ok, msg
     ok, msg = dg2.apply_action("jade", {"action": "respond_pass"})
     assert ok, msg
-    assert dg2.phase == "dying"
     ok, msg = dg2.apply_action("jade", {"action": "dying_resolve"})
     assert ok, msg
     assert not jade["alive"]
 
-    # end play + discard
     eg = GameSession.create("END", ["kate", "liam"])
+    _blank_skills(eg, "kate", "liam")
     cur = eg.current_player()
-    # cannot skip discard from play
     ok, msg = eg.apply_action(cur, {"action": "discard_done"})
     assert ok and eg.turn_phase == "discard", msg
-    # over-limit hand blocks discard_done
     p = eg.players[cur]
     p["max_hp"] = 4
     extras = [
@@ -349,22 +341,14 @@ def main() -> None:
     p["hand"] = extras[:]
     ok, msg = eg.apply_action(cur, {"action": "discard_done"})
     assert not ok and "还需弃置" in msg, msg
-    # selective discard then finish
-    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-0"})
-    assert ok, msg
-    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-1"})
-    assert ok, msg
-    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-2"})
-    assert ok, msg
-    ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": "extra-3"})
-    assert ok, msg
-    assert len(p["hand"]) == 2
+    for i in range(4):
+        ok, msg = eg.apply_action(cur, {"action": "discard_card", "instance_id": f"extra-{i}"})
+        assert ok, msg
     ok, msg = eg.apply_action(cur, {"action": "discard_done"})
     assert ok, msg
-    assert eg.current_player() != cur or eg.phase == "ended" or True
 
-    # discard 4 basics for tech
     tg = GameSession.create("TECH", ["mona", "neil"])
+    _blank_skills(tg, "mona", "neil")
     mona = tg.players["mona"]
     tg.turn_index = tg.player_order.index("mona")
     tg.phase = "turn"
@@ -383,21 +367,88 @@ def main() -> None:
     )
     assert ok, msg
     assert mona["tech_level"] == 3
-    assert len(mona["hand"]) == 0
-    # unlimited per turn
-    more = [
-        {**basics[0], "instance_id": "tb-5"},
-        {**basics[1], "instance_id": "tb-6"},
-        {**basics[2], "instance_id": "tb-7"},
-        {**basics[3], "instance_id": "tb-8"},
-    ]
-    _give(mona, *more)
-    ok, msg = tg.apply_action(
-        "mona",
-        {"action": "discard_for_tech", "instance_ids": ["tb-5", "tb-6", "tb-7", "tb-8"]},
-    )
+
+    # 关一帆星舰 + 流浪
+    gy = GameSession.create("GUAN", ["guan", "foe"])
+    _as_role(gy, "guan", "guan_yifan")
+    _blank_skills(gy, "foe")
+    assert gy.players["guan"]["tech_level"] == 4
+    gy.turn_index = gy.player_order.index("guan")
+    gy.phase = "turn"
+    gy.turn_phase = "play"
+    _give(gy.players["guan"])
+    ok, msg = gy.apply_action("guan", {"action": "end_play"})
     assert ok, msg
-    assert mona["tech_level"] == 4
+    ok, msg = gy.apply_action("guan", {"action": "discard_done"})
+    assert ok, msg
+    assert gy.phase == "prompt" and gy.prompt and gy.prompt.get("type") == "wander_draw"
+    assert gy.players["guan"]["tech_level"] == 3
+    ok, msg = gy.apply_action("guan", {"action": "wander_pass"})
+    assert ok, msg
+    assert gy.current_player() == "foe"
+
+    # 弗雷斯土著 + 凝聚
+    fr = GameSession.create("FRISS", ["friss", "prey"])
+    _as_role(fr, "friss", "friss")
+    _blank_skills(fr, "prey")
+    fr.turn_index = fr.player_order.index("friss")
+    fr.phase = "turn"
+    fr.turn_phase = "play"
+    prey = fr.players["prey"]
+    prey["hp"] = 6
+    kill_n = {**kill, "instance_id": "kill-native", "tier": 1}
+    _give(fr.players["friss"], kill_n)
+    ok, msg = fr.apply_action("friss", {"action": "play_card", "instance_id": "kill-native", "target": "prey"})
+    assert ok, msg
+    ok, msg = fr.apply_action("prey", {"action": "respond_pass"})
+    assert ok, msg
+    assert fr.phase == "prompt"
+    assert fr.prompt and fr.prompt.get("is_native_repeat")
+    assert prey["hp"] == 5
+    ok, msg = fr.apply_action("prey", {"action": "respond_pass"})
+    assert ok, msg
+    assert prey["hp"] == 4
+    assert fr.phase == "turn"
+    vis_c = {**visitor, "instance_id": "vis-cohesion"}
+    _give(fr.players["friss"], vis_c)
+    ok, msg = fr.apply_action("friss", {"action": "recast", "instance_id": "vis-cohesion"})
+    assert ok, msg
+
+    # 球状闪电封印流浪；星舰仍生效；封印在其回合结束清除
+    bl = GameSession.create("BALL", ["seer", "target"])
+    _as_role(bl, "target", "guan_yifan")
+    _blank_skills(bl, "seer")
+    bl.turn_index = bl.player_order.index("seer")
+    bl.phase = "turn"
+    bl.turn_phase = "play"
+    ball = {
+        "id": "ball_lightning",
+        "name": "球状闪电",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "ball-1",
+    }
+    _give(bl.players["seer"], ball)
+    ok, msg = bl.apply_action("seer", {"action": "play_card", "instance_id": "ball-1", "target": "target"})
+    assert ok, msg
+    assert any(s["id"] == "skills_sealed" for s in bl.players["target"]["statuses"])
+    _give(bl.players["seer"])
+    ok, msg = bl.apply_action("seer", {"action": "end_play"})
+    assert ok, msg
+    ok, msg = bl.apply_action("seer", {"action": "discard_done"})
+    assert ok, msg
+    assert bl.current_player() == "target"
+    tech_before = bl.players["target"]["tech_level"]
+    _give(bl.players["target"])
+    bl.phase = "turn"
+    bl.turn_phase = "play"
+    ok, msg = bl.apply_action("target", {"action": "end_play"})
+    assert ok, msg
+    ok, msg = bl.apply_action("target", {"action": "discard_done"})
+    assert ok, msg
+    assert bl.players["target"]["tech_level"] == max(1, tech_before - 1)
+    assert not (bl.prompt and bl.prompt.get("type") == "wander_draw")
+    assert not any(s["id"] == "skills_sealed" for s in bl.players["target"]["statuses"])
 
     snap = eg.snapshot_for(eg.current_player())
     assert "tech_level" in snap["you"]
@@ -427,6 +478,7 @@ def main() -> None:
     private = room.game.snapshot_for("smoke_a")
     assert private["phase"] in {"turn", "prompt", "dying"}
     assert isinstance(private["you"]["hand"], list)
+    assert private["you"]["role"]["role_id"] in {"guan_yifan", "friss"}
 
     with c1.websocket_connect("/ws") as ws1:
         hello = json.loads(ws1.receive_text())

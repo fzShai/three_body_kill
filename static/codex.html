@@ -200,16 +200,19 @@
                         list.innerHTML = '<div class="empty">暂无角色数据</div>';
                         return;
                     }
-                    list.innerHTML = roles.map((r) => `
+                    list.innerHTML = roles.map((r) => {
+                        const skills = (r.skills || []).map((s) =>
+                            `<div class="text">${s.locked ? '【锁定技】' : '【技能】'}${escapeHtml(s.name)}：${escapeHtml(s.text || '')}</div>`
+                        ).join('');
+                        return `
                         <div class="item">
                             <div class="name">${escapeHtml(r.name)}</div>
                             <div class="meta">
-                                <span>阵营：${escapeHtml(FACTION_LABEL[r.faction] || r.faction)}</span>
                                 <span>HP：${escapeHtml(r.hp)}</span>
                             </div>
-                            <div class="text">胜利条件：${escapeHtml(r.win)}</div>
-                        </div>
-                    `).join('');
+                            ${skills || '<div class="text">暂无技能说明</div>'}
+                        </div>`;
+                    }).join('');
                 } catch (e) {
                     if (e.message !== 'unauthorized') status.textContent = '加载角色图鉴失败';
                 }

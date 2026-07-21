@@ -122,11 +122,8 @@
       "name": "球状闪电",
       "type": "trick",
       "phase": "C",
-      "text": "封锁目标非锁定技（待实现）",
-      "implemented": false,
-      "needs": [
-        "skill_lock_status"
-      ]
+      "text": "令一名角色的所有非锁定技失效，直到其下个回合结束。",
+      "implemented": true
     },
     "thought_stamp": {
       "id": "thought_stamp",

@@ -19,6 +19,14 @@ from game.equipment import (
     is_temp_ascend_card,
     resolve_slot,
 )
+from game.skills import (
+    SKILL_COHESION,
+    SKILL_NATIVE,
+    SKILL_STARSHIP,
+    SKILL_WANDER,
+    STATUS_SKILLS_SEALED,
+    skill_active,
+)
 from game.stats import initial_combat_fields
 from game.turn import hand_limit
 
@@ -45,14 +53,19 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
     import random
 
     pool = roles[:]
-    random.shuffle(pool)
+    if len(player_names) <= len(pool):
+        chosen = random.sample(pool, len(player_names))
+    else:
+        random.shuffle(pool)
+        chosen = [pool[i % len(pool)] for i in range(len(player_names))]
     assigned: dict[str, dict[str, Any]] = {}
-    for i, name in enumerate(player_names):
-        role = pool[i % len(pool)]
-        assigned[name] = {
+    for name, role in zip(player_names, chosen):
+        skills = deepcopy(role.get("skills") or [])
+        p: dict[str, Any] = {
             "role_id": role["id"],
             "role_name": role["name"],
-            "faction": role["faction"],
+            "faction": role.get("faction"),
+            "skills": skills,
             "hp": role["hp"],
             "max_hp": role["hp"],
             "alive": True,
@@ -65,6 +78,9 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
             "red_coast_used": False,
             **initial_combat_fields(),
         }
+        if skill_active(p, SKILL_STARSHIP):
+            p["tech_level"] = 4
+        assigned[name] = p
     return assigned
 
 
@@ -90,6 +106,7 @@ class GameSession:
         self.turn_deadline_at = 0.0
         self.prompt: dict[str, Any] | None = None
         self.dying: dict[str, Any] | None = None
+        self._pending_conclude: str | None = None
         self._deal_initial()
         self.phase = "turn"
         self.turn_phase = "draw"
@@ -194,6 +211,12 @@ class GameSession:
         if time.time() < self.turn_deadline_at:
             return False
         if self.phase == "prompt" and self.prompt:
+            ptype = self.prompt.get("type")
+            if ptype == "wander_draw":
+                self._log(f"{self.prompt.get('to')} 【流浪】超时，视为放弃")
+                self._apply_wander(str(self.prompt.get("to")), False)
+                self.seq += 1
+                return True
             self._log(f"{self.prompt.get('to')} 响应超时，视为不响应")
             self._resolve_kill_unanswered()
             self.seq += 1
@@ -208,7 +231,7 @@ class GameSession:
         if self.turn_phase in {"play", "discard"}:
             self._auto_discard(name)
         self._log(f"{name} 超时，结束回合")
-        self._advance_turn()
+        self._conclude_turn(name)
         self._check_win()
         self.seq += 1
         return True
@@ -236,7 +259,7 @@ class GameSession:
         if self.turn_phase in {"play", "discard"}:
             self._auto_discard(username)
         self._log(f"{username} 离线，自动跳过回合")
-        self._advance_turn()
+        self._conclude_turn(username)
         self._check_win()
         self.seq += 1
         return True
@@ -252,26 +275,11 @@ class GameSession:
             self.dying = None
             if alive:
                 self.winner = alive[0]
-                self.winner_faction = self.players[alive[0]]["faction"]
+                self.winner_faction = None
                 self._log(f"{self.winner} 获胜")
             else:
                 self.winner = None
                 self._log("无人存活，平局")
-            return True
-        if len(alive) >= len(self.player_order):
-            return False
-        factions = {self.players[n]["faction"] for n in alive}
-        if factions <= {"earth"}:
-            self.phase = "ended"
-            self.winner = alive[0]
-            self.winner_faction = "earth"
-            self._log("地球阵营胜利")
-            return True
-        if factions <= {"eto", "trisolaris"}:
-            self.phase = "ended"
-            self.winner = alive[0]
-            self.winner_faction = "trisolaris"
-            self._log("三体相关阵营胜利")
             return True
         return False
 
@@ -302,11 +310,91 @@ class GameSession:
         return False
 
     def _raise_tech(self, username: str, by: int = 1) -> None:
+        self._set_tech(username, self.players[username]["tech_level"] + by)
+
+    def _set_tech(self, username: str, level: int, *, notify: bool = True) -> bool:
         p = self.players[username]
-        before = p["tech_level"]
-        p["tech_level"] = min(6, p["tech_level"] + by)
-        if before < 6 <= p["tech_level"] and not p.get("ascended"):
+        before = int(p["tech_level"])
+        p["tech_level"] = max(1, min(6, int(level)))
+        after = int(p["tech_level"])
+        if before == after:
+            return False
+        if before < 6 <= after and not p.get("ascended"):
             self._grant_ascension(username)
+        if notify:
+            self._on_tech_changed(username, before, after)
+        return True
+
+    def _on_tech_changed(self, username: str, before: int, after: int) -> None:
+        p = self.players[username]
+        if not p.get("alive"):
+            return
+        if not skill_active(p, SKILL_WANDER):
+            return
+        # Do not nest wander over kill response; queue after current prompt if needed
+        if self.phase == "prompt" and self.prompt and self.prompt.get("type") != "wander_draw":
+            self.prompt["queue_wander"] = username
+            return
+        if self.phase == "dying":
+            return
+        self._open_wander_prompt(username)
+
+    def _open_wander_prompt(self, username: str, *, after: str | None = None) -> None:
+        self.prompt = {
+            "type": "wander_draw",
+            "to": username,
+            "from": username,
+            "after": after,
+        }
+        self.phase = "prompt"
+        self._log(f"{username} 【流浪】：是否失去 1 点体力并摸两张牌？")
+        self._start_turn_timer()
+
+    def _apply_wander(self, username: str, accept: bool) -> None:
+        after = (self.prompt or {}).get("after")
+        native_after = (self.prompt or {}).get("native_after")
+        self.prompt = None
+        if accept and self.players[username]["alive"]:
+            p = self.players[username]
+            p["hp"] -= 1
+            drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+            p["hand"].extend(drawn)
+            self._log(f"{username} 发动【流浪】：失去 1 体力，摸 {len(drawn)} 张（HP {p['hp']}）")
+            if p["hp"] <= 0:
+                if after == "conclude_turn":
+                    self._pending_conclude = username
+                self._begin_dying(username)
+                return
+        else:
+            self._log(f"{username} 放弃【流浪】")
+        if native_after and native_after.get("kind") == "visitor":
+            # visitor has no tier — no-op placeholder for future
+            pass
+        if after == "conclude_turn":
+            self._finish_conclude_turn(username)
+            return
+        if self.phase not in {"dying", "ended"}:
+            self.phase = "turn"
+            self.refresh_turn_timer()
+
+    def _conclude_turn(self, username: str) -> None:
+        """End-of-turn skills then advance. May pause for wander."""
+        p = self.players[username]
+        if p.get("alive") and skill_active(p, SKILL_STARSHIP):
+            before = p["tech_level"]
+            if before > 1:
+                self._set_tech(username, before - 1)
+                self._log(f"{username} 【星舰】：科技降至 {p['tech_level']}")
+        if self.phase == "prompt" and self.prompt and self.prompt.get("type") == "wander_draw":
+            self.prompt["after"] = "conclude_turn"
+            return
+        self._finish_conclude_turn(username)
+
+    def _finish_conclude_turn(self, username: str) -> None:
+        if self._has_status(username, STATUS_SKILLS_SEALED):
+            self._remove_status(username, STATUS_SKILLS_SEALED)
+            self._log(f"{username} 的非锁定技封印结束")
+        self._advance_turn()
 
     def _grant_ascension(self, username: str) -> None:
         import random
@@ -397,13 +485,22 @@ class GameSession:
             self.dying = None
             self.phase = "turn"
             self.refresh_turn_timer()
+            if self._pending_conclude:
+                who = self._pending_conclude
+                self._pending_conclude = None
+                if self.phase not in {"ended"} and self.players.get(who, {}).get("alive") is not False:
+                    self._finish_conclude_turn(who)
             return
         self._eliminate_player(victim)
         self.dying = None
         self._log(f"{victim} 濒死无回复牌，出局")
+        pending = self._pending_conclude
+        self._pending_conclude = None
         if not self._check_win():
             self.phase = "turn"
             self.refresh_turn_timer()
+            if pending:
+                self._finish_conclude_turn(pending)
 
     def _auto_resolve_dying(self) -> None:
         if not self.dying:
@@ -456,7 +553,7 @@ class GameSession:
             over = len(self.players[username]["hand"]) - limit
             if over > 0:
                 return False, f"还需弃置 {over} 张牌"
-            self._advance_turn()
+            self._conclude_turn(username)
             self._check_win()
             self.seq += 1
             return True, "回合结束"
@@ -533,6 +630,10 @@ class GameSession:
                 self._log(f"{username} 对 {victim} 使用 {card.get('name')} 救人，HP {v['hp']}")
             self.refresh_turn_timer()
             self.seq += 1
+            if self._pending_conclude:
+                who = self._pending_conclude
+                self._pending_conclude = None
+                self._finish_conclude_turn(who)
             return True, "脱离濒死"
 
         return False, "濒死阶段行动无效"
@@ -630,7 +731,10 @@ class GameSession:
         if subtype == "heal" or cid == "peach":
             return True
         if subtype == "visitor" or cid == "visitor":
+            # 凝聚：天外来客可重铸 —— 对「有合法打法」判定仍为 True，重铸处单独放行
             return True
+        if cid == "ball_lightning":
+            return self._card_implemented(card) and bool(self._alive_others(username))
         if cid == "ladder_plan" or cid == "red_coast":
             if not self._card_implemented(card):
                 return False
@@ -689,7 +793,11 @@ class GameSession:
         if idx is None:
             return False, "手牌中没有这张牌"
         card = hand[idx]
-        if self._card_has_legal_play(username, card):
+        can_recast_visitor = (
+            (card.get("subtype") == "visitor" or card.get("id") == "visitor")
+            and skill_active(self.players[username], SKILL_COHESION)
+        )
+        if self._card_has_legal_play(username, card) and not can_recast_visitor:
             return False, "该牌有合法打法，不能重铸"
         hand.pop(idx)
         self.discard.append(card)
@@ -735,6 +843,7 @@ class GameSession:
             self._heal(username, heal)
             self.discard.append(card)
             self._log(f"{username} 使用桃，HP {self.players[username]['hp']}")
+            self._maybe_native_repeat_instant(username, card, target=username, kind="peach", heal=heal)
             self.refresh_turn_timer()
             self.seq += 1
             return True, f"回复至 {self.players[username]['hp']} HP"
@@ -743,12 +852,27 @@ class GameSession:
             self.discard.append(card)
             self._raise_tech(username, 1)
             self._log(f"{username} 使用天外来客，科技等级 {self.players[username]['tech_level']}")
+            if self.phase == "prompt" and self.prompt and self.prompt.get("type") == "wander_draw":
+                # wander will resume turn; native repeat after wander if needed
+                self.prompt["native_after"] = {"kind": "visitor", "from": username}
+            else:
+                self._maybe_native_repeat_instant(username, card, target=None, kind="visitor")
             self.refresh_turn_timer()
             self.seq += 1
             return True, f"科技等级 {self.players[username]['tech_level']}"
 
         if cid == "ladder_plan":
             ok, msg = self._play_ladder_plan(username, card, target)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self._maybe_native_repeat_instant(username, card, target=target, kind="ladder")
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
+        if cid == "ball_lightning":
+            ok, msg = self._play_ball_lightning(username, card, target)
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
@@ -775,10 +899,14 @@ class GameSession:
             return True, msg
 
         if ctype == "equipment" or resolve_slot(card):
+            p = self.players[username]
+            tech_before = p["tech_level"]
             ok, msg = self._equip_card(username, card)
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            if p["tech_level"] != tech_before:
+                self._on_tech_changed(username, tech_before, p["tech_level"])
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -805,6 +933,48 @@ class GameSession:
         self._log(f"{username} 对 {target} 使用阶梯计划：视野暴露至其回合结束")
         return True, f"{target} 视野已暴露"
 
+    def _play_ball_lightning(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
+        if not target or target not in self.players:
+            return False, "球状闪电需要指定目标"
+        if not self.players[target]["alive"]:
+            return False, "目标已淘汰"
+        self.discard.append(card)
+        if self._has_status(target, STATUS_SKILLS_SEALED):
+            self._log(f"{username} 对 {target} 使用球状闪电（封印已存在）")
+        else:
+            self._apply_status(target, STATUS_SKILLS_SEALED, "非锁定技失效", "negative")
+            self._log(f"{username} 对 {target} 使用球状闪电：非锁定技失效至其下回合结束")
+        return True, f"{target} 非锁定技已封印"
+
+    def _maybe_native_repeat_instant(
+        self,
+        username: str,
+        card: dict[str, Any],
+        *,
+        target: str | None,
+        kind: str,
+        heal: int = 2,
+        is_repeat: bool = False,
+    ) -> None:
+        if is_repeat:
+            return
+        if int(card.get("tier", 0) or 0) != 1:
+            return
+        if not skill_active(self.players[username], SKILL_NATIVE):
+            return
+        if kind == "peach":
+            self._heal(username, heal)
+            self._log(f"{username} 【土著】：桃效果再结算一次，HP {self.players[username]['hp']}")
+        elif kind == "visitor":
+            self._raise_tech(username, 1)
+            self._log(f"{username} 【土著】：天外来客效果再结算一次，科技 {self.players[username]['tech_level']}")
+        elif kind == "ladder" and target:
+            if target in self.players and self.players[target]["alive"] and not self.players[target].get("vision_exposed"):
+                t = self.players[target]
+                t["vision_exposed"] = True
+                t["vision_clear_at_turn_end"] = True
+                self._log(f"{username} 【土著】：阶梯计划再结算一次，{target} 视野暴露")
+
     def _play_red_coast(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
         p = self.players[username]
         if p.get("red_coast_used"):
@@ -816,10 +986,17 @@ class GameSession:
         self._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
         return True, f"摸了 {len(drawn)} 张"
 
-    def _play_kill(self, username: str, card: dict[str, Any], target: str | None) -> tuple[bool, str]:
+    def _play_kill(
+        self,
+        username: str,
+        card: dict[str, Any],
+        target: str | None,
+        *,
+        is_native_repeat: bool = False,
+    ) -> tuple[bool, str]:
         p = self.players[username]
         kill_limit = 2 + int(p.get("kill_limit_bonus", 0))
-        if p["kills_used_this_turn"] >= kill_limit:
+        if not is_native_repeat and p["kills_used_this_turn"] >= kill_limit:
             return False, f"本回合出杀已达上限（{kill_limit}）"
         if not target or target not in self.players:
             return False, "杀需要指定目标"
@@ -828,28 +1005,84 @@ class GameSession:
         if not self.players[target]["alive"]:
             return False, "目标已淘汰"
         tier = int(card.get("tier", 1))
-        p["kills_used_this_turn"] += 1
-        self.discard.append(card)
+        if not is_native_repeat:
+            p["kills_used_this_turn"] += 1
+            self.discard.append(card)
+        will_repeat = (
+            not is_native_repeat
+            and tier == 1
+            and skill_active(p, SKILL_NATIVE)
+        )
         self.prompt = {
             "type": "respond_dodge",
             "from": username,
             "to": target,
             "kill_tier": tier,
-            "card_name": card.get("name"),
+            "card_name": card.get("name") if not is_native_repeat else f"{card.get('name')}（土著）",
+            "will_native_repeat": will_repeat,
+            "is_native_repeat": is_native_repeat,
         }
         self.phase = "prompt"
-        self._log(f"{username} 对 {target} 使用{card.get('name')}，等待闪响应")
+        if is_native_repeat:
+            self._log(f"{username} 【土著】：对 {target} 再次结算{card.get('name')}，等待闪响应")
+        else:
+            self._log(f"{username} 对 {target} 使用{card.get('name')}，等待闪响应")
         self._start_turn_timer()
         return True, f"等待 {target} 响应"
 
-    def _apply_prompt_action(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+    def _finish_kill_prompt(self, dodged: bool) -> None:
         if not self.prompt or self.prompt.get("type") != "respond_dodge":
+            return
+        src = self.prompt["from"]
+        tgt = self.prompt["to"]
+        tier = int(self.prompt["kill_tier"])
+        will_repeat = bool(self.prompt.get("will_native_repeat"))
+        queue_wander = self.prompt.get("queue_wander")
+        self.prompt = None
+        if not dodged:
+            dmg = compute_kill_damage(tier, self.players[src], self.players[tgt])
+            msg = self._deal_damage(src, tgt, dmg)
+            self._log(msg)
+        if self.phase == "ended":
+            return
+        if self.phase == "dying":
+            return
+        if will_repeat and self.players.get(tgt, {}).get("alive"):
+            fake = {"name": f"{tier}阶杀", "tier": tier}
+            self._play_kill(src, fake, tgt, is_native_repeat=True)
+            return
+        if queue_wander and self.players.get(str(queue_wander), {}).get("alive"):
+            self._open_wander_prompt(str(queue_wander))
+            return
+        self.phase = "turn"
+        self.refresh_turn_timer()
+        self._check_win()
+
+    def _apply_prompt_action(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        if not self.prompt:
+            return False, "当前无响应"
+        ptype = self.prompt.get("type")
+        act = str(action.get("action", "")).strip()
+
+        if ptype == "wander_draw":
+            if self.prompt.get("to") != username:
+                return False, "不是你的【流浪】询问"
+            if act in {"wander_accept", "respond_accept"}:
+                self._apply_wander(username, True)
+                self.seq += 1
+                return True, "发动流浪"
+            if act in {"wander_pass", "respond_pass", "pass"}:
+                self._apply_wander(username, False)
+                self.seq += 1
+                return True, "放弃流浪"
+            return False, "无效的流浪响应"
+
+        if ptype != "respond_dodge":
             return False, "当前无响应"
         if self.prompt.get("to") != username:
             return False, "不是你的响应"
-        act = str(action.get("action", "")).strip()
         if act in {"respond_pass", "pass"}:
-            self._resolve_kill_unanswered()
+            self._finish_kill_prompt(dodged=False)
             self.seq += 1
             return True, "不响应"
         if act == "respond_dodge" or act == "play_card":
@@ -866,27 +1099,13 @@ class GameSession:
             hand.pop(idx)
             self.discard.append(card)
             self._log(f"{username} 打出{card.get('name')}，响应成功")
-            self.prompt = None
-            self.phase = "turn"
-            self.refresh_turn_timer()
+            self._finish_kill_prompt(dodged=True)
             self.seq += 1
             return True, "成功闪避"
         return False, "无效的响应行动"
 
     def _resolve_kill_unanswered(self) -> None:
-        if not self.prompt:
-            return
-        src = self.prompt["from"]
-        tgt = self.prompt["to"]
-        tier = int(self.prompt["kill_tier"])
-        dmg = compute_kill_damage(tier, self.players[src], self.players[tgt])
-        self.prompt = None
-        msg = self._deal_damage(src, tgt, dmg)
-        self._log(msg)
-        if self.phase not in {"dying", "ended"}:
-            self.phase = "turn"
-            self.refresh_turn_timer()
-        self._check_win()
+        self._finish_kill_prompt(dodged=False)
 
     def public_player_view(self, name: str) -> dict[str, Any]:
         p = self.players[name]
@@ -904,8 +1123,8 @@ class GameSession:
             "damage_bonus": p["damage_bonus"],
             "damage_reduction": p["damage_reduction"],
             "ascension": p.get("ascension"),
-            "faction": p["faction"] if self.phase == "ended" else None,
             "role_name": p["role_name"] if self.phase == "ended" else None,
+            "skills_sealed": self._has_status(name, STATUS_SKILLS_SEALED),
         }
 
     def snapshot_for(self, viewer: str) -> dict[str, Any]:
@@ -916,7 +1135,7 @@ class GameSession:
             private_role = {
                 "role_id": me["role_id"],
                 "role_name": me["role_name"],
-                "faction": me["faction"],
+                "skills": deepcopy(me.get("skills") or []),
             }
         timed = self.phase in {"turn", "prompt", "dying"}
         remaining = max(0.0, self.turn_deadline_at - time.time()) if timed else 0.0
@@ -948,5 +1167,6 @@ class GameSession:
                 "tech_level": me["tech_level"] if me else 1,
                 "hand_limit": limit,
                 "kills_used_this_turn": me["kills_used_this_turn"] if me else 0,
+                "skills_sealed": self._has_status(viewer, STATUS_SKILLS_SEALED) if me else False,
             },
         }

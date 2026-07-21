@@ -131,6 +131,8 @@
                         <button class="btn btn-outline" id="techConfirmBtn" style="display:none;">确认升科技</button>
                         <button class="btn btn-outline" id="techCancelBtn" style="display:none;">取消</button>
                         <button class="btn btn-outline" id="respondPassBtn" style="display:none;">不响应</button>
+                        <button class="btn btn-outline" id="wanderAcceptBtn" style="display:none;">发动流浪</button>
+                        <button class="btn btn-outline" id="wanderPassBtn" style="display:none;">放弃流浪</button>
                         <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结算濒死</button>
                         <button class="btn btn-outline" id="recastBtn">重铸</button>
                     </div>
@@ -183,6 +185,7 @@
                     card.subtype === 'kill'
                     || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3'
                     || card.id === 'ladder_plan'
+                    || card.id === 'ball_lightning'
                 );
             }
 
@@ -285,6 +288,8 @@
                 const isDying = snap.phase === 'dying' && dying;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
                 const myPrompt = isPrompt && prompt.to === username;
+                const isWander = isPrompt && prompt.type === 'wander_draw';
+                const myWander = isWander && prompt.to === username;
                 const myDying = isDying && dying.victim === username;
                 const canSaveDying = isDying && snap.you?.alive !== false;
                 const inPlay = myTurn && snap.turn_phase === 'play';
@@ -298,6 +303,8 @@
                     hint.textContent = need > 0
                         ? `弃牌阶段：还需弃置 ${need} 张（已选 ${selectedIds.size}）`
                         : '手牌已达上限，可点击「完成弃牌」';
+                } else if (myWander) {
+                    hint.textContent = '【流浪】：是否失去 1 点体力并摸两张牌？';
                 } else if (isDying) {
                     hint.textContent = myDying
                         ? '你濒死：打出桃自救，或点击「结算濒死」'
@@ -318,10 +325,11 @@
                         p.online === false ? 'offline' : '',
                     ].filter(Boolean).join(' ');
                     const vis = p.vision_exposed ? ' · 视野暴露' : '';
+                    const sealed = p.skills_sealed ? ' · 非锁定技失效' : '';
                     const asc = p.ascension ? ` · ${ASCENSION_LABEL[p.ascension] || p.ascension}` : '';
                     return `<div class="player-chip ${cls}">
                         <div class="n">${p.username}${p.username === username ? ' (你)' : ''}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${asc}${p.alive ? '' : ' · 出局'}</div>
+                        <div class="s">HP ${p.hp}/${p.max_hp} · 科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${vis}${sealed}${asc}${p.alive ? '' : ' · 出局'}</div>
                         <div class="eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
                         <div class="st">${statusLines(p.statuses)}</div>
                     </div>`;
@@ -329,8 +337,13 @@
 
                 const role = snap.you?.role;
                 const you = snap.you || {};
-                document.getElementById('roleBox').textContent = role
-                    ? `${role.role_name}（${role.faction}） · HP ${you.hp} · 科技${you.tech_level ?? 1} · 手牌上限${you.hand_limit ?? '—'}`
+                const skillText = (role?.skills || []).map((s) =>
+                    `${s.locked ? '【锁定】' : ''}${s.name}`
+                ).join(' · ');
+                const sealedYou = you.skills_sealed ? ' · 非锁定技失效' : '';
+                document.getElementById('roleBox').innerHTML = role
+                    ? `${role.role_name} · HP ${you.hp} · 科技${you.tech_level ?? 1} · 手牌上限${you.hand_limit ?? '—'}${sealedYou}`
+                        + (skillText ? `<div style="margin-top:6px;opacity:0.75;font-size:12px;">${skillText}</div>` : '')
                     : '—';
 
                 const hand = you.hand || [];
@@ -338,7 +351,8 @@
                 const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard';
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
-                    if (isPrompt) dim = c.subtype === 'dodge' ? '' : 'dim';
+                    if (isWander) dim = 'dim';
+                    else if (isPrompt) dim = c.subtype === 'dodge' ? '' : 'dim';
                     if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
                     if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
                     const selected = multiSelect
@@ -406,7 +420,7 @@
                 sel.disabled = !(inPlay || myPrompt || canSaveDying) || uiMode === 'tech_discard' || uiMode === 'discard';
                 sel.onchange = () => { lastTargetValue = sel.value; };
 
-                const canPlay = ((inPlay && uiMode === 'play') || myPrompt || canSaveDying) && selectedId;
+                const canPlay = ((inPlay && uiMode === 'play') || (myPrompt && !isWander) || canSaveDying) && selectedId;
                 document.getElementById('playBtn').disabled = !canPlay;
                 document.getElementById('playBtn').textContent =
                     inDiscard ? '弃置所选' : (uiMode === 'tech_discard' ? '—' : (isDying && !myDying ? '救人' : (isDying ? '自救' : '出牌')));
@@ -416,7 +430,7 @@
                 }
 
                 document.getElementById('endPlayBtn').disabled = !(inPlay && uiMode === 'play');
-                document.getElementById('endPlayBtn').style.display = (inDiscard || uiMode === 'tech_discard') ? 'none' : '';
+                document.getElementById('endPlayBtn').style.display = (inDiscard || uiMode === 'tech_discard' || isWander) ? 'none' : '';
 
                 const discardDoneBtn = document.getElementById('discardDoneBtn');
                 discardDoneBtn.style.display = inDiscard ? '' : 'none';
@@ -432,11 +446,17 @@
                 techConfirmBtn.disabled = !(uiMode === 'tech_discard' && selectedIds.size === 4);
 
                 document.getElementById('recastBtn').disabled = !(inPlay && uiMode === 'play' && selectedId);
-                document.getElementById('recastBtn').style.display = (inDiscard || uiMode === 'tech_discard') ? 'none' : '';
+                document.getElementById('recastBtn').style.display = (inDiscard || uiMode === 'tech_discard' || isWander) ? 'none' : '';
 
                 const respondPassBtn = document.getElementById('respondPassBtn');
-                respondPassBtn.style.display = isPrompt ? 'inline-block' : 'none';
-                respondPassBtn.disabled = !myPrompt;
+                respondPassBtn.style.display = (isPrompt && !isWander) ? 'inline-block' : 'none';
+                respondPassBtn.disabled = !myPrompt || isWander;
+                const wanderAcceptBtn = document.getElementById('wanderAcceptBtn');
+                const wanderPassBtn = document.getElementById('wanderPassBtn');
+                wanderAcceptBtn.style.display = isWander ? 'inline-block' : 'none';
+                wanderPassBtn.style.display = isWander ? 'inline-block' : 'none';
+                wanderAcceptBtn.disabled = !myWander;
+                wanderPassBtn.disabled = !myWander;
                 const dyingPassBtn = document.getElementById('dyingPassBtn');
                 dyingPassBtn.style.display = myDying ? 'inline-block' : 'none';
                 dyingPassBtn.disabled = !myDying;
@@ -448,6 +468,9 @@
                 if (snap.phase === 'ended') {
                     banner.classList.add('show');
                     banner.textContent = snap.winner ? `对局结束 · 胜者 ${snap.winner}` : '对局结束';
+                } else if (isWander) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.to} 【流浪】：是否失去 1 体力并摸两张牌？`;
                 } else if (isPrompt) {
                     banner.classList.add('show', 'dying');
                     banner.textContent = `${prompt.from} 对 ${prompt.to} 使用${prompt.card_name || '杀'} · 等待闪响应`;
@@ -540,6 +563,12 @@
             });
             document.getElementById('respondPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'respond_pass' }, roomId);
+            });
+            document.getElementById('wanderAcceptBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'wander_accept' }, roomId);
+            });
+            document.getElementById('wanderPassBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'wander_pass' }, roomId);
             });
             document.getElementById('dyingPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'dying_resolve' }, roomId);

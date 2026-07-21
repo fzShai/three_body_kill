@@ -1,39 +1,42 @@
 {
   "roles": [
     {
-      "id": "wallfacer",
-      "name": "面壁者",
-      "faction": "earth",
-      "hp": 4,
-      "win": "淘汰所有三体相关阵营玩家"
+      "id": "guan_yifan",
+      "name": "关一帆",
+      "hp": 6,
+      "skills": [
+        {
+          "id": "starship",
+          "name": "星舰",
+          "locked": true,
+          "text": "锁定技，你的初始科技等级为4，每回合结束时（弃牌结束后）降一级（不低于1）。"
+        },
+        {
+          "id": "wander",
+          "name": "流浪",
+          "locked": false,
+          "text": "科技等级发生变化时，你可以失去1点体力，摸两张牌。"
+        }
+      ]
     },
     {
-      "id": "eto",
-      "name": "地球三体组织",
-      "faction": "eto",
-      "hp": 3,
-      "win": "三体阵营或ETO存活且面壁者全灭"
-    },
-    {
-      "id": "trisolaran",
-      "name": "三体人",
-      "faction": "trisolaris",
-      "hp": 4,
-      "win": "消灭所有地球阵营"
-    },
-    {
-      "id": "swordsman",
-      "name": "执剑人",
-      "faction": "earth",
-      "hp": 5,
-      "win": "作为地球阵营存活到最后"
-    },
-    {
-      "id": "observer",
-      "name": "观察者",
-      "faction": "neutral",
-      "hp": 3,
-      "win": "存活到仅剩两名玩家时你仍存活"
+      "id": "friss",
+      "name": "弗雷斯",
+      "hp": 8,
+      "skills": [
+        {
+          "id": "native",
+          "name": "土著",
+          "locked": true,
+          "text": "锁定技，你的1阶牌在结算完成后，若目标仍合法则效果额外再结算一次（重复结算不再触发本技能）。"
+        },
+        {
+          "id": "cohesion",
+          "name": "凝聚",
+          "locked": false,
+          "text": "你的【天外来客】可以重铸。"
+        }
+      ]
     }
   ]
 }

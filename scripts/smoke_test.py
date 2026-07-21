@@ -487,6 +487,120 @@ def main() -> None:
     assert not (bl.prompt and bl.prompt.get("type") == "wander_draw")
     assert not any(s["id"] == "skills_sealed" for s in bl.players["target"]["statuses"])
 
+    # --- Wave 1–5 trick smoke (blank hands to avoid interrupt pollution) ---
+    def _trick(session, actor, card, **action_extra):
+        session.phase = "turn"
+        session.turn_phase = "play"
+        session.prompt = None
+        session._pending_trick = None
+        for n in session.player_order:
+            session.players[n]["hand"] = []
+        session.players[actor]["hand"] = [card]
+        payload = {"action": "play_card", "instance_id": card["instance_id"], **action_extra}
+        return session.apply_action(actor, payload)
+
+    tg = GameSession.create("TRICKS", ["t1", "t2"])
+    _blank_skills(tg, "t1", "t2")
+    tg.turn_index = tg.player_order.index("t1")
+    for n in ("t1", "t2"):
+        tg.players[n]["max_hp"] = 5
+        tg.players[n]["hp"] = 4
+
+    ok, msg = _trick(tg, "t1", {"id": "sophon", "name": "智子", "type": "trick", "implemented": True, "instance_id": "sp1"}, target="t2")
+    assert ok, msg
+    assert any(s["id"] == "tech_lock" for s in tg.players["t2"]["statuses"]), msg
+
+    ok, msg = _trick(tg, "t1", {"id": "curtain", "name": "帷幕", "type": "trick", "implemented": True, "instance_id": "cu1"})
+    assert ok, msg
+    assert len(tg.players["t1"]["hand"]) >= 2
+
+    tg.players["t2"]["hand"] = [{"id": "peach", "name": "桃", "instance_id": "px"}]
+    tg.players["t2"]["vision_exposed"] = True
+    ok, msg = _trick(tg, "t1", {"id": "wallfacer_plan", "name": "面壁", "type": "trick", "implemented": True, "instance_id": "wf1"}, target="t2")
+    assert ok, msg
+    assert len(tg.players["t2"]["hand"]) == 0
+
+    ok, msg = _trick(tg, "t1", {"id": "broadcast", "name": "广播", "type": "trick", "implemented": True, "instance_id": "br1"}, target="t2")
+    # t2 may already be exposed from above — reset
+    tg.players["t2"]["vision_exposed"] = False
+    ok, msg = _trick(tg, "t1", {"id": "broadcast", "name": "广播", "type": "trick", "implemented": True, "instance_id": "br2"}, target="t2")
+    assert ok, msg
+    assert tg.players["t2"]["vision_exposed"]
+
+    # toxic with response window
+    hp_before = tg.players["t2"]["hp"]
+    ok, msg = _trick(tg, "t1", {"id": "toxic_water", "name": "剧毒", "type": "trick", "implemented": True, "instance_id": "tw1"}, target="t2")
+    assert ok, msg
+    assert tg.phase == "prompt" and tg.prompt and tg.prompt.get("type") == "respond_toxic"
+    ok, msg = tg.apply_action("t2", {"action": "respond_pass"})
+    assert ok, msg
+    assert tg.players["t2"]["hp"] < hp_before
+
+    ok, msg = _trick(tg, "t1", {"id": "cradle", "name": "摇篮", "type": "trick", "implemented": True, "instance_id": "cr1"})
+    assert ok and any(s["id"] == "cradle" for s in tg.players["t1"]["statuses"]), msg
+
+    ok, msg = _trick(tg, "t1", {"id": "hibernation", "name": "冬眠", "type": "trick", "implemented": True, "instance_id": "hi1"})
+    assert ok and any(s["id"] == "hibernation" for s in tg.players["t1"]["statuses"]), msg
+
+    ok, msg = _trick(tg, "t1", {"id": "deterrence", "name": "威慑", "type": "trick", "implemented": True, "instance_id": "de1"})
+    assert ok and tg.players["t1"].get("deterrence_extra", 0) >= 1, msg
+
+    ok, msg = _trick(tg, "t1", {"id": "swordholder", "name": "执剑", "type": "trick", "implemented": True, "instance_id": "sw1"})
+    assert ok and tg.players["t1"].get("swordholder_ready"), msg
+
+    tg.players["t2"]["vision_exposed"] = False
+    tg.players["t2"]["hp"] = 5
+    ok, msg = _trick(tg, "t1", {"id": "dual_vector", "name": "二向箔", "type": "trick", "implemented": True, "instance_id": "dv1"}, target="t2")
+    assert ok, msg
+    assert tg.players["t2"]["hp"] <= 2  # 5-3 true, maybe heal from swordholder on t1
+
+    ok, msg = _trick(tg, "t1", {"id": "soap", "name": "香皂", "type": "trick", "implemented": True, "instance_id": "so1"}, target="t2")
+    assert ok, msg
+
+    # guzheng choice
+    tg.players["t1"]["hand"] = [
+        {"id": "guzheng_plan", "name": "古筝", "type": "trick", "implemented": True, "instance_id": "gz1"},
+        {"id": "peach", "name": "桃", "instance_id": "gzp"},
+    ]
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "gz1", "discard_instance_id": "gzp"})
+    assert ok, msg
+    assert tg.prompt and tg.prompt.get("type") == "choice"
+    ok, msg = tg.apply_action("t1", {"action": "choose", "choice": "draw2"})
+    assert ok, msg
+
+    ok, msg = _trick(tg, "t1", {"id": "dark_domain", "name": "黑域", "type": "trick", "implemented": True, "instance_id": "dd1"})
+    assert ok and any(f["id"] == "dark_domain" for f in tg.fields), msg
+
+    ok, msg = _trick(tg, "t1", {"id": "dark_forest_field", "name": "黑暗森林", "type": "trick", "implemented": True, "instance_id": "df1"})
+    assert ok and any(f["id"] == "dark_forest_field" for f in tg.fields), msg
+
+    ok, msg = _trick(tg, "t1", {"id": "cosmic_safety", "name": "宇宙安全声明", "type": "trick", "implemented": True, "instance_id": "cs1"})
+    assert ok and tg.fields == [], msg
+
+    # interrupt: give t2 thought_stamp, play curtain from t1
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    tg.players["t1"]["hand"] = [{"id": "curtain", "name": "帷幕", "type": "trick", "implemented": True, "instance_id": "cu2"}]
+    tg.players["t2"]["hand"] = [{"id": "thought_stamp", "name": "思想钢印", "type": "trick", "implemented": True, "instance_id": "ts1"}]
+    hand_before = len(tg.players["t1"]["hand"])
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "cu2"})
+    assert ok and tg.prompt and tg.prompt.get("type") == "interrupt_trick", msg
+    ok, msg = tg.apply_action("t2", {"action": "play_card", "instance_id": "ts1"})
+    assert ok, msg
+    # curtain nullified — t1 should not have drawn from it
+    assert tg.phase == "turn"
+
+    ok, msg = _trick(
+        tg,
+        "t1",
+        {"id": "reckoning", "name": "清算", "type": "trick", "implemented": True, "realm_id": "reckoning", "instance_id": "rk1"},
+        target="t2",
+    )
+    assert ok, msg
+    assert tg.players["t1"]["hp"] == 1 and tg.players["t2"]["hp"] == 1
+
     snap = eg.snapshot_for(eg.current_player())
     assert "tech_level" in snap["you"]
     assert "turn_phase" in snap

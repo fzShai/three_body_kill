@@ -131,6 +131,7 @@
                         <button class="btn btn-outline" id="techConfirmBtn" style="display:none;">确认升科技</button>
                         <button class="btn btn-outline" id="techCancelBtn" style="display:none;">取消</button>
                         <button class="btn btn-outline" id="respondPassBtn" style="display:none;">不响应</button>
+                        <span id="choiceBtns" style="display:none;"></span>
                         <button class="btn btn-outline" id="wanderAcceptBtn" style="display:none;">发动流浪</button>
                         <button class="btn btn-outline" id="wanderPassBtn" style="display:none;">放弃流浪</button>
                         <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结算濒死</button>
@@ -181,11 +182,15 @@
             const TEMP_ASCEND_IDS = new Set(['nano_center', 'chip_workshop', 'stars_plan']);
 
             function needsOtherTarget(card) {
+                const ids = new Set([
+                    'ladder_plan', 'ball_lightning', 'sophon', 'wallfacer_plan', 'broadcast',
+                    'toxic_water', 'four_dimension', 'deadline', 'dual_vector', 'soap',
+                    'great_ravine', 'killer_52', 'reckoning', 'finale',
+                ]);
                 return card && (
                     card.subtype === 'kill'
                     || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3'
-                    || card.id === 'ladder_plan'
-                    || card.id === 'ball_lightning'
+                    || ids.has(card.id)
                 );
             }
 
@@ -288,8 +293,10 @@
                 const isDying = snap.phase === 'dying' && dying;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
                 const myPrompt = isPrompt && prompt.to === username;
-                const isWander = isPrompt && prompt.type === 'wander_draw';
-                const myWander = isWander && prompt.to === username;
+                const isChoice = isPrompt && prompt.type === 'choice';
+                const isInterrupt = isPrompt && (prompt.type === 'interrupt_trick' || prompt.type === 'respond_toxic');
+                const myChoice = isChoice && prompt.to === username;
+                const myInterrupt = isInterrupt && prompt.to === username;
                 const myDying = isDying && dying.victim === username;
                 const canSaveDying = isDying && snap.you?.alive !== false;
                 const inPlay = myTurn && snap.turn_phase === 'play';
@@ -449,8 +456,26 @@
                 document.getElementById('recastBtn').style.display = (inDiscard || uiMode === 'tech_discard' || isWander) ? 'none' : '';
 
                 const respondPassBtn = document.getElementById('respondPassBtn');
-                respondPassBtn.style.display = (isPrompt && !isWander) ? 'inline-block' : 'none';
-                respondPassBtn.disabled = !myPrompt || isWander;
+                respondPassBtn.style.display = (isPrompt && !isWander && !isChoice) ? 'inline-block' : 'none';
+                respondPassBtn.disabled = !(myPrompt || myInterrupt) || isWander || isChoice;
+                respondPassBtn.textContent = isInterrupt ? '不响应/不打断' : '不响应';
+
+                const choiceBtns = document.getElementById('choiceBtns');
+                if (isChoice && myChoice) {
+                    choiceBtns.style.display = 'inline-flex';
+                    choiceBtns.style.gap = '8px';
+                    choiceBtns.innerHTML = (prompt.options || []).map((o) =>
+                        `<button class="btn" data-choice="${o.id}">${o.label}</button>`
+                    ).join('');
+                    choiceBtns.querySelectorAll('button').forEach((btn) => {
+                        btn.addEventListener('click', () => {
+                            sock.send('game_action', { action: 'choose', choice: btn.getAttribute('data-choice') }, roomId);
+                        });
+                    });
+                } else {
+                    choiceBtns.style.display = 'none';
+                    choiceBtns.innerHTML = '';
+                }
                 const wanderAcceptBtn = document.getElementById('wanderAcceptBtn');
                 const wanderPassBtn = document.getElementById('wanderPassBtn');
                 wanderAcceptBtn.style.display = isWander ? 'inline-block' : 'none';
@@ -468,6 +493,14 @@
                 if (snap.phase === 'ended') {
                     banner.classList.add('show');
                     banner.textContent = snap.winner ? `对局结束 · 胜者 ${snap.winner}` : '对局结束';
+                } else if (isChoice) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.to} 请选择：${(prompt.options || []).map((o) => o.label).join(' / ')}`;
+                } else if (isInterrupt) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = prompt.type === 'respond_toxic'
+                        ? `${prompt.from} 对 ${prompt.to} 使用剧毒之水 · 可用杀/思想钢印响应`
+                        : `${prompt.from} 打出${prompt.card_name || '锦囊'} · ${prompt.to} 可打断`;
                 } else if (isWander) {
                     banner.classList.add('show', 'dying');
                     banner.textContent = `${prompt.to} 【流浪】：是否失去 1 体力并摸两张牌？`;

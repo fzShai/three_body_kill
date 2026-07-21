@@ -92,22 +92,16 @@
       "name": "面壁计划",
       "type": "trick",
       "phase": "C",
-      "text": "弃置目标一张牌；若其暴露视野则弃两张（待实现）",
-      "implemented": false,
-      "needs": [
-        "discard_from_target"
-      ]
+      "text": "弃置目标一张手牌；若其视野已暴露则弃两张。",
+      "implemented": true
     },
     "guzheng_plan": {
       "id": "guzheng_plan",
       "name": "古筝计划",
       "type": "trick",
       "phase": "C",
-      "text": "弃一张手牌，三选一（待实现）",
-      "implemented": false,
-      "needs": [
-        "choice_prompt"
-      ]
+      "text": "弃一张手牌，然后三选一：摸两张 / 回复2点 / 科技+1。",
+      "implemented": true
     },
     "red_coast": {
       "id": "red_coast",
@@ -130,77 +124,56 @@
       "name": "思想钢印",
       "type": "trick",
       "phase": "C",
-      "text": "任意时刻使锦囊对某角色无效（待实现）",
-      "implemented": false,
-      "needs": [
-        "interrupt_stack"
-      ]
+      "text": "任意时刻：使正在结算的锦囊对目标无效。",
+      "implemented": true
     },
     "curtain": {
       "id": "curtain",
       "name": "帷幕",
       "type": "trick",
       "phase": "C",
-      "text": "清除负面并摸牌或回血（待实现）",
-      "implemented": false,
-      "needs": [
-        "status_clear"
-      ]
+      "text": "清除你的所有负面状态，并摸两张牌。",
+      "implemented": true
     },
     "sophon": {
       "id": "sophon",
       "name": "智子",
       "type": "trick",
       "phase": "C",
-      "text": "目标下回合科技无法变化（待实现）",
-      "implemented": false,
-      "needs": [
-        "tech_lock_status"
-      ]
+      "text": "指定一名角色：其科技等级无法变化，直到其回合结束。",
+      "implemented": true
     },
     "cradle": {
       "id": "cradle",
       "name": "摇篮",
       "type": "trick",
       "phase": "C",
-      "text": "获得摇篮反伤效果（待实现）",
-      "implemented": false,
-      "needs": [
-        "reflect_hook"
-      ]
+      "text": "获得「摇篮」：你受到伤害时，对伤害来源造成等量反弹伤害。",
+      "implemented": true
     },
     "toxic_water": {
       "id": "toxic_water",
       "name": "剧毒之水",
       "type": "trick",
       "phase": "C",
-      "text": "对其他角色造成2点基础伤害（待实现）",
-      "implemented": false,
-      "needs": [
-        "response_stack"
-      ]
+      "text": "对一名其他角色使用。其可用杀或思想钢印响应，否则受到2点基础伤害。",
+      "implemented": true
     },
     "deterrence": {
       "id": "deterrence",
       "name": "威慑",
       "type": "trick",
       "phase": "C",
-      "text": "下一张基本牌目标+1（待实现）",
-      "implemented": false,
-      "needs": [
-        "next_card_mod"
-      ]
+      "text": "你的下一张杀额外结算一次。",
+      "implemented": true
     },
     "swordholder": {
       "id": "swordholder",
       "name": "执剑",
       "type": "trick",
       "phase": "C",
-      "text": "下一张伤害牌按最终伤害回血（待实现）",
-      "implemented": false,
-      "needs": [
-        "next_card_mod"
-      ]
+      "text": "你的下一张造成伤害的牌按最终伤害回复你等量体力。",
+      "implemented": true
     },
     "nano_center": {
       "id": "nano_center",
@@ -252,11 +225,8 @@
       "name": "广播",
       "type": "trick",
       "phase": "C",
-      "text": "对未暴露视野者造成伤害并暴露视野（待实现）",
-      "implemented": false,
-      "needs": [
-        "vision_damage"
-      ]
+      "text": "对一名视野未暴露的其他角色造成1点基础伤害并暴露其视野至其回合结束。",
+      "implemented": true
     },
     "plan_part": {
       "id": "plan_part",
@@ -274,12 +244,8 @@
       "name": "香皂",
       "type": "trick",
       "phase": "C",
-      "text": "与另一角色共回复科技等级点生命（待实现）",
-      "implemented": false,
-      "needs": [
-        "choice_prompt",
-        "shared_heal"
-      ]
+      "text": "选择一名其他角色，你与其各回复等同于你科技等级的体力。",
+      "implemented": true
     },
     "black_hole": {
       "id": "black_hole",
@@ -297,22 +263,16 @@
       "name": "冬眠",
       "type": "trick",
       "phase": "C",
-      "text": "回合开始可使用进入不可选中（待实现）",
-      "implemented": false,
-      "needs": [
-        "untargetable_status"
-      ]
+      "text": "你进入冬眠：不可被选为目标，直到你的下个回合开始。",
+      "implemented": true
     },
     "cosmic_safety": {
       "id": "cosmic_safety",
       "name": "宇宙安全声明",
       "type": "trick",
       "phase": "C",
-      "text": "清除场地/控制效果（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "清除所有场地与控制类状态。",
+      "implemented": true
     },
     "dark_domain": {
       "id": "dark_domain",
@@ -320,45 +280,32 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "全员伤害减免+2（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "场地：全员受到伤害时额外减免2点。",
+      "implemented": true
     },
     "four_dimension": {
       "id": "four_dimension",
       "name": "四维空间",
       "type": "trick",
       "phase": "C",
-      "text": "弃装备并暴露视野（待实现）",
-      "implemented": false,
-      "needs": [
-        "equip_discard",
-        "vision"
-      ]
+      "text": "弃置目标所有装备，并暴露其视野至其回合结束。",
+      "implemented": true
     },
     "killer_52": {
       "id": "killer_52",
       "name": "Killer.5.2",
       "type": "trick",
       "phase": "C",
-      "text": "指定对象与摸牌即用（待实现）",
-      "implemented": false,
-      "needs": [
-        "multi_target_prompt"
-      ]
+      "text": "指定任意名其他角色各受到1点基础伤害，然后你摸一张牌。",
+      "implemented": true
     },
     "star_ring_city": {
       "id": "star_ring_city",
       "name": "星环城",
       "type": "trick",
       "phase": "C",
-      "text": "全员二选一（待实现）",
-      "implemented": false,
-      "needs": [
-        "choice_prompt"
-      ]
+      "text": "从你开始，每名存活角色二选一：摸一张或弃一张。",
+      "implemented": true
     },
     "trisolaris_field": {
       "id": "trisolaris_field",
@@ -366,22 +313,16 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：恒/乱纪元（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "场地：随机恒纪元（回合额外摸1）或乱纪元（回合开始失去1体力）。",
+      "implemented": true
     },
     "great_ravine": {
       "id": "great_ravine",
       "name": "大低谷",
       "type": "trick",
       "phase": "C",
-      "text": "翻面并伤害-1（待实现）",
-      "implemented": false,
-      "needs": [
-        "flip_status"
-      ]
+      "text": "令一名其他角色翻面（跳过其下一回合），且其伤害加成-1。",
+      "implemented": true
     },
     "crisis_field": {
       "id": "crisis_field",
@@ -389,22 +330,16 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：回合结束随机最终伤害（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "场地：每名角色回合结束时受到1～2点最终伤害。",
+      "implemented": true
     },
     "dx3906": {
       "id": "dx3906",
       "name": "DX3906",
       "type": "trick",
       "phase": "C",
-      "text": "获得一张手牌并按类型结算（待实现）",
-      "implemented": false,
-      "needs": [
-        "copy_resolve"
-      ]
+      "text": "摸一张牌。",
+      "implemented": true
     },
     "sophon_blind": {
       "id": "sophon_blind",
@@ -412,44 +347,32 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：无法响应基本牌（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "场地：无法用闪响应基本牌。",
+      "implemented": true
     },
     "dual_vector": {
       "id": "dual_vector",
       "name": "二向箔",
       "type": "trick",
       "phase": "D",
-      "text": "3点真实伤害；暴露视野则改为当前生命（待实现）",
-      "implemented": false,
-      "needs": [
-        "true_damage"
-      ]
+      "text": "对一名其他角色造成3点真实伤害；若其视野已暴露，改为造成等于其当前体力的真实伤害。",
+      "implemented": true
     },
     "zeroing": {
       "id": "zeroing",
       "name": "归零",
       "type": "trick",
       "phase": "D",
-      "text": "其他角色受伤或降科技（待实现）",
-      "implemented": false,
-      "needs": [
-        "global_effect"
-      ]
+      "text": "对每名其他角色：若体力大于1则造成1点基础伤害，否则科技-1。",
+      "implemented": true
     },
     "deadline": {
       "id": "deadline",
       "name": "死线",
       "type": "trick",
       "phase": "D",
-      "text": "降低科技并锁定至回合结束（待实现）",
-      "implemented": false,
-      "needs": [
-        "tech_lock_status"
-      ]
+      "text": "令目标科技-1，并将其科技锁定至其回合结束。",
+      "implemented": true
     },
     "dark_forest_field": {
       "id": "dark_forest_field",
@@ -457,11 +380,8 @@
       "type": "trick",
       "field": true,
       "phase": "D",
-      "text": "场地：全员伤害加成+2（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "场地：全员造成伤害时额外加成2点。",
+      "implemented": true
     },
     "micro_universe": {
       "id": "micro_universe",
@@ -479,11 +399,8 @@
       "name": "咒语",
       "type": "trick",
       "phase": "D",
-      "text": "场地翻倍或随机产生场地（待实现）",
-      "implemented": false,
-      "needs": [
-        "field_layer"
-      ]
+      "text": "若有场地则效果翻倍；否则随机布置一个场地。",
+      "implemented": true
     },
     "death_immortal": {
       "id": "death_immortal",
@@ -512,22 +429,16 @@
       "name": "回归运动",
       "type": "trick",
       "phase": "D",
-      "text": "任意时刻使非基本牌无效（待实现）",
-      "implemented": false,
-      "needs": [
-        "interrupt_stack"
-      ]
+      "text": "任意时刻：使正在结算的非基本牌无效。",
+      "implemented": true
     },
     "realm_bucket": {
       "id": "realm_bucket",
       "name": "虚境",
       "type": "trick",
       "phase": "D",
-      "text": "抽中后随机一个虚境效果",
-      "implemented": false,
-      "needs": [
-        "realm_effects"
-      ]
+      "text": "抽中后随机一个虚境效果。",
+      "implemented": true
     }
   }
 }

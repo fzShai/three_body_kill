@@ -27,7 +27,19 @@ from game.skills import (
     STATUS_SKILLS_SEALED,
     skill_active,
 )
-from game.stats import initial_combat_fields
+from game.stats import final_basic_damage, initial_combat_fields
+from game.trick_effects import (
+    HANDLERS as TRICK_HANDLERS,
+    STATUS_CRADLE,
+    STATUS_FLIPPED,
+    STATUS_HIBERNATION,
+    STATUS_TECH_LOCK,
+    TARGET_TRICKS,
+    field_bonus_damage,
+    field_bonus_reduction,
+    has_field,
+    legal_play as trick_legal_play,
+)
 from game.turn import hand_limit
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -107,6 +119,10 @@ class GameSession:
         self.prompt: dict[str, Any] | None = None
         self.dying: dict[str, Any] | None = None
         self._pending_conclude: str | None = None
+        self.fields: list[dict[str, Any]] = []
+        self.field_multiplier: int = 1
+        self.trisolaris_era: str | None = None
+        self._pending_trick: dict[str, Any] | None = None
         self._deal_initial()
         self.phase = "turn"
         self.turn_phase = "draw"
@@ -178,35 +194,6 @@ class GameSession:
             p["vision_clear_at_turn_end"] = False
             self._log(f"{username} 的视野暴露结束")
 
-    def _advance_turn(self) -> None:
-        if self.phase == "ended":
-            return
-        name = self.current_player()
-        if self.players[name].get("ascension") == "gene" and self.players[name]["alive"]:
-            self._heal(name, 2)
-            self._log(f"{name} 基因飞升：回合结束回复 2 点")
-        self._clear_vision_if_due(name)
-        n = len(self.player_order)
-        for _ in range(n):
-            self.turn_index = (self.turn_index + 1) % n
-            nxt = self.current_player()
-            if not self.players[nxt]["alive"]:
-                continue
-            if not self.player_online.get(nxt, True):
-                self._log(f"{nxt} 离线，跳过回合")
-                continue
-            if self._has_status(nxt, STATUS_LOCKED):
-                self._remove_status(nxt, STATUS_LOCKED)
-                self._log(f"{nxt} 被锁死，跳过回合")
-                continue
-            self.phase = "turn"
-            self.turn_phase = "draw"
-            self._run_draw_phase()
-            self._start_turn_timer()
-            self._log(f"轮到 {nxt}")
-            return
-        self.phase = "ended"
-
     def expire_turn_if_due(self) -> bool:
         if time.time() < self.turn_deadline_at:
             return False
@@ -215,6 +202,22 @@ class GameSession:
             if ptype == "wander_draw":
                 self._log(f"{self.prompt.get('to')} 【流浪】超时，视为放弃")
                 self._apply_wander(str(self.prompt.get("to")), False)
+                self.seq += 1
+                return True
+            ptype = self.prompt.get("type")
+            if ptype == "choice":
+                self._log(f"{self.prompt.get('to')} 选择超时，自动第一项")
+                opts = self.prompt.get("options") or []
+                if opts:
+                    self.apply_action(str(self.prompt.get("to")), {"action": "choose", "choice": opts[0]["id"]})
+                else:
+                    self.prompt = None
+                    self.phase = "turn"
+                self.seq += 1
+                return True
+            if ptype in {"interrupt_trick", "respond_toxic"}:
+                self._log(f"{self.prompt.get('to')} 打断超时，视为不响应")
+                self._resolve_interrupt_or_toxic()
                 self.seq += 1
                 return True
             self._log(f"{self.prompt.get('to')} 响应超时，视为不响应")
@@ -312,8 +315,11 @@ class GameSession:
     def _raise_tech(self, username: str, by: int = 1) -> None:
         self._set_tech(username, self.players[username]["tech_level"] + by)
 
-    def _set_tech(self, username: str, level: int, *, notify: bool = True) -> bool:
+    def _set_tech(self, username: str, level: int, *, notify: bool = True, force: bool = False) -> bool:
         p = self.players[username]
+        if not force and (self._has_status(username, STATUS_TECH_LOCK) or p.get("cold_silence")):
+            self._log(f"{username} 科技被锁定，无法变化")
+            return False
         before = int(p["tech_level"])
         p["tech_level"] = max(1, min(6, int(level)))
         after = int(p["tech_level"])
@@ -394,7 +400,73 @@ class GameSession:
         if self._has_status(username, STATUS_SKILLS_SEALED):
             self._remove_status(username, STATUS_SKILLS_SEALED)
             self._log(f"{username} 的非锁定技封印结束")
+        p = self.players[username]
+        if p.get("tech_lock_clear_at_turn_end"):
+            self._remove_status(username, STATUS_TECH_LOCK)
+            p["tech_lock_clear_at_turn_end"] = False
+            self._log(f"{username} 的科技锁定结束")
+        if has_field(self, "crisis_field") and p.get("alive"):
+            import random
+
+            dmg = random.randint(1, 2) * max(1, int(self.field_multiplier or 1))
+            self._log(f"危机场地：{username} 受到 {dmg} 点最终伤害")
+            self._deal_damage(username, username, dmg)
+        if p.get("finale_death_pending") and p.get("alive"):
+            p["finale_death_pending"] = False
+            self._log(f"{username} 终末到期，出局")
+            self._eliminate_player(username)
+            if self._check_win():
+                return
         self._advance_turn()
+
+    def _advance_turn(self) -> None:
+        if self.phase == "ended":
+            return
+        name = self.current_player()
+        if self.players[name].get("ascension") == "gene" and self.players[name]["alive"]:
+            self._heal(name, 2)
+            self._log(f"{name} 基因飞升：回合结束回复 2 点")
+        self._clear_vision_if_due(name)
+        n = len(self.player_order)
+        for _ in range(n):
+            self.turn_index = (self.turn_index + 1) % n
+            nxt = self.current_player()
+            if not self.players[nxt]["alive"]:
+                continue
+            if not self.player_online.get(nxt, True):
+                self._log(f"{nxt} 离线，跳过回合")
+                continue
+            if self._has_status(nxt, STATUS_LOCKED):
+                self._remove_status(nxt, STATUS_LOCKED)
+                self._log(f"{nxt} 被锁死，跳过回合")
+                continue
+            if self._has_status(nxt, STATUS_FLIPPED):
+                self._remove_status(nxt, STATUS_FLIPPED)
+                self._log(f"{nxt} 翻面，跳过回合")
+                continue
+            # clear hibernation at turn start
+            if self.players[nxt].get("hibernation_clear_at_turn_start"):
+                self._remove_status(nxt, STATUS_HIBERNATION)
+                self.players[nxt]["hibernation_clear_at_turn_start"] = False
+                self._log(f"{nxt} 冬眠结束")
+            if self.trisolaris_era == "chaos" and self.players[nxt]["alive"]:
+                self.players[nxt]["hp"] -= 1
+                self._log(f"乱纪元：{nxt} 失去 1 体力（HP {self.players[nxt]['hp']}）")
+                if self.players[nxt]["hp"] <= 0:
+                    self._begin_dying(nxt)
+                    if self.phase == "dying":
+                        return
+            self.phase = "turn"
+            self.turn_phase = "draw"
+            self._run_draw_phase()
+            if self.trisolaris_era == "stable":
+                extra = self.draw_sys.draw_n(self.players[nxt]["tech_level"], 1)
+                self.players[nxt]["hand"].extend(extra)
+                self._log(f"恒纪元：{nxt} 额外摸 1 张")
+            self._start_turn_timer()
+            self._log(f"轮到 {nxt}")
+            return
+        self.phase = "ended"
 
     def _grant_ascension(self, username: str) -> None:
         import random
@@ -438,14 +510,16 @@ class GameSession:
         """Apply armor / equipment modifiers to incoming final damage."""
         t = self.players[target]
         dmg = max(0, int(amount))
+        red = field_bonus_reduction(self) * max(1, int(self.field_multiplier or 1))
+        dmg = max(0, dmg - red)
         if t.get("deep_sea") and not t.get("vision_exposed"):
             dmg = max(0, dmg - 1)
         if t.get("eco_bottle") and dmg > 3:
             dmg = 3
         if t.get("lightspeed_stacks") is not None:
             stacks = int(t.get("lightspeed_stacks", 0))
-            red = min(3, stacks)
-            dmg = max(0, dmg - red)
+            red2 = min(3, stacks)
+            dmg = max(0, dmg - red2)
             t["lightspeed_stacks"] = min(3, stacks + 1)
             t["lightspeed_reduction"] = min(3, stacks + 1)
         return dmg
@@ -455,6 +529,25 @@ class GameSession:
         final = self._incoming_damage(target, final)
         t["hp"] -= final
         msg = f"{target} 受到 {final} 点最终伤害（HP {t['hp']}）"
+        src = self.players.get(source)
+        if src and src.get("swordholder_ready") and final > 0 and source != target:
+            self._heal(source, final)
+            src["swordholder_ready"] = False
+            self._log(f"{source} 执剑：回复 {final} 点")
+        if (
+            final > 0
+            and source
+            and source != target
+            and self._has_status(target, STATUS_CRADLE)
+            and self.players.get(source, {}).get("alive")
+        ):
+            # reflect once without chaining cradle
+            reflect = final
+            s = self.players[source]
+            s["hp"] -= reflect
+            self._log(f"{target} 摇篮反弹 {reflect} 点给 {source}（HP {s['hp']}）")
+            if s["hp"] <= 0:
+                self._begin_dying(source)
         if t["hp"] <= 0:
             msg += "，" + self._begin_dying(target)
         return msg
@@ -754,6 +847,8 @@ class GameSession:
             if cid == "ladder_plan":
                 return bool(self._unexposed_others(username))
             return True
+        if cid in TRICK_HANDLERS:
+            return trick_legal_play(self, username, card)
         if is_temp_ascend_card(card):
             if not self._card_implemented(card):
                 return False
@@ -908,6 +1003,26 @@ class GameSession:
             self.seq += 1
             return True, msg
 
+        if cid in TRICK_HANDLERS:
+            if cid in {"thought_stamp", "return_motion"}:
+                hand.insert(idx, card)
+                return False, "该牌只能在响应窗口打出"
+            if self._needs_trick_interrupt(username, card):
+                # keep card out; store pending
+                self._open_trick_interrupt(username, card, target, action)
+                self.refresh_turn_timer()
+                self.seq += 1
+                return True, "等待打断响应"
+            if cid == "toxic_water":
+                card = {**card, "allow_response": True}
+            ok, msg = TRICK_HANDLERS[cid](self, username, card, target, action)
+            if not ok:
+                hand.insert(idx, card)
+                return False, msg
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, msg
+
         if is_temp_ascend_card(card):
             ok, msg = self._apply_temp_ascend(username, card)
             if not ok:
@@ -1005,6 +1120,218 @@ class GameSession:
         self._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
         return True, f"摸了 {len(drawn)} 张"
 
+    def _compute_kill_damage_full(self, tier: int, src: str, tgt: str) -> int:
+        s, t = self.players[src], self.players[tgt]
+        bonus = int(s.get("damage_bonus", 0)) + field_bonus_damage(self) * max(1, int(self.field_multiplier or 1))
+        # temporarily inject for compute_kill_damage
+        s2 = {**s, "damage_bonus": bonus}
+        t2 = {**t, "damage_reduction": int(t.get("damage_reduction", 0))}
+        return compute_kill_damage(tier, s2, t2)
+
+    def _needs_trick_interrupt(self, username: str, card: dict[str, Any]) -> bool:
+        cid = card.get("id")
+        if cid in {"thought_stamp", "return_motion"}:
+            return False
+        for name in self.player_order:
+            if name == username or not self.players[name]["alive"]:
+                continue
+            for c in self.players[name]["hand"]:
+                if c.get("id") in {"thought_stamp", "return_motion"}:
+                    return True
+        return False
+
+    def _open_trick_interrupt(self, username: str, card: dict[str, Any], target: str | None, action: dict[str, Any]) -> None:
+        responders = []
+        for name in self.player_order:
+            if name == username or not self.players[name]["alive"]:
+                continue
+            if any(c.get("id") in {"thought_stamp", "return_motion"} for c in self.players[name]["hand"]):
+                responders.append(name)
+        self._pending_trick = {
+            "from": username,
+            "card": card,
+            "target": target,
+            "action": dict(action),
+        }
+        self.prompt = {
+            "type": "interrupt_trick",
+            "from": username,
+            "to": responders[0],
+            "queue": responders[1:],
+            "card_name": card.get("name"),
+            "nullified": False,
+        }
+        self.phase = "prompt"
+        self._log(f"{username} 打出{card.get('name')}，等待打断（{responders[0]}）")
+        self._start_turn_timer()
+
+    def _resolve_interrupt_or_toxic(self) -> None:
+        if not self.prompt:
+            return
+        ptype = self.prompt.get("type")
+        if ptype == "interrupt_trick":
+            nullified = bool(self.prompt.get("nullified"))
+            queue = list(self.prompt.get("queue") or [])
+            if not nullified and queue:
+                nxt = queue.pop(0)
+                self.prompt["to"] = nxt
+                self.prompt["queue"] = queue
+                self._log(f"等待 {nxt} 打断响应")
+                self._start_turn_timer()
+                return
+            pending = self._pending_trick
+            self.prompt = None
+            self._pending_trick = None
+            self.phase = "turn"
+            if not pending:
+                self.refresh_turn_timer()
+                return
+            if nullified:
+                self.discard.append(pending["card"])
+                self._log(f"{pending['card'].get('name')} 被无效")
+                self.refresh_turn_timer()
+                return
+            card = pending["card"]
+            username = pending["from"]
+            target = pending.get("target")
+            action = pending.get("action") or {}
+            cid = card.get("id")
+            if cid == "toxic_water":
+                card = {**card, "allow_response": True}
+            if cid in TRICK_HANDLERS:
+                ok, msg = TRICK_HANDLERS[cid](self, username, card, target, action)
+                self._log(msg if ok else f"结算失败：{msg}")
+            self.refresh_turn_timer()
+            return
+        if ptype == "respond_toxic":
+            nullified = bool(self.prompt.get("nullified"))
+            src = self.prompt["from"]
+            tgt = self.prompt["to"]
+            base = int(self.prompt.get("base", 2))
+            self.prompt = None
+            self.phase = "turn"
+            if nullified:
+                self._log("剧毒之水被无效")
+                self.refresh_turn_timer()
+                return
+            s, t = self.players[src], self.players[tgt]
+            dmg = final_basic_damage(
+                base,
+                int(s.get("damage_bonus", 0)) + field_bonus_damage(self) * max(1, int(self.field_multiplier or 1)),
+                int(t.get("damage_reduction", 0)),
+            )
+            msg = self._deal_damage(src, tgt, dmg)
+            self._log(f"剧毒之水结算：{msg}")
+            self.refresh_turn_timer()
+            self._check_win()
+
+    def _apply_choice_prompt(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        if not self.prompt or self.prompt.get("to") != username:
+            return False, "不是你的选择"
+        act = str(action.get("action", "")).strip()
+        choice = str(action.get("choice", "")).strip()
+        if act not in {"choose", "choice"} or not choice:
+            return False, "请选择一项"
+        opts = {o["id"] for o in (self.prompt.get("options") or [])}
+        if choice not in opts:
+            return False, "无效选项"
+        card_id = self.prompt.get("card_id")
+        if card_id == "guzheng_plan":
+            p = self.players[username]
+            if choice == "draw2":
+                drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+                p["hand"].extend(drawn)
+                self._log(f"{username} 古筝：摸 {len(drawn)} 张")
+            elif choice == "heal2":
+                self._heal(username, 2)
+                self._log(f"{username} 古筝：回复至 {p['hp']}")
+            elif choice == "tech1":
+                self._raise_tech(username, 1)
+                self._log(f"{username} 古筝：科技 {p['tech_level']}")
+            self.prompt = None
+            self.phase = "turn"
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, "古筝已选择"
+        if card_id == "star_ring_city":
+            p = self.players[username]
+            if choice == "draw1":
+                drawn = self.draw_sys.draw_n(p["tech_level"], 1)
+                p["hand"].extend(drawn)
+                self._log(f"{username} 星环城：摸 1 张")
+            else:
+                if p["hand"]:
+                    c = p["hand"].pop()
+                    self.discard.append(c)
+                    self._log(f"{username} 星环城：弃 {c.get('name')}")
+                else:
+                    self._log(f"{username} 星环城：无牌可弃")
+            queue = list(self.prompt.get("queue") or [])
+            if queue:
+                nxt = queue.pop(0)
+                self.prompt["to"] = nxt
+                self.prompt["queue"] = queue
+                self._start_turn_timer()
+                self.seq += 1
+                return True, f"轮到 {nxt}"
+            self.prompt = None
+            self.phase = "turn"
+            self.refresh_turn_timer()
+            self.seq += 1
+            return True, "星环城结束"
+        return False, "未知选择牌"
+
+    def _apply_interrupt_prompt(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        if not self.prompt or self.prompt.get("to") != username:
+            return False, "不是你的打断窗口"
+        act = str(action.get("action", "")).strip()
+        if act in {"respond_pass", "pass", "interrupt_pass"}:
+            self._resolve_interrupt_or_toxic()
+            self.seq += 1
+            return True, "不打断"
+        if act in {"play_card", "respond_dodge", "interrupt_play"}:
+            instance_id = str(action.get("instance_id", "")).strip()
+            hand = self.players[username]["hand"]
+            idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
+            if idx is None:
+                return False, "手牌中没有这张牌"
+            card = hand[idx]
+            cid = card.get("id")
+            if cid not in {"thought_stamp", "return_motion"}:
+                return False, "只能打出思想钢印或回归运动"
+            hand.pop(idx)
+            ok, msg = TRICK_HANDLERS[cid](self, username, card, None, action)
+            self.seq += 1
+            return ok, msg
+        return False, "无效打断行动"
+
+    def _apply_toxic_prompt(self, username: str, action: dict[str, Any]) -> tuple[bool, str]:
+        if not self.prompt or self.prompt.get("to") != username:
+            return False, "不是你的剧毒响应"
+        act = str(action.get("action", "")).strip()
+        if act in {"respond_pass", "pass"}:
+            self._resolve_interrupt_or_toxic()
+            self.seq += 1
+            return True, "不响应剧毒"
+        if act in {"play_card", "respond_dodge"}:
+            instance_id = str(action.get("instance_id", "")).strip()
+            hand = self.players[username]["hand"]
+            idx = next((i for i, c in enumerate(hand) if c["instance_id"] == instance_id), None)
+            if idx is None:
+                return False, "手牌中没有这张牌"
+            card = hand[idx]
+            # 杀或思想钢印可响应
+            if card.get("subtype") == "kill" or card.get("id") == "thought_stamp":
+                hand.pop(idx)
+                self.discard.append(card)
+                self.prompt["nullified"] = True
+                self._log(f"{username} 用{card.get('name')}响应剧毒之水")
+                self._resolve_interrupt_or_toxic()
+                self.seq += 1
+                return True, "剧毒之水被响应"
+            return False, "请打出杀或思想钢印响应"
+        return False, "无效响应"
+
     def _play_kill(
         self,
         username: str,
@@ -1023,7 +1350,14 @@ class GameSession:
             return False, "不能杀自己"
         if not self.players[target]["alive"]:
             return False, "目标已淘汰"
+        if self._has_status(target, STATUS_HIBERNATION):
+            return False, "目标冬眠中，不可选中"
         tier = int(card.get("tier", 1))
+        extra = 0
+        if not is_native_repeat and int(p.get("deterrence_extra", 0)) > 0:
+            extra = 1
+            p["deterrence_extra"] = int(p.get("deterrence_extra", 0)) - 1
+            self._log(f"{username} 威慑：本杀额外结算一次")
         if not is_native_repeat:
             p["kills_used_this_turn"] += 1
             self.discard.append(card)
@@ -1040,6 +1374,7 @@ class GameSession:
             "card_name": card.get("name") if not is_native_repeat else f"{card.get('name')}（土著）",
             "will_native_repeat": will_repeat,
             "is_native_repeat": is_native_repeat,
+            "deterrence_extra": extra,
         }
         self.phase = "prompt"
         if is_native_repeat:
@@ -1057,9 +1392,10 @@ class GameSession:
         tier = int(self.prompt["kill_tier"])
         will_repeat = bool(self.prompt.get("will_native_repeat"))
         queue_wander = self.prompt.get("queue_wander")
+        deterrence_extra = int(self.prompt.get("deterrence_extra") or 0)
         self.prompt = None
         if not dodged:
-            dmg = compute_kill_damage(tier, self.players[src], self.players[tgt])
+            dmg = self._compute_kill_damage_full(tier, src, tgt)
             msg = self._deal_damage(src, tgt, dmg)
             self._log(msg)
         if self.phase == "ended":
@@ -1068,6 +1404,11 @@ class GameSession:
             return
         if will_repeat and self.players.get(tgt, {}).get("alive"):
             fake = {"name": f"{tier}阶杀", "tier": tier}
+            self._play_kill(src, fake, tgt, is_native_repeat=True)
+            return
+        if deterrence_extra and self.players.get(tgt, {}).get("alive"):
+            fake = {"name": f"{tier}阶杀", "tier": tier}
+            self._log(f"{src} 威慑追加杀")
             self._play_kill(src, fake, tgt, is_native_repeat=True)
             return
         if queue_wander and self.players.get(str(queue_wander), {}).get("alive"):
@@ -1096,6 +1437,12 @@ class GameSession:
                 return True, "放弃流浪"
             return False, "无效的流浪响应"
 
+        if ptype == "choice":
+            return self._apply_choice_prompt(username, action)
+        if ptype == "interrupt_trick":
+            return self._apply_interrupt_prompt(username, action)
+        if ptype == "respond_toxic":
+            return self._apply_toxic_prompt(username, action)
         if ptype != "respond_dodge":
             return False, "当前无响应"
         if self.prompt.get("to") != username:
@@ -1113,6 +1460,8 @@ class GameSession:
             card = hand[idx]
             if card.get("subtype") != "dodge":
                 return False, "请打出闪来响应"
+            if has_field(self, "sophon_blind"):
+                return False, "智子盲区：无法响应基本牌"
             if not can_dodge(card, int(self.prompt["kill_tier"])):
                 return False, "闪的阶数不足以响应此杀"
             hand.pop(idx)
@@ -1177,6 +1526,9 @@ class GameSession:
             "turn_deadline_ms": int(self.turn_deadline_at * 1000) if timed else None,
             "prompt": deepcopy(self.prompt),
             "dying": deepcopy(self.dying),
+            "fields": deepcopy(self.fields),
+            "field_multiplier": self.field_multiplier,
+            "trisolaris_era": self.trisolaris_era,
             "you": {
                 "username": viewer,
                 "hand": private_hand,

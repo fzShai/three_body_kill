@@ -7,10 +7,8 @@
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/motion.css" />
     <style>
-        /* 重置 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* 页面整体：静默猎手夜空，右侧登录框 */
         body {
             font-family: var(--font-ui);
             font-weight: 500;
@@ -25,375 +23,368 @@
             background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 48%, #02080c 100%);
         }
 
-        /* 微小星星（铺满背景，左侧会有三颗独立闪烁的星）*/
-        .stars{
-            position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
+        .stars {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.45;
+            mix-blend-mode: screen;
             background-image:
                 radial-gradient(circle at 10px 20px, rgba(255,255,255,0.9) 0 1px, transparent 2px),
-                radial-gradient(circle at 40px 70px, rgba(255,255,255,0.8) 0 1px, transparent 2px),
-                radial-gradient(circle at 50px 160px, rgba(255,255,255,0.7) 0 1px, transparent 2px),
-                radial-gradient(circle at 90px 40px, rgba(255,255,255,0.6) 0 1px, transparent 2px),
-                radial-gradient(circle at 130px 80px, rgba(255,255,255,0.9) 0 1px, transparent 2px);
-            background-size: 220px 220px; opacity: 0.45; mix-blend-mode: screen;
+                radial-gradient(circle at 40px 70px, rgba(255,255,255,0.75) 0 1px, transparent 2px),
+                radial-gradient(circle at 50px 160px, rgba(255,255,255,0.6) 0 1px, transparent 2px),
+                radial-gradient(circle at 90px 40px, rgba(255,255,255,0.55) 0 1px, transparent 2px),
+                radial-gradient(circle at 130px 80px, rgba(255,255,255,0.85) 0 1px, transparent 2px),
+                radial-gradient(circle at 180px 130px, rgba(255,255,255,0.4) 0 1px, transparent 2px);
+            background-size: 220px 220px;
+            transition: opacity 1.2s ease;
         }
+        .stars.extinguished { opacity: 0; }
 
-        /* 三颗可控漂移星（左侧），使用实际 DOM 元素，颜色为亮银色，中心更亮 */
-        .drift-star{
-            position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; display:block;
-            transform: translate(-50%, -50%) scale(1);
-            /* 进一步增强：更集中的白色核心、更大更亮的光晕 */
-            background: radial-gradient(circle at 50% 45%, #ffffff 0%, #ffffff 34%, #f8fbff 46%, rgba(245,248,252,0.95) 60%, transparent 100%);
-            box-shadow: 0 0 36px rgba(255,255,255,1), 0 0 86px rgba(220,235,245,0.36) inset, 0 0 160px rgba(210,230,245,0.2);
-            opacity: 0.95; will-change: left, top, transform, opacity, filter;
-            animation-name: flicker-yellow; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
-        }
-        .drift-star:nth-of-type(1){ width:10px; height:10px; animation-duration: 5.2s; animation-delay: 0.2s; }
-        .drift-star:nth-of-type(2){ width:7px; height:7px; animation-duration: 7.2s; animation-delay: 0.6s; }
-        .drift-star:nth-of-type(3){ width:12px; height:12px; animation-duration: 8.4s; animation-delay: 1s; }
-
-        @keyframes flicker-yellow {
-            0% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
-            40% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.35); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
-            60% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.08); }
-            100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
-        }
-
-        /* 拖尾粒子 */
-        .star-trail{
-            position: fixed; pointer-events: none; z-index: 0;
-            /* 长条渐变，尾部逐渐透明，制造彗尾感 */
-            background: linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(230,235,245,0.75) 30%, rgba(200,210,225,0.35) 60%, transparent 100%);
-            border-radius: 999px;
-            mix-blend-mode: screen; filter: blur(6px);
-            opacity: 0.85; transform-origin: center left;
-            transition: transform 720ms cubic-bezier(.2,.8,.2,1), opacity 720ms linear;
-            will-change: transform, opacity;
-
-        }
-
-        /* 保持原有 .drift-star 视觉与行为（使用脚本控制移动与亮度） */
-
-        /* 过渡雾气层：淡淡光晕，放在星空与森林之间，增加层次感 */
-        .mist{
-            position: fixed; left: 0; right: 0; bottom: 0; height: 52vh; width: 100%; z-index: 1; pointer-events: none;
-            background: radial-gradient(60% 40% at 20% 30%, rgba(2,40,50,0.28), rgba(2,20,30,0.12) 30%, transparent 70%),
-                        radial-gradient(40% 30% at 60% 60%, rgba(6,30,40,0.18), transparent 60%);
-            filter: blur(18px) saturate(120%);
-            opacity: 0.85; mix-blend-mode: screen;
-            animation: drift 18s linear infinite;
-        }
-
-        @keyframes drift{
-            0%{ transform: translateX(-6%); }
-            50%{ transform: translateX(6%); }
-            100%{ transform: translateX(-6%); }
-        }
-
-        /* 森林剪影：改为内联 SVG（更尖锐的松树轮廓），放置在页面底部 */
-        .forest{
-            position: fixed; left: 0; right: 0; bottom: 0; height: 44vh; width: 100%; z-index: 2; pointer-events: none;
-            display: block; transform: translateZ(0);
-        }
-        .forest svg{ width:100%; height:100%; display:block; }
-        /* 近景更深，远景更淡，保持夜色氛围 */
-        .forest .layer-far{ fill: rgba(6,12,10,0.55); }
-        .forest .layer-mid{ fill: rgba(3,6,5,0.75); }
-        .forest .layer-near{ fill: rgba(0,0,0,0.95); }
-
-        /* 转场层：太阳与火焰覆盖层 */
-        .transition-layer{
-            position: fixed;
-            inset: 0;
-            z-index: 2.5;
-            pointer-events: none;
-            overflow: hidden;
-        }
-        #fireCanvas{
+        .star-dot {
             position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            width: 100%;
-            height: 44vh;
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-        .solar-rise{
-            position: absolute;
-            inset: 0;
-            z-index: 1;
-            pointer-events: none;
-        }
-        .sun{
-            position: absolute;
-            bottom: 0;
-            width: 30vh;
-            height: 30vh;
+            width: 2px;
+            height: 2px;
             border-radius: 50%;
-            transform: translate(-50%, 100%) scale(0.2);
+            background: #fff;
+            box-shadow: 0 0 6px rgba(255,255,255,0.8);
+            opacity: 0.7;
+            transition: opacity 0.55s ease, transform 0.55s ease;
+            pointer-events: none;
+        }
+        .star-dot.out {
             opacity: 0;
-            background: radial-gradient(circle at 30% 30%, rgba(255,248,230,0.95) 0%, #e8c878 20%, #c9953a 48%, #8a4028 85%, transparent 100%);
-            box-shadow: 0 0 50px rgba(201, 149, 58, 0.28), inset 0 0 16px rgba(255, 230, 180, 0.4);
-            filter: blur(0.4px);
-            transition: opacity 1.2s ease, transform 1.2s ease;
-        }
-        .sun-1{ left: 28%; width: 26vh; height: 26vh; }
-        .sun-2{ left: 72%; width: 28vh; height: 28vh; }
-        .sun-3{ left: 50%; width: 34vh; height: 34vh; }
-        .sun-rise-active .sun{
-            animation-name: sun-rise;
-            animation-duration: 2.8s;
-            animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
-            animation-fill-mode: forwards;
-        }
-        .sun-rise-active .sun-1{ animation-delay: 0.15s; }
-        .sun-rise-active .sun-2{ animation-delay: 0.3s; }
-        .sun-rise-active .sun-3{ animation-delay: 0.45s; }
-        .sun.pulse{
-            animation: sun-pulse 3.5s ease-in-out infinite;
-        }
-        .sun.fade-out{
-            animation: none !important;
-            opacity: 0 !important;
-            transform: translate(-50%, -10%) scale(0.65) !important;
-            transition: opacity 1.4s ease, transform 1.4s ease;
-        }
-        @keyframes sun-rise {
-            0% { transform: translate(-50%, 100%) scale(0.2); opacity: 0; }
-            65% { transform: translate(-50%, -35%) scale(1.06); opacity: 1; }
-            100% { transform: translate(-50%, -35%) scale(1); opacity: 1; }
-        }
-        @keyframes sun-pulse {
-            0%,100% { transform: translate(-50%, -35%) scale(1); filter: blur(0.4px); box-shadow: 0 0 50px rgba(201, 149, 58, 0.28), inset 0 0 16px rgba(255, 230, 180, 0.4); }
-            50% { transform: translate(-50%, -35%) scale(1.04); filter: blur(0.55px); box-shadow: 0 0 64px rgba(201, 149, 58, 0.4), inset 0 0 22px rgba(255, 230, 180, 0.5); }
+            transform: scale(0.2);
         }
 
-        /* Epigraph during ash */
-        .epigraph {
+        .drift-star {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+            display: block;
+            transform: translate(-50%, -50%) scale(1);
+            background: radial-gradient(circle at 50% 45%, #fff 0%, #fff 34%, #f8fbff 50%, transparent 100%);
+            box-shadow: 0 0 28px rgba(255,255,255,0.9), 0 0 70px rgba(210,230,245,0.25);
+            opacity: 0.9;
+            transition: opacity 0.7s ease, transform 0.7s ease, filter 0.4s ease;
+            animation: star-flicker ease-in-out infinite;
+        }
+        .drift-star:nth-of-type(1) { width: 10px; height: 10px; animation-duration: 5.2s; }
+        .drift-star:nth-of-type(2) { width: 7px; height: 7px; animation-duration: 7.2s; animation-delay: 0.4s; }
+        .drift-star:nth-of-type(3) { width: 12px; height: 12px; animation-duration: 8.4s; animation-delay: 0.8s; }
+        .drift-star.out {
+            opacity: 0 !important;
+            transform: translate(-50%, -50%) scale(0.15);
+            animation: none;
+            filter: brightness(0.2);
+        }
+        @keyframes star-flicker {
+            0%, 100% { opacity: 0.55; }
+            50% { opacity: 1; }
+        }
+
+        .coord-flash {
             position: fixed;
             left: 50%;
-            top: 38%;
+            top: 42%;
             transform: translate(-50%, -50%);
-            z-index: 4;
+            z-index: 5;
             pointer-events: none;
-            font-family: var(--font-ui);
-            font-size: clamp(14px, 2.4vw, 18px);
-            font-weight: 500;
-            letter-spacing: 0.18em;
-            color: rgba(216, 228, 240, 0.55);
-            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            letter-spacing: 0.28em;
+            color: rgba(200, 220, 235, 0.45);
             opacity: 0;
-            transition: opacity 1.2s ease;
-            max-width: 90vw;
+            transition: opacity 0.25s ease;
         }
-        .epigraph.show { opacity: 1; }
-        .epigraph.hide { opacity: 0; }
+        .coord-flash.show { opacity: 1; }
 
-        /* Scene transitions */
-        body[data-scene="start"] .drift-star{
-            animation-play-state: paused;
-            transition: filter 0.4s ease, opacity 2s ease;
+        .strike-particle {
+            position: fixed;
+            left: 50%;
+            top: 48%;
+            width: 4px;
+            height: 4px;
+            margin: -2px 0 0 -2px;
+            border-radius: 50%;
+            z-index: 6;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(circle, #fff 0%, rgba(200, 230, 245, 0.9) 35%, transparent 70%);
+            box-shadow:
+                0 0 12px rgba(255,255,255,0.95),
+                0 0 40px rgba(180, 210, 230, 0.45);
+            transform: translate3d(0, 0, 0) scale(0.08);
+            will-change: transform, opacity;
         }
+        .strike-particle.tail::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 2px;
+            height: 28px;
+            transform: translate(-50%, -100%);
+            background: linear-gradient(to top, rgba(255,255,255,0.55), transparent);
+            filter: blur(1px);
+            opacity: 0.6;
+        }
+        .strike-particle.fly {
+            opacity: 1;
+            animation: strike-rush 1.8s cubic-bezier(0.15, 0.05, 0.35, 1) forwards;
+        }
+        @keyframes strike-rush {
+            0% {
+                opacity: 0.2;
+                transform: translate3d(0, 8vh, 0) scale(0.06);
+                filter: blur(1.5px);
+            }
+            40% {
+                opacity: 1;
+                transform: translate3d(0, 0, 0) scale(0.35);
+                filter: blur(0.4px);
+            }
+            85% {
+                opacity: 1;
+                transform: translate3d(0, -2vh, 0) scale(18);
+                filter: blur(0);
+            }
+            100% {
+                opacity: 0.95;
+                transform: translate3d(0, -2vh, 0) scale(48);
+                filter: blur(0);
+            }
+        }
+
+        .flash-veil,
+        .void-veil {
+            position: fixed;
+            inset: 0;
+            z-index: 7;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .flash-veil {
+            background: #f5f8fc;
+            z-index: 8;
+        }
+        .flash-veil.on {
+            animation: hard-flash 0.5s ease-out forwards;
+        }
+        @keyframes hard-flash {
+            0% { opacity: 0; }
+            12% { opacity: 1; }
+            55% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .void-veil {
+            background: #000;
+            z-index: 9;
+            transition: opacity 0.35s ease;
+        }
+        .void-veil.on { opacity: 1; }
+
         body[data-scene] .container {
             opacity: 0;
             pointer-events: none;
         }
-        body {
-            transition: background 2.2s ease-in-out;
+        body[data-scene="start"] .drift-star {
+            animation-play-state: paused;
         }
-        /* Cold-white → thin amber (壮烈, not apricot neon) */
-        body[data-scene="sunrise"], body[data-scene="burning"]{
-            background: linear-gradient(to bottom, #1a1410 0%, #3a2818 42%, #5a3820 100%);
+        body[data-scene="void"] {
+            background: #000;
         }
-        body[data-scene="sunrise"] .stars,
-        body[data-scene="burning"] .stars{
-            opacity: 0.08;
-            transition: opacity 1.8s ease-in-out;
-        }
-        .forest svg path,
-        .forest svg g path{
-            transition: fill 2.2s ease-in-out;
-        }
-        body[data-scene="sunrise"] .layer-far { fill: #6a3a22; }
-        body[data-scene="sunrise"] .layer-mid { fill: #4a2214; }
-        body[data-scene="sunrise"] .layer-near { fill: #1a0804; }
-        body[data-scene="burning"] .layer-far { fill: #8a4020; }
-        body[data-scene="burning"] .layer-mid { fill: #5a2010; }
-        body[data-scene="burning"] .layer-near { fill: #2a0a06; }
-        body[data-scene="burning"] #fireCanvas{ opacity: 1; }
-
-        /* Ash: return to void night — matches lobby */
-        body[data-scene="ash"]{
-            background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 48%, #02080c 100%);
-        }
-        body[data-scene="ash"] .stars{
-            opacity: 0.4;
-            transition: opacity 1.6s ease-in-out;
-        }
-        body[data-scene="ash"] .mist{
-            opacity: 0.5;
-            transition: opacity 1.4s ease;
-        }
-        body[data-scene="ash"] .layer-far { fill: rgba(6,12,10,0.55); }
-        body[data-scene="ash"] .layer-mid { fill: rgba(3,6,5,0.75); }
-        body[data-scene="ash"] .layer-near { fill: rgba(0,0,0,0.95); }
-        body[data-scene="ash"] #fireCanvas{
+        body[data-scene="void"] .stars {
             opacity: 0;
-            transition: opacity 1s ease;
         }
 
-        /* 登录框：静默细线 HUD，无霓虹激光 */
-                .container{
-                    position: relative;
-                    z-index: 3;
-                    width: 100%; max-width: 420px;
-                    margin-right: 6vw;
-                    padding: 40px 36px;
-                    border-radius: 0;
-                    background: rgba(8, 12, 20, 0.55);
-                    backdrop-filter: blur(12px) saturate(110%);
-                    -webkit-backdrop-filter: blur(12px) saturate(110%);
-                    border: 1px solid var(--line-strong);
-                    box-shadow: none;
-                    overflow: visible;
-                    transition: opacity 1s ease;
-                }
+        .container {
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            max-width: 420px;
+            margin-right: 6vw;
+            padding: 40px 36px;
+            border-radius: 0;
+            background: rgba(8, 12, 20, 0.55);
+            backdrop-filter: blur(12px) saturate(110%);
+            -webkit-backdrop-filter: blur(12px) saturate(110%);
+            border: 1px solid var(--line-strong);
+            overflow: visible;
+            transition: opacity 0.9s ease;
+        }
 
-        .title{
+        .title {
             font-size: 30px;
             font-weight: 700;
             letter-spacing: 0.14em;
-            text-align: left;
             color: var(--ink);
         }
-        .subtitle{
+        .subtitle {
             font-family: var(--font-mono);
             font-size: 11px;
             letter-spacing: 0.22em;
             text-transform: uppercase;
             color: var(--ink-muted);
             margin-bottom: 20px;
-            text-align: left;
         }
 
-        .tabs{ display:flex; gap:8px; margin-bottom:18px; }
-        .tabs button{
-            flex: none; padding:8px 14px; border-radius:0;
-            border:1px solid var(--line); background: transparent;
-            color: var(--ink-dim); cursor:pointer; font-weight:600;
-            font-family: var(--font-ui); transition: border-color 0.2s, color 0.2s, background 0.2s;
+        .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+        .tabs button {
+            flex: none;
+            padding: 8px 14px;
+            border-radius: 0;
+            border: 1px solid var(--line);
+            background: transparent;
+            color: var(--ink-dim);
+            cursor: pointer;
+            font-weight: 600;
+            font-family: var(--font-ui);
+            transition: border-color 0.2s, color 0.2s, background 0.2s;
         }
-        .tabs button.active{
+        .tabs button.active {
             background: var(--accent-ice-glow);
             color: var(--accent-ice-bright);
             border-color: var(--accent-ice);
         }
-        .tabs button:hover{ border-color: var(--accent-ice); color: var(--accent-ice-bright); }
+        .tabs button:hover {
+            border-color: var(--accent-ice);
+            color: var(--accent-ice-bright);
+        }
 
-        .form-panel{ display: none; flex-direction: column; gap:14px; }
-        .form-panel.active{ display:flex; }
-        .form-panel label{ font-size:13px; color: var(--ink-dim); font-weight: 600; }
-        .form-panel input{
-            padding:12px 14px; border-radius:0; border:1px solid var(--line);
-            background: var(--bg-inset); color: var(--ink); font-size:15px; outline:none; font-weight: 500;
+        .form-panel { display: none; flex-direction: column; gap: 14px; }
+        .form-panel.active { display: flex; }
+        .form-panel label { font-size: 13px; color: var(--ink-dim); font-weight: 600; }
+        .form-panel input {
+            padding: 12px 14px;
+            border-radius: 0;
+            border: 1px solid var(--line);
+            background: var(--bg-inset);
+            color: var(--ink);
+            font-size: 15px;
+            outline: none;
             font-family: var(--font-ui);
             transition: border-color 0.2s, background 0.2s;
         }
-        .form-panel input:focus{
+        .form-panel input:focus {
             border-color: var(--accent-ice);
             background: rgba(8, 16, 24, 0.7);
-            box-shadow: none;
         }
-        .form-panel input::placeholder{ color: var(--ink-muted); }
+        .form-panel input::placeholder { color: var(--ink-muted); }
 
-        .password-row{ position: relative; }
-        .password-row input{ width:100%; padding-right:46px; }
-        .password-toggle{
-            position:absolute; right:8px; top:50%; transform:translateY(-50%);
-            background:transparent; border:none; color: var(--accent-ice);
-            cursor:pointer; font-size:20px; font-weight: 700; letter-spacing: -2px;
-            display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+        .password-row { position: relative; }
+        .password-row input { width: 100%; padding-right: 46px; }
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: var(--accent-ice);
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
         }
-        .password-toggle.hidden::after{ content: ''; position: absolute; width: 3px; height: 32px; background: currentColor; transform: rotate(-45deg); }
+        .password-toggle.hidden::after {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 32px;
+            background: currentColor;
+            transform: rotate(-45deg);
+        }
 
-        .form-panel button{
-            padding:12px; border-radius:0; border:1px solid var(--line-strong);
-            background: var(--accent-ice-dim); color: var(--ink); font-weight:700;
-            font-family: var(--font-ui); cursor:pointer; transition: border-color 0.2s, background 0.2s;
+        .form-panel button[id$="Btn"] {
+            padding: 12px;
+            border-radius: 0;
+            border: 1px solid var(--line-strong);
+            background: var(--accent-ice-dim);
+            color: var(--ink);
+            font-weight: 700;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
         }
-        .form-panel button:hover{
+        .form-panel button[id$="Btn"]:hover {
             background: rgba(122, 158, 176, 0.32);
             border-color: var(--accent-ice);
-            box-shadow: none;
         }
 
-        .message{ text-align:left; font-size:14px; margin-top:8px; min-height:20px; color: var(--ink-dim); }
-        .message.success{ color: var(--ok); }
-        .message.error{ color: #c87878; }
-
-        .hint-text{ font-size:13px; color: var(--ink-muted); text-align:left; margin-top:6px; }
-
-        .panel-badge{
-            position: absolute; top: 12px; left: 12px; width: 44px; height: 20px; z-index: 6; pointer-events: none;
-            display: flex; gap:6px; align-items:center;
+        .message {
+            text-align: left;
+            font-size: 14px;
+            margin-top: 8px;
+            min-height: 20px;
+            color: var(--ink-dim);
         }
-        .panel-badge .bar{ height:1px; background: var(--line-strong); border-radius:0; }
-        .panel-badge .bar.short{ width:12px; opacity:0.9; }
-        .panel-badge .bar.long{ width:28px; opacity:0.7; }
-        .panel-badge::after{
-            content: ''; position: absolute; right:-8px; bottom:-6px;
-            width:8px; height:8px; border-radius:0; background: var(--accent-ice-dim);
+        .message.success { color: var(--ok); }
+        .message.error { color: #c87878; }
+        .hint-text {
+            font-size: 13px;
+            color: var(--ink-muted);
+            text-align: left;
+            margin-top: 6px;
         }
 
-        /* 响应式：窄屏居中显示，调整星星位置避免重叠 */
+        .panel-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            width: 44px;
+            height: 20px;
+            z-index: 6;
+            pointer-events: none;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .panel-badge .bar { height: 1px; background: var(--line-strong); }
+        .panel-badge .bar.short { width: 12px; }
+        .panel-badge .bar.long { width: 28px; opacity: 0.7; }
+        .panel-badge::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            bottom: -6px;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-ice-dim);
+        }
+
         @media (max-width: 900px) {
-                    body { justify-content: center; padding: 6vh 6vw; }
-                    .container { margin: 0; max-width: 460px; }
-                    /* 在窄屏上通过缩小和分散星星来避免重叠，不覆盖 JS 动画位置 */
-                    .drift-star:nth-of-type(1) { left: 10vw; top: 18vh; transform: translate(-50%, -50%) scale(0.8); }
-                    .drift-star:nth-of-type(2) { left: 6vw;  top: 32vh; transform: translate(-50%, -50%) scale(0.8); }
-                    .drift-star:nth-of-type(3) { left: 14vw; top: 44vh; transform: translate(-50%, -50%) scale(0.9); }
+            body { justify-content: center; padding: 6vh 6vw; }
+            .container { margin: 0; max-width: 460px; }
+        }
 
-                    /* 为 Stars 脚本提供响应式数据 */
-                    .drift-star:nth-of-type(1)::before { content: attr(data-l); display: none; }
-                }
+        @media (prefers-reduced-motion: reduce) {
+            .strike-particle.fly,
+            .flash-veil.on,
+            .drift-star { animation: none !important; }
+        }
     </style>
 </head>
 <body>
-    <div class="stars">
-        <div class="drift-star" data-l="8vw" data-t="20vh" aria-hidden="true"></div>
-        <div class="drift-star" data-l="6vw" data-t="34vh" aria-hidden="true"></div>
-        <div class="drift-star" data-l="11vw" data-t="46vh" aria-hidden="true"></div>
+    <div class="stars" id="starField" aria-hidden="true">
+        <div class="drift-star" data-l="8vw" data-t="20vh"></div>
+        <div class="drift-star" data-l="6vw" data-t="34vh"></div>
+        <div class="drift-star" data-l="11vw" data-t="46vh"></div>
     </div>
-    <!-- 过渡雾气层，位于星空与森林之间 -->
-    <div class="mist" aria-hidden="true"></div>
-    <!-- 内联 SVG 森林剪影（AI 生成） -->
-    <div class="forest" aria-hidden="true">
-        <svg viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-            <!-- 远景山丘 -->
-            <path class="layer-far" d="M0,200 C80,160 160,180 240,152 C320,124 400,160 480,148 C560,136 640,176 720,152 C800,128 880,156 960,140 C1040,124 1120,160 1200,148 C1280,136 1360,160 1440,140 L1440,320 L0,320 Z" />
-            <!-- 中景：稀疏的松树轮廓 -->
-            <g class="layer-mid">
-                <path d="M40 220 L70 170 L88 188 L76 166 L100 166 L86 142 L110 160 L128 130 L146 166 L160 150 L174 186 L200 160 L220 190 L240 168 L260 202 L280 180 L300 206 L330 170 L360 200 L390 166 L420 198 L450 170 L480 200 L500 180 L520 208 L560 180 L600 210 L640 180 L680 210 L720 182 L760 210 L800 180 L840 212 L880 178 L920 210 L960 182 L1000 212 L1040 180 L1080 208 L1120 178 L1160 210 L1200 182 L1240 210 L1280 184 L1320 212 L1360 188 L1400 216 L1440 190 L1440 320 L0 320 Z"/>
-            </g>
-            <!-- 近景：尖锐松树群，形成剪影边缘 -->
-            <g class="layer-near">
-                <path d="M0 260 L28 220 L48 240 L44 210 L68 240 L82 204 L108 238 L122 200 L150 238 L168 204 L196 244 L220 200 L244 246 L268 206 L296 252 L320 200 L344 254 L372 210 L400 260 L428 210 L452 258 L480 208 L508 260 L540 212 L572 266 L600 214 L632 272 L660 212 L692 276 L720 216 L752 280 L780 220 L812 284 L840 224 L872 288 L900 228 L932 292 L960 234 L992 298 L1020 236 L1052 300 L1080 240 L1112 304 L1140 244 L1172 308 L1200 248 L1232 312 L1260 256 L1292 316 L1320 260 L1352 320 L0 320 Z"/>
-            </g>
-        </svg>
-    </div>
-    <div class="transition-layer" aria-hidden="true">
-        <canvas id="fireCanvas"></canvas>
-        <div class="solar-rise" id="solarRise">
-            <div class="sun sun-1"></div>
-            <div class="sun sun-2"></div>
-            <div class="sun sun-3"></div>
-        </div>
-    </div>
-    <div class="epigraph" id="epigraph" aria-hidden="true">给岁月以文明，而不是给文明以岁月。</div>
+    <div class="coord-flash" id="coordFlash" aria-hidden="true"></div>
+    <div class="strike-particle tail" id="strikeParticle" aria-hidden="true"></div>
+    <div class="flash-veil" id="flashVeil" aria-hidden="true"></div>
+    <div class="void-veil" id="voidVeil" aria-hidden="true"></div>
+
     <div class="container">
         <div class="panel-badge" aria-hidden="true">
             <div class="bar short"></div>
@@ -403,11 +394,10 @@
         <div class="subtitle">Dark Forest · Sign in</div>
 
         <div class="tabs">
-            <button id="loginTab" class="active">登录</button>
-            <button id="registerTab">注册</button>
+            <button id="loginTab" class="active" type="button">登录</button>
+            <button id="registerTab" type="button">注册</button>
         </div>
 
-        <!-- 登录面板 -->
         <div id="loginPanel" class="form-panel active">
             <label>用户名</label>
             <input type="text" id="loginUsername" placeholder="输入用户名" />
@@ -416,11 +406,10 @@
                 <input type="password" id="loginPassword" placeholder="输入密码" />
                 <button type="button" class="password-toggle hidden" data-target="loginPassword" aria-label="显示密码">👁</button>
             </div>
-            <button id="loginBtn">登录</button>
+            <button id="loginBtn" type="button">登录</button>
             <div class="hint-text">还没有账号？点击「注册」加入</div>
         </div>
 
-        <!-- 注册面板 -->
         <div id="registerPanel" class="form-panel">
             <label>用户名</label>
             <input type="text" id="regUsername" placeholder="设置用户名" />
@@ -434,7 +423,7 @@
                 <input type="password" id="regPasswordConfirm" placeholder="再次输入密码" />
                 <button type="button" class="password-toggle hidden" data-target="regPasswordConfirm" aria-label="显示密码">👁</button>
             </div>
-            <button id="registerBtn">注册</button>
+            <button id="registerBtn" type="button">注册</button>
             <div class="hint-text">已有账号？点击「登录」返回</div>
         </div>
 
@@ -442,21 +431,11 @@
     </div>
 
     <script>
-        // 登录成功后的转场动画开关：false = 保留代码但不播放，直接进入大厅
         const login_animation = true;
-        // #region agent log
-        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:flag',message:'login_animation flag at load',data:{login_animation:login_animation},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-
         const messageEl = document.getElementById('message');
 
-        // Tab 切换
-        document.getElementById('loginTab').addEventListener('click', () => {
-            setTab('login');
-        });
-        document.getElementById('registerTab').addEventListener('click', () => {
-            setTab('register');
-        });
+        document.getElementById('loginTab').addEventListener('click', () => setTab('login'));
+        document.getElementById('registerTab').addEventListener('click', () => setTab('register'));
 
         function setTab(tab) {
             document.getElementById('loginTab').classList.toggle('active', tab === 'login');
@@ -467,135 +446,107 @@
             messageEl.className = 'message';
         }
 
-        // 登录
-                document.getElementById('loginBtn').addEventListener('click', async () => {
-                    const username = document.getElementById('loginUsername').value.trim();
-                    const password = document.getElementById('loginPassword').value.trim();
-                    await doRequest('/api/login', username, password, '登录成功！');
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            await doRequest('/api/login', username, password, '登录成功！');
+        });
+
+        document.getElementById('registerBtn').addEventListener('click', async () => {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const confirm = document.getElementById('regPasswordConfirm').value.trim();
+            if (password !== confirm) {
+                showMessage('两次密码输入不一致', 'error');
+                return;
+            }
+            if (password.length < 3) {
+                showMessage('密码至少3位', 'error');
+                return;
+            }
+            await doRequest('/api/register', username, password, '注册成功！请登录');
+        });
+
+        async function doRequest(url, username, password, successMsg) {
+            if (!username || !password) {
+                showMessage('请填写用户名和密码', 'error');
+                return;
+            }
+            const btn = url === '/api/login'
+                ? document.getElementById('loginBtn')
+                : document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+            showMessage('', '');
+
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 10000);
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include',
+                    signal: ctrl.signal,
                 });
-
-                // 注册
-                document.getElementById('registerBtn').addEventListener('click', async () => {
-                    const username = document.getElementById('regUsername').value.trim();
-                    const password = document.getElementById('regPassword').value.trim();
-                    const confirm = document.getElementById('regPasswordConfirm').value.trim();
-
-                    if (password !== confirm) {
-                        showMessage('两次密码输入不一致', 'error');
-                        return;
-                    }
-                    if (password.length < 3) {
-                        showMessage('密码至少3位', 'error');
-                        return;
-                    }
-                    await doRequest('/api/register', username, password, '注册成功！请登录');
-                });
-
-                async function doRequest(url, username, password, successMsg) {
-                    if (!username || !password) {
-                        showMessage('请填写用户名和密码', 'error');
-                        return;
-                    }
-
-                    const btn = url === '/api/login' ?
-                        document.getElementById('loginBtn') :
-                        document.getElementById('registerBtn');
-                    btn.disabled = true;
-                    btn.textContent = '处理中...';
-                    showMessage('', '');
-
-                    // ✅ 添加超时控制（10 秒），避免请求卡死
-                    const ctrl = new AbortController();
-                    const timer = setTimeout(() => ctrl.abort(), 10000);
-
-                    try {
-                        const res = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username, password }),
-                            credentials: 'include',
-                            signal: ctrl.signal
-                        });
-                        const data = await res.json();
-
-                        if (res.ok && data.success) {
-                            showMessage(data.message || successMsg, 'success');
-                            if (url === '/api/login') {
-                                // 服务端 Set-Cookie: session(HttpOnly) + username；localStorage 仅作展示
-                                const loginUsername = data.username || username;
-                                localStorage.setItem('username', loginUsername);
-                                // #region agent log
-                                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:success-branch',message:'login success branch',data:{login_animation:login_animation,willPlayScene:!!login_animation,reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches},timestamp:Date.now()})}).catch(()=>{});
-                                // #endregion
-                                if (login_animation) {
-                                    // #region agent log
-                                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:startScene',message:'calling startSceneTransition',data:{},timestamp:Date.now()})}).catch(()=>{});
-                                    // #endregion
-                                    startSceneTransition(loginUsername);
-                                } else {
-                                    // #region agent log
-                                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:skip-anim',message:'skipping animation, hard redirect lobby',data:{},timestamp:Date.now()})}).catch(()=>{});
-                                    // #endregion
-                                    window.location.href = '/lobby';
-                                }
-                            } else {
-                                // ✅ 注册成功：清空注册表单，切到登录面板
-                                document.getElementById('regUsername').value = '';
-                                document.getElementById('regPassword').value = '';
-                                document.getElementById('regPasswordConfirm').value = '';
-                                document.getElementById('loginUsername').value = username;
-                                setTab('login');
-                            }
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showMessage(data.message || successMsg, 'success');
+                    if (url === '/api/login') {
+                        const loginUsername = data.username || username;
+                        localStorage.setItem('username', loginUsername);
+                        if (login_animation) {
+                            startSceneTransition(loginUsername);
                         } else {
-                            showMessage(data.message || '操作失败', 'error');
+                            window.location.href = '/lobby';
                         }
-                    } catch (err) {
-                        if (err.name === 'AbortError') {
-                            showMessage('请求超时，请检查网络后重试', 'error');
-                        } else {
-                            showMessage('网络错误，请稍后重试', 'error');
-                        }
-                    } finally {
-                        clearTimeout(timer);
-                        btn.disabled = false;
-                        btn.textContent = url === '/api/login' ? '登录' : '注册';
-                    }
-                }
-
-        // ✅ 初始化密码切换按钮：确保 DOM class/aria-label 与实际 input.type 同步
-                function syncPasswordToggle(button) {
-                    const targetId = button.getAttribute('data-target');
-                    const input = document.getElementById(targetId);
-                    if (!input) return;
-                    const isPassword = input.type === 'password';
-                    if (isPassword) {
-                        button.classList.add('hidden');
-                        button.setAttribute('aria-label', '显示密码');
                     } else {
-                        button.classList.remove('hidden');
-                        button.setAttribute('aria-label', '隐藏密码');
+                        document.getElementById('regUsername').value = '';
+                        document.getElementById('regPassword').value = '';
+                        document.getElementById('regPasswordConfirm').value = '';
+                        document.getElementById('loginUsername').value = username;
+                        setTab('login');
                     }
+                } else {
+                    showMessage(data.message || '操作失败', 'error');
                 }
-                document.querySelectorAll('.password-toggle').forEach((button) => {
-                    syncPasswordToggle(button);
-                    button.addEventListener('click', () => {
-                        const targetId = button.getAttribute('data-target');
-                        const input = document.getElementById(targetId);
-                        if (!input) return;
-                        const isPassword = input.type === 'password';
-                        input.type = isPassword ? 'text' : 'password';
-                        syncPasswordToggle(button);
-                    });
-                });
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    showMessage('请求超时，请检查网络后重试', 'error');
+                } else {
+                    showMessage('网络错误，请稍后重试', 'error');
+                }
+            } finally {
+                clearTimeout(timer);
+                btn.disabled = false;
+                btn.textContent = url === '/api/login' ? '登录' : '注册';
+            }
+        }
+
+        function syncPasswordToggle(button) {
+            const input = document.getElementById(button.getAttribute('data-target'));
+            if (!input) return;
+            const isPassword = input.type === 'password';
+            button.classList.toggle('hidden', isPassword);
+            button.setAttribute('aria-label', isPassword ? '显示密码' : '隐藏密码');
+        }
+        document.querySelectorAll('.password-toggle').forEach((button) => {
+            syncPasswordToggle(button);
+            button.addEventListener('click', () => {
+                const input = document.getElementById(button.getAttribute('data-target'));
+                if (!input) return;
+                input.type = input.type === 'password' ? 'text' : 'password';
+                syncPasswordToggle(button);
+            });
+        });
 
         function showMessage(msg, type) {
             messageEl.textContent = msg;
             messageEl.className = 'message' + (type ? ' ' + type : '');
         }
 
-        // ========== 统一时间轴控制器（替代多个分散的 setTimeout） ==========
         function createTimeline() {
-            let events = [];           // { at: 相对时间(ms), fn: 回调 }
+            let events = [];
             let startTime = null;
             let rafId = null;
             let nextEventIndex = 0;
@@ -603,9 +554,8 @@
 
             function at(ms, fn) {
                 events.push({ at: ms, fn });
-                return api; // 链式调用
+                return api;
             }
-
             function start() {
                 if (startTime !== null) return;
                 cancelled = false;
@@ -614,68 +564,71 @@
                 startTime = performance.now();
                 tick(startTime);
             }
-
             function cancel() {
                 cancelled = true;
-                if (rafId) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
-                }
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = null;
                 startTime = null;
             }
-
             function tick(ts) {
                 if (cancelled) return;
                 const elapsed = ts - startTime;
-
                 while (nextEventIndex < events.length && events[nextEventIndex].at <= elapsed) {
-                    try {
-                        events[nextEventIndex].fn();
-                    } catch (e) {
-                        console.error('Timeline event error:', e);
-                    }
+                    try { events[nextEventIndex].fn(); } catch (e) { console.error(e); }
                     nextEventIndex++;
                 }
-
                 if (nextEventIndex < events.length) {
                     rafId = requestAnimationFrame(tick);
                 } else {
                     rafId = null;
                 }
             }
-
             const api = { at, start, cancel };
             return api;
         }
 
-        function startSceneTransition(username) {
-            // #region agent log
-            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:startSceneTransition',message:'startSceneTransition entered',data:{reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
+        function seedFieldStars() {
+            const field = document.getElementById('starField');
+            const positions = [
+                [12, 14], [28, 22], [44, 11], [61, 19], [78, 15], [88, 28],
+                [18, 38], [35, 44], [52, 36], [69, 48], [84, 41],
+                [8, 58], [25, 62], [41, 55], [58, 68], [74, 59], [91, 72],
+                [15, 78], [32, 84], [48, 76], [66, 88], [82, 81],
+            ];
+            positions.forEach(([x, y], i) => {
+                const d = document.createElement('div');
+                d.className = 'star-dot';
+                d.style.left = x + '%';
+                d.style.top = y + '%';
+                d.style.width = (i % 5 === 0 ? 2.5 : 1.5) + 'px';
+                d.style.height = d.style.width;
+                d.style.opacity = String(0.35 + (i % 7) * 0.07);
+                field.appendChild(d);
+            });
+        }
+        seedFieldStars();
+
+        function startSceneTransition() {
             const goLobby = () => {
-                try { sessionStorage.setItem('tbk_enter', 'ash'); } catch (e) {}
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'C',location:'login.html:goLobby',message:'handoff to lobby',data:{scene:document.body.dataset.scene||null},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
+                try { sessionStorage.setItem('tbk_enter', 'void'); } catch (e) {}
                 window.location.href = '/lobby';
             };
 
             const container = document.querySelector('.container');
             if (container) {
                 container.setAttribute('aria-hidden', 'true');
-                let liveRegion = document.getElementById('transition-announcer');
-                if (!liveRegion) {
-                    liveRegion = document.createElement('div');
-                    liveRegion.id = 'transition-announcer';
-                    liveRegion.setAttribute('aria-live', 'assertive');
-                    liveRegion.setAttribute('role', 'status');
-                    liveRegion.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;z-index:9999;';
-                    document.body.appendChild(liveRegion);
+                let live = document.getElementById('transition-announcer');
+                if (!live) {
+                    live = document.createElement('div');
+                    live.id = 'transition-announcer';
+                    live.setAttribute('aria-live', 'assertive');
+                    live.setAttribute('role', 'status');
+                    live.style.cssText = 'position:fixed;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);';
+                    document.body.appendChild(live);
                 }
-                liveRegion.textContent = '登录成功，正在前往大厅...';
+                live.textContent = '登录成功，正在前往大厅...';
             }
 
-            // Reduced motion: brief fade then lobby
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 document.body.dataset.scene = 'start';
                 setTimeout(goLobby, 400);
@@ -683,58 +636,83 @@
             }
 
             document.body.dataset.scene = 'start';
-            const timeline = createTimeline();
-            const epigraph = document.getElementById('epigraph');
+            if (window.stopStarDrift) window.stopStarDrift();
 
-            // 0s: star fall
-            timeline.at(0, () => {
-                if (window.startStarDrop) window.startStarDrop();
-            })
-            // 2.2s: three suns rise (cold-white → thin amber)
-            .at(2200, () => {
-                document.body.dataset.scene = 'sunrise';
-                document.getElementById('solarRise')?.classList.add('sun-rise-active');
-            })
-            // 3.6s: brief burning
-            .at(3600, () => {
-                document.body.dataset.scene = 'burning';
-                if (window.startFire) window.startFire();
-            })
-            .at(4200, () => {
-                document.querySelectorAll('.sun').forEach((el) => el.classList.add('pulse'));
-            })
-            // 5.2s: ash — fire dies, suns fade, void returns
-            .at(5200, () => {
-                document.body.dataset.scene = 'ash';
-                if (window.stopFire) window.stopFire();
-                document.querySelectorAll('.sun').forEach((el) => {
-                    el.classList.remove('pulse');
-                    el.classList.add('fade-out');
+            const dots = Array.from(document.querySelectorAll('.star-dot'));
+            const drifts = Array.from(document.querySelectorAll('.drift-star'));
+            const extinguishTargets = [...dots, ...drifts];
+            // Shuffle for uneven kill order
+            for (let i = extinguishTargets.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [extinguishTargets[i], extinguishTargets[j]] = [extinguishTargets[j], extinguishTargets[i]];
+            }
+
+            const timeline = createTimeline();
+            const coord = document.getElementById('coordFlash');
+            const strike = document.getElementById('strikeParticle');
+            const flash = document.getElementById('flashVeil');
+            const voidEl = document.getElementById('voidVeil');
+            const field = document.getElementById('starField');
+
+            // Extinguish stars: slow then fast across ~0.3–3.2s
+            const n = extinguishTargets.length;
+            extinguishTargets.forEach((el, idx) => {
+                const t = idx / Math.max(1, n - 1);
+                const atMs = 300 + Math.pow(t, 1.35) * 2900;
+                timeline.at(atMs, () => {
+                    document.body.dataset.scene = 'extinguish';
+                    el.classList.add('out');
                 });
-                document.getElementById('solarRise')?.classList.remove('sun-rise-active');
-            })
-            .at(5600, () => {
-                if (epigraph) {
-                    epigraph.classList.add('show');
-                    epigraph.removeAttribute('aria-hidden');
-                }
-            })
-            .at(7200, () => {
-                if (epigraph) {
-                    epigraph.classList.add('hide');
-                    epigraph.classList.remove('show');
-                }
+            });
+
+            timeline.at(3100, () => {
+                field.classList.add('extinguished');
+            });
+
+            // Coordinate flash — erased
+            timeline.at(3200, () => {
+                const a = Math.floor(Math.random() * 90 + 10);
+                const b = Math.floor(Math.random() * 900 + 100);
+                const c = Math.floor(Math.random() * 900 + 100);
+                coord.textContent = `α · ${a}.${b} · ${c}`;
+                coord.classList.add('show');
+            });
+            timeline.at(3550, () => {
+                coord.classList.remove('show');
+                coord.textContent = '';
+            });
+
+            // Strike particle toward camera
+            timeline.at(3600, () => {
+                document.body.dataset.scene = 'strike';
+                strike.classList.add('fly');
+            });
+
+            // Hard white flash — our civilization hit
+            timeline.at(5400, () => {
+                document.body.dataset.scene = 'flash';
+                flash.classList.add('on');
+                strike.classList.remove('fly');
+                strike.style.opacity = '0';
+            });
+
+            // Absolute void
+            timeline.at(5900, () => {
+                document.body.dataset.scene = 'void';
+                voidEl.classList.add('on');
+                flash.classList.remove('on');
+            });
+
+            timeline.at(7500, () => {
                 const announcer = document.getElementById('transition-announcer');
                 if (announcer) announcer.remove();
-            })
-            // 8.5s: handoff while still in ash night
-            .at(8500, goLobby);
+            });
 
+            timeline.at(8200, goLobby);
             timeline.start();
             window._sceneTimeline = timeline;
         }
 
-        // 按回车键触发登录/注册
         document.getElementById('loginPassword').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') document.getElementById('loginBtn').click();
         });
@@ -742,125 +720,68 @@
             if (e.key === 'Enter') document.getElementById('registerBtn').click();
         });
 
-        // 已登录检测：有本地用户名则尝试用 session 访问受保护 API
         (async () => {
             const savedUser = localStorage.getItem('username');
             if (!savedUser) return;
             try {
                 const res = await fetch('/api/rooms', { credentials: 'include' });
-                if (res.ok) {
-                    window.location.href = '/lobby';
-                } else {
-                    localStorage.removeItem('username');
-                }
-            } catch (e) {
-                /* stay on login */
-            }
+                if (res.ok) window.location.href = '/lobby';
+                else localStorage.removeItem('username');
+            } catch (e) { /* stay */ }
         })();
 
         window.addEventListener('beforeunload', () => {
             if (window._sceneTimeline) window._sceneTimeline.cancel();
-            if (window.stopFire) window.stopFire();
         });
     </script>
     <script>
-        /* Star drift: 改为在登录框左侧区域内移动，速度与亮度随机化 */
-        (function(){
+        /* Idle drift for three bright stars */
+        (function () {
             const stars = Array.from(document.querySelectorAll('.drift-star'));
-            if(!stars.length) return;
-
+            if (!stars.length) return;
             const container = document.querySelector('.container');
-            const vw = ()=> window.innerWidth / 100;
-            const vh = ()=> window.innerHeight / 100;
-            function rand(min,max){ return Math.random()*(max-min)+min; }
+            const vw = () => window.innerWidth / 100;
+            const vh = () => window.innerHeight / 100;
+            const rand = (a, b) => Math.random() * (b - a) + a;
+            let running = true;
 
-            // 初始化位置并设置随机亮度与初始速度相关参数
-            stars.forEach((el)=>{
-                const l = el.getAttribute('data-l') || '8vw';
-                const t = el.getAttribute('data-t') || '20vh';
-                el.style.left = l;
-                el.style.top = t;
-                el.style.position = 'fixed';
-                // 随机亮度（进一步提高上限以显著增强中心光）
-                const brightness = rand(1.8, 4.0);
-                el.style.filter = `brightness(${brightness})`;                el.dataset.baseBrightness = brightness;                // 随机透明度（更高的基础可见度）
-                el.style.opacity = String(rand(0.75, 1));
-                // 根据亮度放大发光效果（更强的冷白光晕）
-                const glowFactor = Math.max(1, brightness);
-                el.style.boxShadow = `0 0 ${18 * glowFactor}px rgba(255,255,255,1), 0 0 ${64 * glowFactor}px rgba(220,235,245,0.4), 0 0 ${160 * glowFactor}px rgba(210,230,245,0.22) inset`;
+            stars.forEach((el) => {
+                el.style.left = el.getAttribute('data-l') || '8vw';
+                el.style.top = el.getAttribute('data-t') || '20vh';
             });
 
-            class Walker{
-                constructor(el){
+            class Walker {
+                constructor(el) {
                     this.el = el;
-                    // 计算水平移动边界：从页面左侧约 2vw 到登录框左侧 - 60px
                     this.minX = Math.max(2 * vw(), 8);
-                    const containerLeft = container ? container.getBoundingClientRect().left : window.innerWidth - 140;
+                    const containerLeft = container
+                        ? container.getBoundingClientRect().left
+                        : window.innerWidth - 140;
                     this.maxX = Math.max(this.minX + 20, containerLeft - 60);
-                    // 垂直范围在视口内自由移动
                     this.minY = 6 * vh();
                     this.maxY = 88 * vh();
-
-                    this.resetBase();
-                    // 每颗星随机化速度区间（ms）
-                    this.durationMin = rand(2000, 4500);
-                    this.durationMax = rand(5000, 14000);
-                    this.lastTrail = 0;
-                    this.trailInterval = rand(60, 140);
+                    const cs = getComputedStyle(el);
+                    this.baseX = parseFloat(cs.left) || this.minX + 20;
+                    this.baseY = parseFloat(cs.top) || this.minY + 20;
                     this.setNewTarget();
                 }
-                resetBase(){
-                    const cs = getComputedStyle(this.el);
-                    this.baseX = parseFloat(cs.left);
-                    this.baseY = parseFloat(cs.top);
-                    // 保证基础位置在边界内
-                    if(this.baseX < this.minX) this.baseX = this.minX + rand(0, 10);
-                    if(this.baseX > this.maxX) this.baseX = this.maxX - rand(0, 10);
-                    if(this.baseY < this.minY) this.baseY = this.minY + rand(0, 10);
-                    if(this.baseY > this.maxY) this.baseY = this.maxY - rand(0, 10);
+                setNewTarget() {
+                    this.startX = this.baseX;
+                    this.startY = this.baseY;
+                    this.targetX = rand(this.minX, this.maxX);
+                    this.targetY = rand(this.minY, this.maxY);
+                    this.duration = rand(4000, 12000);
+                    this.startTime = undefined;
                 }
-                setNewTarget(){
-                                    this.startX = this.baseX;
-                                    this.startY = this.baseY;
-                                    this.targetX = rand(this.minX, this.maxX);
-                                    this.targetY = rand(this.minY, this.maxY);
-                                    this.duration = rand(this.durationMin, this.durationMax);
-                                    this.startTime = undefined;
-                                }
-                step(ts){
-                    if(!this.startTime) this.startTime = ts;
-                    if(this.dropMode){
-                                            const t = Math.min((ts - this.startTime) / this.duration, 1);
-                                            const ease = t * t;
-                                            const curY = this.startY + (this.targetY - this.startY) * ease;
-                                            this.el.style.left = this.startX + 'px';
-                                            this.el.style.top = curY + 'px';
-                                            this.el.style.opacity = String(Math.max(0, 1 - t));
-                                            if(t >= 1){
-                                                this.el.style.opacity = '0';
-                                                this.el.style.display = 'none';
-                                                this.done = true; // 标记已完成，从循环中移除
-                                            }
-                                            return;
-                                        }
+                step(ts) {
+                    if (!this.startTime) this.startTime = ts;
                     const t = Math.min((ts - this.startTime) / this.duration, 1);
-                    const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
+                    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
                     const curX = this.startX + (this.targetX - this.startX) * ease;
                     const curY = this.startY + (this.targetY - this.startY) * ease;
                     this.el.style.left = curX + 'px';
                     this.el.style.top = curY + 'px';
-                    const now = performance.now();
-                    // 拖尾已禁用（按用户要求移除）
-
-                    if(t >= 1){
-                        // 每次完成一次移动后微调亮度和速度区间，制造更随机的视觉效果
-                        const brightness = rand(2.2, 5.0);
-                        this.el.style.filter = `brightness(${brightness})`;
-                        this.el.style.opacity = String(rand(0.8, 1));
-                        const glowFactor = Math.max(1, brightness);
-                        this.el.style.boxShadow = `0 0 ${24 * glowFactor}px rgba(255,255,255,1), 0 0 ${96 * glowFactor}px rgba(220,235,245,0.44), 0 0 ${192 * glowFactor}px rgba(210,230,245,0.24) inset`;
-                        this.durationMin = rand(1800, 5000);
-                        this.durationMax = rand(4000, 16000);
+                    if (t >= 1) {
                         this.baseX = curX;
                         this.baseY = curY;
                         this.setNewTarget();
@@ -868,181 +789,15 @@
                 }
             }
 
-            let walkers = stars.map(s => new Walker(s));
-            let starDropStarted = false;
+            let walkers = stars.map((s) => new Walker(s));
+            window.stopStarDrift = () => { running = false; };
 
-            function startStarDrop() {
-                if (starDropStarted) return;
-                starDropStarted = true;
-                walkers.forEach((walker) => {
-                    const cs = getComputedStyle(walker.el);
-                    const currentX = parseFloat(cs.left);
-                    const currentY = parseFloat(cs.top);
-                    walker.startX = currentX;
-                                        walker.startY = currentY;
-                                        walker.targetX = currentX;
-                                        walker.targetY = window.innerHeight + 100;
-                                        walker.duration = 2200;
-                                        // ✅ 修复：使用 undefined 而非 0，避免与 falsy 检查冲突
-                                        walker.startTime = undefined;
-                                        walker.dropMode = true;
-                    const base = parseFloat(walker.el.dataset.baseBrightness) || 1;
-                    walker.el.style.filter = `brightness(${base * 2})`;
-                });
-            }
-            window.startStarDrop = startStarDrop;
-
-            function onResize(){
-                // 重新从 data 属性重置位置，并重建 walkers（以重新计算 container 的位置）
-                stars.forEach(s=>{
-                    const l = s.getAttribute('data-l') || '8vw';
-                    const t = s.getAttribute('data-t') || '20vh';
-                    s.style.left = l; s.style.top = t;
-                });
-                walkers = stars.map(s => new Walker(s));
-            }
-
-            // 拖尾函数已移除（用户请求取消拖尾）
-
-            window.addEventListener('resize', onResize);
-
-            function loop(ts){
-                            // 过滤掉已完成的 walker，避免资源泄漏
-                            walkers = walkers.filter(w => !w.done);
-                            walkers.forEach(w => w.step(ts));
-                            requestAnimationFrame(loop);
-                        }
-
-            requestAnimationFrame(loop);
-        })();
-    </script>
-    <script>
-        (function(){
-            const canvas = document.getElementById('fireCanvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            let width = 0;
-            let height = 0;
-            let rafId = null;
-            let lastTime = 0;
-            let running = false;
-            const particles = [];
-            const pool = [];
-            let fireIntensity = 0;
-
-            function rand(min, max){ return Math.random() * (max - min) + min; }
-
-            function resizeCanvas(){
-                            const rect = canvas.getBoundingClientRect();
-                            width = rect.width;
-                            height = rect.height;
-                            // ✅ 降级：若元素不可见导致尺寸为 0，使用 CSS 推算尺寸（44vh 高度 × 100vw 宽度）
-                            if (width < 1 || height < 1) {
-                                width = window.innerWidth;
-                                height = window.innerHeight * 0.44;
-                            }
-                            const dpr = window.devicePixelRatio || 1;
-                            canvas.width = Math.round(width * dpr);
-                            canvas.height = Math.round(height * dpr);
-                            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                        }
-
-            function createParticle(){
-                if (particles.length >= 220) return null;
-                const p = pool.pop() || {};
-                p.x = rand(0, width);
-                p.y = height - rand(6, 18);
-                p.vx = rand(-0.3, 0.3);
-                p.vy = -rand(0.7, 2.1);
-                p.size = rand(4, 16);
-                p.age = 0;
-                p.life = rand(1.8, 2.8);
-                p.alpha = 1;
-                p.drift = rand(-0.25, 0.25);
-                return p;
-            }
-
-            function updateParticles(dt){
-                const rate = 45 + fireIntensity * 20;
-                const spawn = Math.round(rate * dt);
-                for (let i = 0; i < spawn; i++) {
-                    const particle = createParticle();
-                    if (particle) particles.push(particle);
-                }
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    const p = particles[i];
-                    p.age += dt;
-                    p.vy += 0.08 * dt;
-                    p.x += (p.vx + p.drift * (0.6 + fireIntensity * 0.8)) * 12;
-                    p.y += p.vy * 12;
-                    p.alpha = Math.max(0, 1 - p.age / p.life);
-                    if (p.age >= p.life || p.y < -40 || p.alpha <= 0) {
-                        particles.splice(i, 1);
-                        pool.push(p);
-                    }
-                }
-            }
-
-            function drawParticle(p){
-                const progress = p.age / p.life;
-                const radius = p.size * (0.8 + progress * 1.4);
-                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
-                grad.addColorStop(0, `rgba(255, 220, 150, ${p.alpha * 0.9})`);
-                grad.addColorStop(0.3, `rgba(201, 149, 58, ${p.alpha * 0.75})`);
-                grad.addColorStop(0.6, `rgba(184, 74, 74, ${p.alpha * 0.35})`);
-                grad.addColorStop(1, `rgba(184, 74, 74, 0)`);
-                ctx.fillStyle = grad;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            function render(){
-                ctx.clearRect(0, 0, width, height);
-                ctx.globalCompositeOperation = 'lighter';
-                particles.forEach(drawParticle);
-                ctx.globalCompositeOperation = 'source-over';
-            }
-
-            function loopFire(ts){
+            function loop(ts) {
                 if (!running) return;
-                if (!lastTime) lastTime = ts;
-                const dt = Math.min((ts - lastTime) / 1000, 0.033);
-                lastTime = ts;
-                updateParticles(dt);
-                render();
-                rafId = requestAnimationFrame(loopFire);
+                walkers.forEach((w) => w.step(ts));
+                requestAnimationFrame(loop);
             }
-
-            function startFire(){
-                            if (running) return;
-                            running = true;
-                            fireIntensity = 0;
-                            resizeCanvas();
-                            // ✅ 修复：使用 undefined 而非 0，避免与 falsy 检查冲突
-                            lastTime = undefined;
-                            const start = performance.now();
-                const ramp = (time) => {
-                    const elapsed = time - start;
-                    fireIntensity = Math.min(1, elapsed / 800);
-                    if (fireIntensity < 1) requestAnimationFrame(ramp);
-                };
-                requestAnimationFrame(ramp);
-                rafId = requestAnimationFrame(loopFire);
-            }
-
-            function stopFire(){
-                running = false;
-                if (rafId) cancelAnimationFrame(rafId);
-                ctx.clearRect(0, 0, width, height);
-                particles.length = 0;
-                pool.length = 0;
-            }
-
-            window.startFire = startFire;
-            window.stopFire = stopFire;
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
+            requestAnimationFrame(loop);
         })();
     </script>
 </body>

@@ -443,7 +443,10 @@
 
     <script>
         // 登录成功后的转场动画开关：false = 保留代码但不播放，直接进入大厅
-        const login_animation = false;
+        const login_animation = true;
+        // #region agent log
+        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:flag',message:'login_animation flag at load',data:{login_animation:login_animation},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         const messageEl = document.getElementById('message');
 
@@ -521,9 +524,18 @@
                                 // 服务端 Set-Cookie: session(HttpOnly) + username；localStorage 仅作展示
                                 const loginUsername = data.username || username;
                                 localStorage.setItem('username', loginUsername);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:success-branch',message:'login success branch',data:{login_animation:login_animation,willPlayScene:!!login_animation,reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches},timestamp:Date.now()})}).catch(()=>{});
+                                // #endregion
                                 if (login_animation) {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:startScene',message:'calling startSceneTransition',data:{},timestamp:Date.now()})}).catch(()=>{});
+                                    // #endregion
                                     startSceneTransition(loginUsername);
                                 } else {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:skip-anim',message:'skipping animation, hard redirect lobby',data:{},timestamp:Date.now()})}).catch(()=>{});
+                                    // #endregion
                                     window.location.href = '/lobby';
                                 }
                             } else {
@@ -637,8 +649,14 @@
         }
 
         function startSceneTransition(username) {
+            // #region agent log
+            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:startSceneTransition',message:'startSceneTransition entered',data:{reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             const goLobby = () => {
                 try { sessionStorage.setItem('tbk_enter', 'ash'); } catch (e) {}
+                // #region agent log
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'C',location:'login.html:goLobby',message:'handoff to lobby',data:{scene:document.body.dataset.scene||null},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 window.location.href = '/lobby';
             };
 

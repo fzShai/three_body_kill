@@ -23,7 +23,6 @@
             background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 52%, #02080c 100%);
         }
 
-        /* Pure DOM starfield — no tiled CSS stars */
         .stars {
             position: fixed;
             inset: 0;
@@ -36,18 +35,31 @@
             position: absolute;
             border-radius: 50%;
             background: #fff;
-            box-shadow: 0 0 4px rgba(255,255,255,0.55);
+            box-shadow: 0 0 4px rgba(255,255,255,0.5);
             pointer-events: none;
-            transition:
-                opacity 1.25s ease,
-                filter 1.25s ease,
-                transform 1.25s ease;
             will-change: opacity, filter, transform;
         }
-        .star-dot.out {
+        .star-dot.mode-fade {
+            transition: opacity 1.5s ease, filter 1.5s ease, transform 1.5s ease;
+        }
+        .star-dot.mode-fade.out {
             opacity: 0 !important;
             filter: brightness(0);
-            transform: scale(0.35);
+            transform: scale(0.4);
+        }
+        .star-dot.mode-snap {
+            transition: opacity 0.1s linear, filter 0.18s ease, transform 0.18s ease;
+        }
+        .star-dot.mode-snap.flash {
+            filter: brightness(3.2);
+            transform: scale(1.85);
+            box-shadow: 0 0 10px rgba(255,255,255,1);
+        }
+        .star-dot.mode-snap.out {
+            opacity: 0 !important;
+            filter: brightness(0);
+            transform: scale(0.15);
+            transition: opacity 0.08s linear, filter 0.08s linear, transform 0.08s linear;
         }
 
         .drift-star {
@@ -58,35 +70,27 @@
             transform: translate(-50%, -50%);
             background: radial-gradient(circle at 50% 45%, #fff 0%, #fff 40%, transparent 100%);
             box-shadow: 0 0 22px rgba(255,255,255,0.85), 0 0 56px rgba(200,220,235,0.22);
-            transition:
-                opacity 1.35s ease,
-                filter 1.35s ease,
-                transform 1.35s ease,
-                box-shadow 1.35s ease;
             animation: star-flicker ease-in-out infinite;
+            will-change: left, top, opacity;
         }
         .drift-star:nth-of-type(1) { width: 9px; height: 9px; animation-duration: 5.2s; }
         .drift-star:nth-of-type(2) { width: 6px; height: 6px; animation-duration: 7s; animation-delay: 0.4s; }
         .drift-star:nth-of-type(3) { width: 11px; height: 11px; animation-duration: 8.2s; animation-delay: 0.8s; }
-        .drift-star.out {
-            opacity: 0 !important;
-            filter: brightness(0);
-            transform: translate(-50%, -50%) scale(0.2);
-            box-shadow: none;
+        .drift-star.dropping {
             animation: none;
+            transition: opacity 0.4s ease;
         }
         @keyframes star-flicker {
             0%, 100% { opacity: 0.55; }
             50% { opacity: 0.95; }
         }
 
-        /* Minimal clearing — sparse silhouette only */
         .forest-clearing {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
-            height: 34vh;
+            height: 38vh;
             z-index: 2;
             pointer-events: none;
         }
@@ -95,17 +99,14 @@
             height: 100%;
             display: block;
         }
-        .forest-clearing .ridge {
-            fill: rgba(4, 8, 12, 0.72);
-        }
-        .forest-clearing .trees {
-            fill: rgba(0, 0, 0, 0.92);
-        }
+        .forest-clearing .layer-far { fill: rgba(6, 10, 14, 0.55); }
+        .forest-clearing .layer-mid { fill: rgba(2, 4, 6, 0.82); }
+        .forest-clearing .layer-near { fill: #000; }
 
         .coord-flash {
             position: fixed;
             left: 50%;
-            top: 36%;
+            top: 34%;
             transform: translate(-50%, -50%);
             z-index: 5;
             pointer-events: none;
@@ -118,7 +119,6 @@
         }
         .coord-flash.show { opacity: 1; }
 
-        /* Meteor: behind forest (z < forest) */
         .meteor {
             position: fixed;
             left: 0;
@@ -138,92 +138,84 @@
             position: absolute;
             right: 50%;
             top: 50%;
-            width: 72px;
+            width: 80px;
             height: 2px;
             transform: translateY(-50%) rotate(45deg);
             transform-origin: right center;
-            background: linear-gradient(90deg, transparent 0%, rgba(230,240,250,0.15) 40%, rgba(255,255,255,0.85) 100%);
-            filter: blur(0.4px);
+            background: linear-gradient(90deg, transparent 0%, rgba(230,240,250,0.12) 45%, rgba(255,255,255,0.9) 100%);
         }
         .meteor.fly {
             opacity: 1;
-            animation: meteor-fall 1.65s cubic-bezier(0.22, 0.05, 0.45, 1) forwards;
+            animation: meteor-fall 1.7s cubic-bezier(0.22, 0.05, 0.45, 1) forwards;
         }
-        /* 45° from upper-left toward impact ~55% x, 72% y (behind treeline) */
         @keyframes meteor-fall {
-            0% {
-                opacity: 0;
-                transform: translate(8vw, 4vh);
-                filter: blur(0.8px);
-            }
-            8% {
-                opacity: 0.85;
-                filter: blur(0.35px);
-            }
-            70% {
-                opacity: 1;
-                filter: blur(0);
-                transform: translate(48vw, 58vh);
-            }
-            92% {
-                opacity: 0.7;
-                filter: blur(0);
-                transform: translate(54vw, 70vh);
-            }
-            100% {
-                opacity: 0;
-                transform: translate(55vw, 72vh);
-                filter: blur(0);
-            }
+            0% { opacity: 0; transform: translate(8vw, 4vh); filter: blur(0.6px); }
+            10% { opacity: 0.9; filter: blur(0.2px); }
+            75% { opacity: 1; filter: blur(0); transform: translate(50vw, 62vh); }
+            100% { opacity: 0; filter: blur(0); transform: translate(55vw, 72vh); }
         }
 
-        .impact-core {
+        /* Oppenheimer-style exposure blast */
+        .blast-exposure {
             position: fixed;
-            left: 55%;
-            top: 72%;
-            width: 6px;
-            height: 6px;
-            margin: -3px 0 0 -3px;
-            border-radius: 50%;
-            z-index: 1;
-            pointer-events: none;
-            opacity: 0;
-            background: #fff;
-            box-shadow: 0 0 16px rgba(255,255,255,0.9);
-        }
-        .impact-core.on {
-            animation: impact-ping 0.35s ease-out forwards;
-        }
-        @keyframes impact-ping {
-            0% { opacity: 0; transform: scale(0.4); }
-            40% { opacity: 1; transform: scale(1.4); }
-            100% { opacity: 0; transform: scale(0.8); }
-        }
-
-        /* Radial white bloom from impact — sharp, not blurry */
-        .bloom-veil {
-            position: fixed;
-            left: 55%;
-            top: 72%;
-            width: 24px;
-            height: 24px;
-            margin: -12px 0 0 -12px;
-            border-radius: 50%;
+            inset: 0;
             z-index: 8;
             pointer-events: none;
             opacity: 0;
-            background: radial-gradient(circle, #ffffff 0%, #f2f6fa 55%, #e8eef4 100%);
-            transform: scale(0.01);
-            will-change: transform, opacity;
+            background:
+                radial-gradient(ellipse 55% 50% at 55% 72%, rgba(255,255,255,0.95) 0%, rgba(240,244,248,0.45) 28%, transparent 62%),
+                rgba(236, 240, 244, 0);
+            mix-blend-mode: screen;
         }
-        .bloom-veil.expand {
+        .blast-exposure.climb {
+            animation: exposure-climb 0.65s ease-in forwards;
+        }
+        .blast-exposure.hold {
             opacity: 1;
-            animation: bloom-expand 1s cubic-bezier(0.15, 0.2, 0.25, 1) forwards;
+            background: #f7f8f9;
+            mix-blend-mode: normal;
+            animation: none;
         }
-        @keyframes bloom-expand {
-            0% { opacity: 1; transform: scale(0.01); }
-            70% { opacity: 1; transform: scale(55); }
-            100% { opacity: 1; transform: scale(90); }
+        .blast-exposure.afterimage {
+            animation: exposure-after 0.85s ease-in forwards;
+        }
+        @keyframes exposure-climb {
+            0% {
+                opacity: 0.15;
+                background:
+                    radial-gradient(ellipse 30% 28% at 55% 72%, rgba(255,255,255,0.55) 0%, transparent 55%),
+                    rgba(220, 226, 232, 0.05);
+            }
+            100% {
+                opacity: 1;
+                background:
+                    radial-gradient(ellipse 90% 80% at 55% 72%, #fff 0%, #f4f6f8 35%, rgba(236,240,244,0.92) 70%),
+                    rgba(245, 247, 248, 0.98);
+            }
+        }
+        @keyframes exposure-after {
+            0% { opacity: 1; background: #f7f8f9; }
+            45% { opacity: 1; background: #c8ccd0; }
+            100% { opacity: 1; background: #000; }
+        }
+
+        .blast-grain {
+            position: fixed;
+            inset: 0;
+            z-index: 8;
+            pointer-events: none;
+            opacity: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+        .blast-grain.on {
+            animation: grain-pulse 1.5s ease-out forwards;
+        }
+        @keyframes grain-pulse {
+            0% { opacity: 0; }
+            25% { opacity: 0.12; }
+            70% { opacity: 0.08; }
+            100% { opacity: 0; }
         }
 
         .void-veil {
@@ -233,7 +225,7 @@
             pointer-events: none;
             opacity: 0;
             background: #000;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.25s ease;
         }
         .void-veil.on { opacity: 1; }
 
@@ -244,9 +236,7 @@
         body[data-scene="start"] .drift-star {
             animation-play-state: paused;
         }
-        body[data-scene="void"] {
-            background: #000;
-        }
+        body[data-scene="void"] { background: #000; }
 
         .container {
             position: relative;
@@ -415,10 +405,10 @@
 
         @media (prefers-reduced-motion: reduce) {
             .meteor.fly,
-            .bloom-veil.expand,
-            .impact-core.on,
+            .blast-exposure.climb,
+            .blast-exposure.afterimage,
+            .blast-grain.on,
             .drift-star { animation: none !important; }
-            .star-dot, .drift-star { transition-duration: 0.2s !important; }
         }
     </style>
 </head>
@@ -430,17 +420,14 @@
     </div>
 
     <div class="meteor" id="meteor" aria-hidden="true"></div>
-    <div class="impact-core" id="impactCore" aria-hidden="true"></div>
 
     <div class="forest-clearing" aria-hidden="true">
-        <svg viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-            <path class="ridge" d="M0,210 C120,188 240,198 360,180 C480,162 600,190 720,175 C840,160 960,185 1080,170 C1200,155 1320,175 1440,165 L1440,320 L0,320 Z"/>
-            <path class="trees" d="M0,250 L40,210 L55,235 L70,195 L95,240 L120,200 L145,245 L170,205 L200,250 L230,210 L255,248 L280,215 L310,255 L340,218 L370,258 L400,220 L430,260 L460,222 L490,262 L520,225 L550,265 L580,228 L610,268 L640,230 L670,270 L700,232 L730,272 L760,235 L790,274 L820,238 L850,276 L880,240 L910,278 L940,242 L970,280 L1000,245 L1030,282 L1060,248 L1090,284 L1120,250 L1150,286 L1180,252 L1210,288 L1240,255 L1270,290 L1300,258 L1330,292 L1360,262 L1390,294 L1440,268 L1440,320 L0,320 Z"/>
-        </svg>
+        <svg id="forestSvg" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
 
     <div class="coord-flash" id="coordFlash" aria-hidden="true"></div>
-    <div class="bloom-veil" id="bloomVeil" aria-hidden="true"></div>
+    <div class="blast-exposure" id="blastExposure" aria-hidden="true"></div>
+    <div class="blast-grain" id="blastGrain" aria-hidden="true"></div>
     <div class="void-veil" id="voidVeil" aria-hidden="true"></div>
 
     <div class="container">
@@ -638,28 +625,156 @@
             return api;
         }
 
+        /* --- Poisson-ish star scatter --- */
         function seedFieldStars() {
             const field = document.getElementById('starField');
-            /* Dense DOM-only field (no CSS tile). Keep above treeline. */
-            const positions = [];
-            for (let i = 0; i < 52; i++) {
-                const x = 3 + (i * 17) % 94;
-                const y = 4 + ((i * 29) % 58);
-                positions.push([x, y, i]);
+            const placed = [];
+            const minDist = 3.2;
+            let attempts = 0;
+            while (placed.length < 64 && attempts < 4000) {
+                attempts++;
+                const x = 2 + Math.random() * 96;
+                const y = 3 + Math.random() * 52;
+                let ok = true;
+                for (let i = 0; i < placed.length; i++) {
+                    const dx = x - placed[i][0];
+                    const dy = (y - placed[i][1]) * 1.15;
+                    if (dx * dx + dy * dy < minDist * minDist) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (!ok) continue;
+                placed.push([x, y]);
             }
-            positions.forEach(([x, y, i]) => {
+            placed.forEach(([x, y], i) => {
                 const d = document.createElement('div');
                 d.className = 'star-dot';
                 d.style.left = x + '%';
                 d.style.top = y + '%';
-                const size = i % 6 === 0 ? 2.4 : (i % 3 === 0 ? 1.8 : 1.3);
+                const size = Math.random() < 0.12 ? 2.3 : (Math.random() < 0.35 ? 1.7 : 1.2);
                 d.style.width = size + 'px';
                 d.style.height = size + 'px';
-                d.style.opacity = String(0.28 + (i % 8) * 0.07);
+                d.style.opacity = String(0.25 + Math.random() * 0.55);
+                d.classList.add(Math.random() < 0.42 ? 'mode-fade' : 'mode-snap');
                 field.appendChild(d);
             });
         }
         seedFieldStars();
+
+        /* --- Recursive conifer silhouette generator --- */
+        function mulberry32(a) {
+            return function () {
+                let t = (a += 0x6d2b79f5);
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function coniferPath(cx, baseY, height, rng) {
+            const pts = [];
+            const tipX = cx + (rng() - 0.5) * height * 0.04;
+            const tipY = baseY - height;
+            pts.push([cx - height * 0.04, baseY]);
+            pts.push([cx + height * 0.04, baseY]);
+
+            const tiers = 5 + Math.floor(rng() * 3);
+            for (let t = 0; t < tiers; t++) {
+                const u = t / (tiers - 1);
+                const y = baseY - height * (0.12 + u * 0.78);
+                const half = height * (0.28 - u * 0.22) * (0.85 + rng() * 0.3);
+                const lean = (rng() - 0.5) * half * 0.15;
+                pts.push([cx + half + lean, y + height * 0.02]);
+                /* needle fringe */
+                const needles = 3 + Math.floor(rng() * 3);
+                for (let n = 0; n < needles; n++) {
+                    const ny = y - (n + 1) * (height * 0.035);
+                    const nw = half * (0.72 - n * 0.08);
+                    pts.push([cx + nw * (0.9 + rng() * 0.15), ny]);
+                    pts.push([cx + nw * 0.55, ny - height * 0.01]);
+                }
+            }
+            pts.push([tipX, tipY]);
+            for (let t = tiers - 1; t >= 0; t--) {
+                const u = t / (tiers - 1);
+                const y = baseY - height * (0.12 + u * 0.78);
+                const half = height * (0.28 - u * 0.22) * (0.85 + rng() * 0.3);
+                const lean = (rng() - 0.5) * half * 0.15;
+                pts.push([cx - half + lean, y + height * 0.02]);
+            }
+
+            let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+            for (let i = 1; i < pts.length; i++) {
+                d += ` L ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`;
+            }
+            return d + ' Z';
+        }
+
+        function buildForest() {
+            const svg = document.getElementById('forestSvg');
+            svg.innerHTML = '';
+            const rng = mulberry32(0x3b71c0de ^ (Date.now() & 0xfff));
+
+            const ridge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            ridge.setAttribute('class', 'layer-far');
+            ridge.setAttribute('d', 'M0,230 C180,205 360,220 540,200 C720,180 900,215 1080,195 C1260,175 1380,200 1440,190 L1440,360 L0,360 Z');
+            svg.appendChild(ridge);
+
+            function plantLayer(cls, count, y0, hMin, hMax, spacingJitter) {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', cls);
+                let x = -20;
+                for (let i = 0; i < count; i++) {
+                    x += 28 + rng() * spacingJitter;
+                    if (x > 1460) break;
+                    const h = hMin + rng() * (hMax - hMin);
+                    const y = y0 + rng() * 12;
+                    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    p.setAttribute('d', coniferPath(x, y, h, rng));
+                    g.appendChild(p);
+                }
+                svg.appendChild(g);
+            }
+
+            plantLayer('layer-far', 22, 250, 55, 90, 55);
+            plantLayer('layer-mid', 28, 275, 70, 115, 42);
+            plantLayer('layer-near', 34, 300, 85, 140, 36);
+        }
+        buildForest();
+
+        function dropBigStars(done) {
+            const stars = Array.from(document.querySelectorAll('.drift-star'));
+            let left = stars.length;
+            if (!left) {
+                done();
+                return;
+            }
+            stars.forEach((el, idx) => {
+                el.classList.add('dropping');
+                const cs = getComputedStyle(el);
+                const startX = parseFloat(cs.left);
+                const startY = parseFloat(cs.top);
+                const endY = window.innerHeight + 40;
+                const duration = 1600 + idx * 180;
+                const t0 = performance.now();
+                function step(ts) {
+                    const t = Math.min(1, (ts - t0) / duration);
+                    const ease = t * t;
+                    el.style.left = startX + 'px';
+                    el.style.top = (startY + (endY - startY) * ease) + 'px';
+                    el.style.opacity = String(Math.max(0, 1 - t * 1.05));
+                    if (t < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        el.style.display = 'none';
+                        left -= 1;
+                        if (left <= 0) done();
+                    }
+                }
+                requestAnimationFrame(step);
+            });
+        }
 
         function startSceneTransition() {
             const goLobby = () => {
@@ -691,73 +806,101 @@
             document.body.dataset.scene = 'start';
             if (window.stopStarDrift) window.stopStarDrift();
 
-            const dots = Array.from(document.querySelectorAll('.star-dot'));
-            const drifts = Array.from(document.querySelectorAll('.drift-star'));
-            const targets = [...dots, ...drifts];
-            for (let i = targets.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [targets[i], targets[j]] = [targets[j], targets[i]];
-            }
-
             const timeline = createTimeline();
             const coord = document.getElementById('coordFlash');
             const meteor = document.getElementById('meteor');
-            const impact = document.getElementById('impactCore');
-            const bloom = document.getElementById('bloomVeil');
+            const blast = document.getElementById('blastExposure');
+            const grain = document.getElementById('blastGrain');
             const voidEl = document.getElementById('voidVeil');
 
-            /* Gradual extinguish: staggered starts, each fades ~1.25s */
-            const n = targets.length;
-            targets.forEach((el, idx) => {
-                const t = idx / Math.max(1, n - 1);
-                const atMs = 250 + Math.pow(t, 1.25) * 3000;
-                timeline.at(atMs, () => {
+            /* Phase A: big stars fall below horizon, then small-star kill */
+            timeline.at(0, () => {
+                dropBigStars(() => {
                     document.body.dataset.scene = 'extinguish';
-                    el.classList.add('out');
+                    const dots = Array.from(document.querySelectorAll('.star-dot'));
+                    const fades = dots.filter((d) => d.classList.contains('mode-fade'));
+                    const snaps = dots.filter((d) => d.classList.contains('mode-snap'));
+
+                    /* shuffle */
+                    const shuffle = (arr) => {
+                        for (let i = arr.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [arr[i], arr[j]] = [arr[j], arr[i]];
+                        }
+                        return arr;
+                    };
+                    shuffle(fades);
+                    shuffle(snaps);
+
+                    const killTimeline = createTimeline();
+                    /* some fades first as bed */
+                    fades.forEach((el, i) => {
+                        killTimeline.at(80 + i * 70, () => el.classList.add('out'));
+                    });
+                    /* rhythmic snaps */
+                    snaps.forEach((el, i) => {
+                        const at = 400 + i * (95 + Math.floor(Math.random() * 55));
+                        killTimeline.at(at, () => el.classList.add('flash'));
+                        killTimeline.at(at + 140, () => {
+                            el.classList.remove('flash');
+                            el.classList.add('out');
+                        });
+                    });
+
+                    const snapEnd = 400 + snaps.length * 150 + 200;
+                    killTimeline.at(Math.max(snapEnd, fades.length * 70 + 900), () => {
+                        /* continue main narrative */
+                        const a = Math.floor(Math.random() * 90 + 10);
+                        const b = Math.floor(Math.random() * 900 + 100);
+                        const c = Math.floor(Math.random() * 900 + 100);
+                        coord.textContent = `α · ${a}.${b} · ${c}`;
+                        coord.classList.add('show');
+                        setTimeout(() => {
+                            coord.classList.remove('show');
+                            coord.textContent = '';
+                        }, 380);
+
+                        setTimeout(() => {
+                            document.body.dataset.scene = 'meteor';
+                            meteor.classList.add('fly');
+                        }, 500);
+
+                        setTimeout(() => {
+                            meteor.classList.remove('fly');
+                            meteor.style.opacity = '0';
+                            document.body.dataset.scene = 'blast';
+                            blast.classList.add('climb');
+                            grain.classList.add('on');
+                        }, 500 + 1700);
+
+                        setTimeout(() => {
+                            blast.classList.remove('climb');
+                            blast.classList.add('hold');
+                        }, 500 + 1700 + 650);
+
+                        setTimeout(() => {
+                            blast.classList.remove('hold');
+                            blast.classList.add('afterimage');
+                        }, 500 + 1700 + 650 + 420);
+
+                        setTimeout(() => {
+                            document.body.dataset.scene = 'void';
+                            voidEl.classList.add('on');
+                            blast.classList.remove('afterimage', 'climb', 'hold');
+                            blast.style.opacity = '0';
+                            grain.classList.remove('on');
+                        }, 500 + 1700 + 650 + 420 + 850);
+
+                        setTimeout(() => {
+                            const announcer = document.getElementById('transition-announcer');
+                            if (announcer) announcer.remove();
+                            goLobby();
+                        }, 500 + 1700 + 650 + 420 + 850 + 900);
+                    });
+                    killTimeline.start();
                 });
             });
 
-            timeline.at(3400, () => {
-                const a = Math.floor(Math.random() * 90 + 10);
-                const b = Math.floor(Math.random() * 900 + 100);
-                const c = Math.floor(Math.random() * 900 + 100);
-                coord.textContent = `α · ${a}.${b} · ${c}`;
-                coord.classList.add('show');
-            });
-            timeline.at(3750, () => {
-                coord.classList.remove('show');
-                coord.textContent = '';
-            });
-
-            /* Meteor 45° — falls behind forest */
-            timeline.at(3900, () => {
-                document.body.dataset.scene = 'meteor';
-                meteor.classList.add('fly');
-            });
-
-            timeline.at(5450, () => {
-                meteor.classList.remove('fly');
-                meteor.style.opacity = '0';
-                impact.classList.add('on');
-            });
-
-            /* White bloom from impact behind treeline */
-            timeline.at(5600, () => {
-                document.body.dataset.scene = 'bloom';
-                bloom.classList.add('expand');
-            });
-
-            timeline.at(6550, () => {
-                document.body.dataset.scene = 'void';
-                voidEl.classList.add('on');
-            });
-
-            timeline.at(7800, () => {
-                const announcer = document.getElementById('transition-announcer');
-                if (announcer) announcer.remove();
-            });
-
-            timeline.at(8500, goLobby);
             timeline.start();
             window._sceneTimeline = timeline;
         }
@@ -806,7 +949,7 @@
                         : window.innerWidth - 140;
                     this.maxX = Math.max(this.minX + 20, containerLeft - 60);
                     this.minY = 5 * vh();
-                    this.maxY = 52 * vh();
+                    this.maxY = 48 * vh();
                     const cs = getComputedStyle(el);
                     this.baseX = parseFloat(cs.left) || this.minX + 20;
                     this.baseY = parseFloat(cs.top) || this.minY + 20;

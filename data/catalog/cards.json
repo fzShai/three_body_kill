@@ -232,9 +232,10 @@
       "id": "plan_part",
       "name": "计划的一部分",
       "type": "equipment",
+      "slot": "armor",
       "phase": "B",
-      "text": "下2次受伤减半等（待实现）",
-      "implemented": false,
+      "text": "装备后，你接下来受到的 2 次伤害各减半（向下取整）。",
+      "implemented": true,
       "needs": [
         "equip_hooks"
       ]
@@ -251,9 +252,10 @@
       "id": "black_hole",
       "name": "黑洞",
       "type": "equipment",
+      "slot": "armor",
       "phase": "B",
-      "text": "累积3张基本牌后复制（待实现）",
-      "implemented": false,
+      "text": "你每使用 3 张基本牌，复制手牌中一张随机牌（至少保留原牌）。",
+      "implemented": true,
       "needs": [
         "equip_hooks"
       ]
@@ -387,9 +389,10 @@
       "id": "micro_universe",
       "name": "小宇宙",
       "type": "equipment",
+      "slot": "armor",
       "phase": "D",
-      "text": "获得5点护盾（待实现）",
-      "implemented": false,
+      "text": "装备时获得 5 点护盾；护盾优先吸收最终伤害。",
+      "implemented": true,
       "needs": [
         "shield"
       ]
@@ -406,9 +409,10 @@
       "id": "death_immortal",
       "name": "死神永生",
       "type": "equipment",
+      "slot": "armor",
       "phase": "D",
-      "text": "即将死亡时回2摸2并移出（待实现）",
-      "implemented": false,
+      "text": "你即将因濒死出局时：回复 2 点体力、摸 2 张牌，并移除此装备。",
+      "implemented": true,
       "needs": [
         "death_interrupt"
       ]
@@ -417,9 +421,10 @@
       "id": "quantum_ghost",
       "name": "量子幽灵",
       "type": "equipment",
+      "slot": "armor",
       "phase": "D",
-      "text": "创造嘲讽替身（待实现）",
-      "implemented": false,
+      "text": "装备时创造嘲讽替身（1 点）：下一次指向你的杀由替身承受并移除本装备。",
+      "implemented": true,
       "needs": [
         "summon"
       ]

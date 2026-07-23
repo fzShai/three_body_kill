@@ -10,8 +10,24 @@ SKILL_STARSHIP = "starship"
 SKILL_WANDER = "wander"
 SKILL_NATIVE = "native"
 SKILL_COHESION = "cohesion"
+SKILL_SWORD_HOLDER = "sword_holder"
+SKILL_WALLFACER = "wallfacer"
+SKILL_RED_SHORE = "red_shore"
+SKILL_LEADER = "leader"
+SKILL_BENEVOLENCE = "benevolence"
+SKILL_MADONNA = "madonna"
+SKILL_COUNTDOWN = "countdown"
+SKILL_FLYING_BLADE = "flying_blade"
 
-LOCKED_SKILLS = frozenset({SKILL_STARSHIP, SKILL_NATIVE})
+LOCKED_SKILLS = frozenset(
+    {
+        SKILL_STARSHIP,
+        SKILL_NATIVE,
+        SKILL_SWORD_HOLDER,
+        SKILL_MADONNA,
+        SKILL_COUNTDOWN,
+    }
+)
 
 
 def role_skills(player: dict[str, Any]) -> list[dict[str, Any]]:

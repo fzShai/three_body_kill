@@ -37,6 +37,82 @@
           "text": "你的【天外来客】可以重铸。"
         }
       ]
+    },
+    {
+      "id": "luo_ji",
+      "name": "罗辑",
+      "hp": 9,
+      "skills": [
+        {
+          "id": "sword_holder",
+          "name": "执剑人",
+          "locked": true,
+          "text": "锁定技，你暴露视野时，敌方不能对你使用杀；敌方暴露视野时，你对他的杀不能躲避。"
+        },
+        {
+          "id": "wallfacer",
+          "name": "面壁者",
+          "locked": false,
+          "text": "当你和敌人都未暴露视野时，若敌方对你造成不少于2点最终伤害，则敌方扣1点体力。"
+        }
+      ]
+    },
+    {
+      "id": "ye_wenjie",
+      "name": "叶文洁",
+      "hp": 8,
+      "skills": [
+        {
+          "id": "red_shore",
+          "name": "红岸",
+          "locked": false,
+          "text": "场上有人死亡时，你摸1张牌并回复1点体力；若由你击杀，再额外摸1张牌并回复1点体力。"
+        },
+        {
+          "id": "leader",
+          "name": "领袖",
+          "locked": false,
+          "text": "你的杀无法被响应，且每回合摸牌数为4。"
+        }
+      ]
+    },
+    {
+      "id": "cheng_xin",
+      "name": "程心",
+      "hp": 7,
+      "skills": [
+        {
+          "id": "benevolence",
+          "name": "仁心",
+          "locked": false,
+          "text": "你的回合开始时（摸牌后），指定一名角色回复2点体力。"
+        },
+        {
+          "id": "madonna",
+          "name": "圣母",
+          "locked": true,
+          "text": "限定技，每局限一次。当场上有人濒死时，你可以使其回复至满血，但科技等级降为1，并弃置其所有手牌。"
+        }
+      ]
+    },
+    {
+      "id": "wang_miao",
+      "name": "汪淼",
+      "hp": 8,
+      "skills": [
+        {
+          "id": "countdown",
+          "name": "倒计时",
+          "locked": true,
+          "text": "锁定技，对局开始时你获得12点倒计时；每次回合结束-1，每次有人提升科技等级-2；归零时立即科技+1、体力上限+1、回复2点体力并摸2张牌。"
+        },
+        {
+          "id": "flying_blade",
+          "name": "飞刃",
+          "locked": false,
+          "text": "出牌阶段限一次，你可令本回合下一次造成的伤害变为真实伤害。"
+        }
+      ]
     }
   ]
 }

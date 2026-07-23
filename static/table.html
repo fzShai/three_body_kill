@@ -134,6 +134,14 @@
                         <span id="choiceBtns" style="display:none;"></span>
                         <button class="btn btn-outline" id="wanderAcceptBtn" style="display:none;">发动流浪</button>
                         <button class="btn btn-outline" id="wanderPassBtn" style="display:none;">放弃流浪</button>
+                        <button class="btn btn-outline" id="benevolenceBtn" style="display:none;">仁心治疗</button>
+                        <button class="btn btn-outline" id="madonnaAcceptBtn" style="display:none;">发动圣母</button>
+                        <button class="btn btn-outline" id="madonnaPassBtn" style="display:none;">放弃圣母</button>
+                        <button class="btn btn-outline" id="flyingBladeBtn" style="display:none;">飞刃</button>
+                        <button class="btn btn-outline" id="curvatureBtn" style="display:none;">曲率判定</button>
+                        <button class="btn btn-outline" id="gravityAcceptBtn" style="display:none;">引力覆盖</button>
+                        <button class="btn btn-outline" id="gravityPassBtn" style="display:none;">放弃引力</button>
+                        <button class="btn btn-outline" id="ultimateLawBtn" style="display:none;">终极规律</button>
                         <button class="btn btn-outline" id="dyingPassBtn" style="display:none;">结算濒死</button>
                         <button class="btn btn-outline" id="recastBtn">重铸</button>
                     </div>
@@ -295,10 +303,17 @@
                 const myPrompt = isPrompt && prompt.to === username;
                 const isWander = isPrompt && prompt.type === 'wander_draw';
                 const myWander = isWander && prompt.to === username;
+                const isBenevolence = isPrompt && prompt.type === 'benevolence_heal';
+                const myBenevolence = isBenevolence && prompt.to === username;
+                const isMadonna = isPrompt && prompt.type === 'madonna_save';
+                const myMadonna = isMadonna && prompt.to === username;
+                const isGravity = isPrompt && prompt.type === 'gravity_override';
+                const myGravity = isGravity && prompt.to === username;
                 const isChoice = isPrompt && prompt.type === 'choice';
                 const isInterrupt = isPrompt && (prompt.type === 'interrupt_trick' || prompt.type === 'respond_toxic');
                 const myChoice = isChoice && prompt.to === username;
                 const myInterrupt = isInterrupt && prompt.to === username;
+                const isDodgePrompt = isPrompt && prompt.type === 'respond_dodge';
                 const myDying = isDying && dying.victim === username;
                 const canSaveDying = isDying && snap.you?.alive !== false;
                 const inPlay = myTurn && snap.turn_phase === 'play';
@@ -314,6 +329,12 @@
                         : '手牌已达上限，可点击「完成弃牌」';
                 } else if (myWander) {
                     hint.textContent = '【流浪】：是否失去 1 点体力并摸两张牌？';
+                } else if (myBenevolence) {
+                    hint.textContent = '【仁心】：选择目标后点击「仁心治疗」';
+                } else if (myMadonna) {
+                    hint.textContent = `【圣母】：是否救治濒死的 ${prompt.victim}？`;
+                } else if (myGravity) {
+                    hint.textContent = '万有引力号：先选两张手牌，再点「引力覆盖」';
                 } else if (isDying) {
                     hint.textContent = myDying
                         ? '你濒死：打出桃自救，或点击「结算濒死」'
@@ -357,10 +378,11 @@
 
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');
-                const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard';
+                const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || myGravity;
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
-                    if (isWander) dim = 'dim';
+                    if (isWander || isBenevolence || isMadonna) dim = 'dim';
+                    else if (isGravity) dim = '';
                     else if (isPrompt) dim = c.subtype === 'dodge' ? '' : 'dim';
                     if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
                     if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
@@ -393,6 +415,13 @@
                             render(state);
                             return;
                         }
+                        if (myGravity) {
+                            if (selectedIds.has(id)) selectedIds.delete(id);
+                            else if (selectedIds.size < 2) selectedIds.add(id);
+                            selectedId = null;
+                            render(state);
+                            return;
+                        }
                         selectedId = id;
                         selectedIds.clear();
                         render(state);
@@ -402,9 +431,16 @@
                 const sel = document.getElementById('targetSelect');
                 const selectedCard = hand.find((c) => c.instance_id === selectedId);
                 const others = (snap.players || []).filter((p) => p.alive && p.username !== username);
+                const allAlive = (snap.players || []).filter((p) => p.alive);
                 const ladderTargets = others.filter((p) => !p.vision_exposed);
                 let options = '';
-                if (isDying && isPeach(selectedCard)) {
+                if (myBenevolence) {
+                    options = '<option value="">（仁心目标）</option>' +
+                        allAlive.map((p) => `<option value="${p.username}">${p.username}${p.username === username ? '（自己）' : ''}</option>`).join('');
+                } else if (inPlay && you.ultimate_law_ready && !selectedCard) {
+                    options = '<option value="">（终极规律目标）</option>' +
+                        others.map((p) => `<option value="${p.username}">${p.username}</option>`).join('');
+                } else if (isDying && isPeach(selectedCard)) {
                     options = `<option value="${dying.victim}">${myDying ? '自己（自救）' : dying.victim + '（救人）'}</option>`;
                 } else if (isPeach(selectedCard)) {
                     options = `<option value="${username}">自己</option>`;
@@ -458,8 +494,9 @@
                 document.getElementById('recastBtn').style.display = (inDiscard || uiMode === 'tech_discard' || isWander) ? 'none' : '';
 
                 const respondPassBtn = document.getElementById('respondPassBtn');
-                respondPassBtn.style.display = (isPrompt && !isWander && !isChoice) ? 'inline-block' : 'none';
-                respondPassBtn.disabled = !(myPrompt || myInterrupt) || isWander || isChoice;
+                const hidePassTypes = isWander || isChoice || isBenevolence || isMadonna || isGravity;
+                respondPassBtn.style.display = (isPrompt && !hidePassTypes) ? 'inline-block' : 'none';
+                respondPassBtn.disabled = !(myPrompt || myInterrupt) || hidePassTypes;
                 respondPassBtn.textContent = isInterrupt ? '不响应/不打断' : '不响应';
 
                 const choiceBtns = document.getElementById('choiceBtns');
@@ -484,6 +521,37 @@
                 wanderPassBtn.style.display = isWander ? 'inline-block' : 'none';
                 wanderAcceptBtn.disabled = !myWander;
                 wanderPassBtn.disabled = !myWander;
+
+                const benevolenceBtn = document.getElementById('benevolenceBtn');
+                benevolenceBtn.style.display = isBenevolence ? 'inline-block' : 'none';
+                benevolenceBtn.disabled = !myBenevolence;
+
+                const madonnaAcceptBtn = document.getElementById('madonnaAcceptBtn');
+                const madonnaPassBtn = document.getElementById('madonnaPassBtn');
+                madonnaAcceptBtn.style.display = isMadonna ? 'inline-block' : 'none';
+                madonnaPassBtn.style.display = isMadonna ? 'inline-block' : 'none';
+                madonnaAcceptBtn.disabled = !myMadonna;
+                madonnaPassBtn.disabled = !myMadonna;
+
+                const flyingBladeBtn = document.getElementById('flyingBladeBtn');
+                flyingBladeBtn.style.display = (inPlay && you.flying_blade_ready) ? 'inline-block' : 'none';
+                flyingBladeBtn.disabled = !(inPlay && you.flying_blade_ready);
+
+                const curvatureBtn = document.getElementById('curvatureBtn');
+                curvatureBtn.style.display = (isDodgePrompt && myPrompt && prompt.curvature) ? 'inline-block' : 'none';
+                curvatureBtn.disabled = !(isDodgePrompt && myPrompt && prompt.curvature);
+
+                const gravityAcceptBtn = document.getElementById('gravityAcceptBtn');
+                const gravityPassBtn = document.getElementById('gravityPassBtn');
+                gravityAcceptBtn.style.display = isGravity ? 'inline-block' : 'none';
+                gravityPassBtn.style.display = isGravity ? 'inline-block' : 'none';
+                gravityAcceptBtn.disabled = !myGravity || selectedIds.size !== 2;
+                gravityPassBtn.disabled = !myGravity;
+
+                const ultimateLawBtn = document.getElementById('ultimateLawBtn');
+                ultimateLawBtn.style.display = (inPlay && you.ultimate_law_ready) ? 'inline-block' : 'none';
+                ultimateLawBtn.disabled = !(inPlay && you.ultimate_law_ready);
+
                 const dyingPassBtn = document.getElementById('dyingPassBtn');
                 dyingPassBtn.style.display = myDying ? 'inline-block' : 'none';
                 dyingPassBtn.disabled = !myDying;
@@ -506,6 +574,15 @@
                 } else if (isWander) {
                     banner.classList.add('show', 'dying');
                     banner.textContent = `${prompt.to} 【流浪】：是否失去 1 体力并摸两张牌？`;
+                } else if (isBenevolence) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.to} 【仁心】：指定一名角色回复 2 点体力`;
+                } else if (isMadonna) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.to} 【圣母】：是否救治 ${prompt.victim}？`;
+                } else if (isGravity) {
+                    banner.classList.add('show', 'dying');
+                    banner.textContent = `${prompt.to} 万有引力号：弃两张手牌使杀仍生效？`;
                 } else if (isPrompt) {
                     banner.classList.add('show', 'dying');
                     banner.textContent = `${prompt.from} 对 ${prompt.to} 使用${prompt.card_name || '杀'} · 等待闪响应`;
@@ -604,6 +681,40 @@
             });
             document.getElementById('wanderPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'wander_pass' }, roomId);
+            });
+            document.getElementById('benevolenceBtn').addEventListener('click', () => {
+                const target = document.getElementById('targetSelect').value;
+                if (!target) { setStatus('请选择仁心目标', 'error'); return; }
+                sock.send('game_action', { action: 'benevolence_heal', target }, roomId);
+            });
+            document.getElementById('madonnaAcceptBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'madonna_accept' }, roomId);
+            });
+            document.getElementById('madonnaPassBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'madonna_pass' }, roomId);
+            });
+            document.getElementById('flyingBladeBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'flying_blade' }, roomId);
+            });
+            document.getElementById('curvatureBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'curvature_judge' }, roomId);
+            });
+            document.getElementById('gravityAcceptBtn').addEventListener('click', () => {
+                if (selectedIds.size !== 2) { setStatus('请选择两张手牌', 'error'); return; }
+                sock.send('game_action', {
+                    action: 'gravity_accept',
+                    instance_ids: [...selectedIds],
+                }, roomId);
+                selectedIds.clear();
+            });
+            document.getElementById('gravityPassBtn').addEventListener('click', () => {
+                sock.send('game_action', { action: 'gravity_pass' }, roomId);
+                selectedIds.clear();
+            });
+            document.getElementById('ultimateLawBtn').addEventListener('click', () => {
+                const target = document.getElementById('targetSelect').value;
+                if (!target) { setStatus('请选择复制目标', 'error'); return; }
+                sock.send('game_action', { action: 'ultimate_law', target }, roomId);
             });
             document.getElementById('dyingPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'dying_resolve' }, roomId);

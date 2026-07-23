@@ -14,7 +14,7 @@
       "name": "万有引力号",
       "text": "你的牌被响应时，你可弃两张手牌，使其仍然生效",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "response_override"
       ],
@@ -62,7 +62,7 @@
       "name": "星环号",
       "text": "无法成为基本牌目标；受锦囊伤害后失去此装备",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "untargetable_basic",
         "trick_damage_hook"
@@ -75,7 +75,7 @@
       "name": "终极规律号",
       "text": "每回合限一次观看并复制一张手牌",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "copy_hand_prompt"
       ],

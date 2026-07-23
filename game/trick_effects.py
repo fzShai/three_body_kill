@@ -127,7 +127,7 @@ def play_broadcast(session: Any, username: str, card: dict[str, Any], target: st
     session.discard.append(card)
     src = session.players[username]
     dmg = final_basic_damage(1, int(src.get("damage_bonus", 0)) + field_bonus_damage(session), int(t.get("damage_reduction", 0)) + field_bonus_reduction(session))
-    msg = session._deal_damage(username, target, dmg)
+    msg = session._deal_damage(username, target, dmg, from_trick=True)
     t["vision_exposed"] = True
     t["vision_clear_at_turn_end"] = True
     session._log(f"{username} 对 {target} 使用广播：{msg}，并暴露视野")
@@ -158,7 +158,7 @@ def play_toxic_water(session: Any, username: str, card: dict[str, Any], target: 
     src = session.players[username]
     t = session.players[target]
     dmg = final_basic_damage(2, int(src.get("damage_bonus", 0)) + field_bonus_damage(session), int(t.get("damage_reduction", 0)) + field_bonus_reduction(session))
-    msg = session._deal_damage(username, target, dmg)
+    msg = session._deal_damage(username, target, dmg, from_trick=True)
     session._log(f"{username} 对 {target} 使用剧毒之水：{msg}")
     return True, msg
 
@@ -204,7 +204,7 @@ def play_zeroing(session: Any, username: str, card: dict[str, Any], _target: str
         # alternate: deal 1 final or drop tech — prefer damage if hp>1 else drop tech
         if t["hp"] > 1:
             dmg = final_basic_damage(1, int(src.get("damage_bonus", 0)) + field_bonus_damage(session), int(t.get("damage_reduction", 0)) + field_bonus_reduction(session))
-            bits.append(session._deal_damage(username, name, dmg))
+            bits.append(session._deal_damage(username, name, dmg, from_trick=True))
         else:
             before = t["tech_level"]
             if not session._has_status(name, STATUS_TECH_LOCK):
@@ -347,7 +347,7 @@ def play_killer_52(session: Any, username: str, card: dict[str, Any], target: st
     for tname in targets:
         t = session.players[tname]
         dmg = final_basic_damage(1, int(src.get("damage_bonus", 0)) + field_bonus_damage(session), int(t.get("damage_reduction", 0)) + field_bonus_reduction(session))
-        bits.append(session._deal_damage(username, tname, dmg))
+        bits.append(session._deal_damage(username, tname, dmg, from_trick=True))
     drawn = session.draw_sys.draw_n(src["tech_level"], 1)
     src["hand"].extend(drawn)
     session._log(f"{username} 使用 Killer.5.2：" + "；".join(bits) + f"；摸到 {drawn[0].get('name')}")

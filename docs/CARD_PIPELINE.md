@@ -27,7 +27,9 @@
 
 ## 待实现清单（装备补全等）
 
-装备：`plan_part` / `black_hole` / `micro_universe` / 未完成船甲等仍可按 Phase B 穿插。
+装备 Phase B 已补齐：`plan_part` / `black_hole` / `micro_universe` / `death_immortal` / `quantum_ghost`，以及舰船 `gravity` / `star_ring` / `ultimate_law`、甲 `curvature` / `solar_observe`。
+
+武将池（当前）：关一帆、弗雷斯、罗辑、叶文洁、程心、汪淼。
 
 ## 录入节奏
 

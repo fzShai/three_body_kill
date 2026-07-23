@@ -14,7 +14,7 @@
       "name": "曲率引擎",
       "text": "需闪/杀响应时可判定，1则视为出闪",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "judge"
       ],
@@ -35,7 +35,7 @@
       "name": "太阳系观测单元",
       "text": "回合内每使用四张牌摸一张",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "cards_used_counter"
       ],

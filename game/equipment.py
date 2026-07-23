@@ -9,6 +9,9 @@ from typing import Any
 PRIMARY_SLOTS = ("ship", "armor")
 ALL_SLOTS = ("ship", "armor", "temp_ascend", "stellar_track", "stability_system")
 TEMP_ASCEND_IDS = frozenset({"nano_center", "chip_workshop", "stars_plan"})
+SPECIAL_ARMOR_IDS = frozenset(
+    {"plan_part", "black_hole", "micro_universe", "death_immortal", "quantum_ghost"}
+)
 SLOT_LABELS = {
     "ship": "船",
     "armor": "甲",
@@ -36,6 +39,9 @@ def resolve_slot(card: dict[str, Any]) -> str | None:
         if slot == "temp_ascend":
             return None
         return slot
+    cid = str(card.get("id") or card.get("ship_id") or card.get("armor_id") or "")
+    if cid in SPECIAL_ARMOR_IDS:
+        return "armor"
     if card.get("ship_id") or card.get("type") == "ship":
         return "ship"
     if card.get("armor_id") or card.get("type") == "armor":
@@ -43,11 +49,25 @@ def resolve_slot(card: dict[str, Any]) -> str | None:
     return None
 
 
+def equip_id(card: dict[str, Any]) -> str:
+    return str(card.get("id") or card.get("ship_id") or card.get("armor_id") or "")
+
+
+def has_ship(player: dict[str, Any], ship_id: str) -> bool:
+    ship = (player.get("equipment") or {}).get("ship")
+    return bool(ship and equip_id(ship) == ship_id)
+
+
+def has_armor(player: dict[str, Any], armor_id: str) -> bool:
+    armor = (player.get("equipment") or {}).get("armor")
+    return bool(armor and equip_id(armor) == armor_id)
+
+
 def apply_equip_bonuses(player: dict[str, Any], card: dict[str, Any], *, equipping: bool) -> list[str]:
     """Apply or reverse static bonuses when equipment enters/leaves. Returns log bits."""
     sign = 1 if equipping else -1
     notes: list[str] = []
-    cid = card.get("id") or card.get("ship_id") or card.get("armor_id")
+    cid = equip_id(card)
 
     if cid == "blue_space":
         player["damage_bonus"] = max(0, player.get("damage_bonus", 0) + sign)
@@ -92,5 +112,61 @@ def apply_equip_bonuses(player: dict[str, Any], card: dict[str, Any], *, equippi
             player.pop("lightspeed_stacks", None)
             player.pop("lightspeed_reduction", None)
         notes.append("光速2号" + ("启用" if equipping else "卸下"))
+    elif cid == "gravity":
+        player["gravity_ship"] = equipping
+        notes.append("万有引力号" + ("启用" if equipping else "卸下"))
+    elif cid == "star_ring":
+        player["star_ring"] = equipping
+        notes.append("星环号" + ("启用" if equipping else "卸下"))
+    elif cid == "ultimate_law":
+        if equipping:
+            player["ultimate_law_used"] = False
+        else:
+            player.pop("ultimate_law_used", None)
+        notes.append("终极规律号" + ("启用" if equipping else "卸下"))
+    elif cid == "curvature":
+        player["curvature"] = equipping
+        notes.append("曲率引擎" + ("启用" if equipping else "卸下"))
+    elif cid == "solar_observe":
+        if equipping:
+            player["cards_used_this_turn"] = 0
+            player["solar_observe"] = True
+        else:
+            player.pop("solar_observe", None)
+            player.pop("cards_used_this_turn", None)
+        notes.append("太阳系观测单元" + ("启用" if equipping else "卸下"))
+    elif cid == "plan_part":
+        if equipping:
+            player["plan_part_charges"] = 2
+        else:
+            player.pop("plan_part_charges", None)
+        notes.append("计划的一部分" + ("启用" if equipping else "卸下"))
+    elif cid == "black_hole":
+        if equipping:
+            player["black_hole_basics"] = 0
+        else:
+            player.pop("black_hole_basics", None)
+        notes.append("黑洞" + ("启用" if equipping else "卸下"))
+    elif cid == "micro_universe":
+        if equipping:
+            player["shield"] = int(player.get("shield", 0)) + 5
+            notes.append("护盾+5")
+        else:
+            # leave remaining shield; only strip if we track source — keep simple: clamp down by leftover mark
+            player["shield"] = max(0, int(player.get("shield", 0)) - int(player.get("micro_universe_shield", 5)))
+            player.pop("micro_universe_shield", None)
+            notes.append("卸下小宇宙")
+        if equipping:
+            player["micro_universe_shield"] = 5
+    elif cid == "death_immortal":
+        player["death_immortal"] = equipping
+        notes.append("死神永生" + ("启用" if equipping else "卸下"))
+    elif cid == "quantum_ghost":
+        if equipping:
+            player["quantum_ghost_hp"] = 1
+            notes.append("嘲讽替身+1")
+        else:
+            player.pop("quantum_ghost_hp", None)
+            notes.append("替身消散")
 
     return notes

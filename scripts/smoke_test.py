@@ -28,7 +28,12 @@ def _blank_skills(session: GameSession, *names: str) -> None:
         p = session.players[n]
         p["skills"] = []
         p["tech_level"] = 1
+        p["countdown"] = None
         p["statuses"] = [s for s in p["statuses"] if s.get("id") != "skills_sealed"]
+    if session.phase == "prompt":
+        session.prompt = None
+        session.phase = "turn"
+        session.turn_phase = "play"
 
 
 def _as_role(session: GameSession, username: str, role_id: str) -> None:
@@ -40,16 +45,52 @@ def _as_role(session: GameSession, username: str, role_id: str) -> None:
     p["max_hp"] = role["hp"]
     p["hp"] = min(p["hp"], role["hp"])
     p["tech_level"] = 4 if role_id == "guan_yifan" else 1
+    p["madonna_used"] = False
+    p["flying_blade_used"] = False
+    p["next_damage_true"] = False
+    p["countdown_done"] = False
+    if role_id == "wang_miao":
+        p["countdown"] = 12
+    else:
+        p["countdown"] = None
+
+
+KNOWN_ROLES = {
+    "guan_yifan",
+    "friss",
+    "luo_ji",
+    "ye_wenjie",
+    "cheng_xin",
+    "wang_miao",
+}
+
+
+def _clear_prompt_to_turn(session: GameSession) -> None:
+    """Dismiss opening skill prompts (e.g. 仁心) so baseline tests can run."""
+    while session.phase == "prompt" and session.prompt:
+        ptype = session.prompt.get("type")
+        who = str(session.prompt.get("to"))
+        if ptype == "benevolence_heal":
+            session.apply_action(who, {"action": "benevolence_pass"})
+        elif ptype == "wander_draw":
+            session.apply_action(who, {"action": "wander_pass"})
+        elif ptype == "madonna_save":
+            session.apply_action(who, {"action": "madonna_pass"})
+        else:
+            session.prompt = None
+            session.phase = "turn"
+            break
 
 
 def main() -> None:
     assert final_basic_damage(2, 1, 1) == 2
 
     g = GameSession.create("SMOKE", ["alice", "bob"])
+    _clear_prompt_to_turn(g)
     assert g.phase == "turn"
     assert g.turn_phase == "play"
     assert all(len(g.players[n]["hand"]) >= 6 for n in ("alice", "bob"))
-    assert {g.players[n]["role_id"] for n in ("alice", "bob")} <= {"guan_yifan", "friss"}
+    assert {g.players[n]["role_id"] for n in ("alice", "bob")} <= KNOWN_ROLES
     _blank_skills(g, "alice", "bob")
     assert g.players["alice"]["tech_level"] == 1
 
@@ -85,6 +126,7 @@ def main() -> None:
 
     # kill -> dodge response
     kg = GameSession.create("KILL", ["cara", "dan"])
+    _clear_prompt_to_turn(kg)
     _blank_skills(kg, "cara", "dan")
     cara, dan = kg.players["cara"], kg.players["dan"]
     kg.turn_index = kg.player_order.index("cara")
@@ -422,6 +464,157 @@ def main() -> None:
     ok, msg = fr.apply_action("friss", {"action": "recast", "instance_id": "vis-cohesion"})
     assert ok, msg
 
+    # 罗辑执剑人：视野暴露不可被杀；对暴露目标杀不可闪
+    lj = GameSession.create("LUOJI", ["luo", "foe"])
+    _as_role(lj, "luo", "luo_ji")
+    _blank_skills(lj, "foe")
+    lj.turn_index = lj.player_order.index("foe")
+    lj.phase = "turn"
+    lj.turn_phase = "play"
+    lj.players["luo"]["vision_exposed"] = True
+    kill_lj = {
+        "id": "kill_low",
+        "name": "1阶杀",
+        "type": "basic",
+        "subtype": "kill",
+        "tier": 1,
+        "instance_id": "kill-lj",
+    }
+    _give(lj.players["foe"], kill_lj)
+    ok, msg = lj.apply_action("foe", {"action": "play_card", "instance_id": "kill-lj", "target": "luo"})
+    assert not ok and "执剑人" in msg
+    lj.players["luo"]["vision_exposed"] = False
+    lj.players["foe"]["vision_exposed"] = True
+    lj.turn_index = lj.player_order.index("luo")
+    kill_lj2 = {**kill_lj, "instance_id": "kill-lj2"}
+    _give(lj.players["luo"], kill_lj2)
+    dodge_lj = {
+        "id": "dodge_low",
+        "name": "1阶闪",
+        "type": "basic",
+        "subtype": "dodge",
+        "tier": 1,
+        "instance_id": "dodge-lj",
+    }
+    _give(lj.players["foe"], dodge_lj)
+    hp_before = lj.players["foe"]["hp"]
+    ok, msg = lj.apply_action("luo", {"action": "play_card", "instance_id": "kill-lj2", "target": "foe"})
+    assert ok, msg
+    assert lj.players["foe"]["hp"] < hp_before
+
+    # 叶文洁领袖：杀无法响应；红岸摸牌
+    yw = GameSession.create("YE", ["ye", "victim"])
+    _as_role(yw, "ye", "ye_wenjie")
+    _blank_skills(yw, "victim")
+    yw.turn_index = yw.player_order.index("ye")
+    yw.phase = "turn"
+    yw.turn_phase = "play"
+    kill_ye = {
+        "id": "kill_low",
+        "name": "1阶杀",
+        "type": "basic",
+        "subtype": "kill",
+        "tier": 1,
+        "instance_id": "kill-ye",
+    }
+    _give(yw.players["ye"], kill_ye)
+    _give(yw.players["victim"])  # 清空手牌，避免濒死强制桃
+    yw.players["victim"]["hp"] = 1
+    hand0 = len(yw.players["ye"]["hand"])
+    ok, msg = yw.apply_action("ye", {"action": "play_card", "instance_id": "kill-ye", "target": "victim"})
+    assert ok, msg
+    # 领袖直接结算，可能进入濒死/圣母询问；强制出局看红岸
+    if yw.phase == "prompt" and yw.prompt and yw.prompt.get("type") == "madonna_save":
+        yw.apply_action(str(yw.prompt["to"]), {"action": "madonna_pass"})
+    if yw.phase == "dying":
+        yw.apply_action("victim", {"action": "dying_resolve"})
+    assert not yw.players["victim"]["alive"]
+    assert len(yw.players["ye"]["hand"]) >= hand0 + 1
+
+    # 程心仁心 + 圣母
+    cx = GameSession.create("CHENG", ["cheng", "hurt"])
+    _as_role(cx, "cheng", "cheng_xin")
+    _blank_skills(cx, "hurt")
+    cx.turn_index = cx.player_order.index("cheng")
+    cx.phase = "turn"
+    cx.turn_phase = "play"
+    cx.players["hurt"]["hp"] = 1
+    cx._open_benevolence_prompt("cheng")
+    ok, msg = cx.apply_action("cheng", {"action": "benevolence_heal", "target": "hurt"})
+    assert ok, msg
+    assert cx.players["hurt"]["hp"] == 3
+    cx.players["hurt"]["hp"] = 0
+    cx._begin_dying("hurt", source="cheng")
+    assert cx.prompt and cx.prompt.get("type") == "madonna_save"
+    ok, msg = cx.apply_action("cheng", {"action": "madonna_accept"})
+    assert ok, msg
+    assert cx.players["hurt"]["hp"] == cx.players["hurt"]["max_hp"]
+    assert cx.players["hurt"]["tech_level"] == 1
+    assert cx.players["cheng"]["madonna_used"] is True
+
+    # 汪淼倒计时 + 飞刃
+    wm = GameSession.create("WANG", ["wang", "foe"])
+    _as_role(wm, "wang", "wang_miao")
+    _blank_skills(wm, "foe")
+    assert wm.players["wang"]["countdown"] == 12
+    wm.turn_index = wm.player_order.index("wang")
+    wm.phase = "turn"
+    wm.turn_phase = "play"
+    wm.players["wang"]["countdown"] = 1
+    wm._tick_countdowns(1)
+    assert wm.players["wang"]["countdown_done"] is True
+    assert wm.players["wang"]["tech_level"] == 2
+    ok, msg = wm.apply_action("wang", {"action": "flying_blade"})
+    assert ok, msg
+    assert wm.players["wang"]["next_damage_true"] is True
+
+    # 新装备：小宇宙护盾 / 星环号不可被杀 / 太阳系观测
+    eqn = GameSession.create("EQUIP_NEW", ["eq", "bot"])
+    _blank_skills(eqn, "eq", "bot")
+    eqn.turn_index = eqn.player_order.index("eq")
+    eqn.phase = "turn"
+    eqn.turn_phase = "play"
+    micro = {
+        "id": "micro_universe",
+        "name": "小宇宙",
+        "type": "equipment",
+        "slot": "armor",
+        "implemented": True,
+        "instance_id": "micro-1",
+    }
+    _give(eqn.players["eq"], micro)
+    ok, msg = eqn.apply_action("eq", {"action": "play_card", "instance_id": "micro-1"})
+    assert ok, msg
+    assert eqn.players["eq"]["shield"] == 5
+    eqn._deal_damage("bot", "eq", 3)
+    assert eqn.players["eq"]["shield"] == 2
+    assert eqn.players["eq"]["hp"] == eqn.players["eq"]["max_hp"]
+
+    star = {
+        "id": "star_ring",
+        "name": "星环号",
+        "type": "equipment",
+        "slot": "ship",
+        "ship_id": "star_ring",
+        "implemented": True,
+        "instance_id": "star-1",
+    }
+    _give(eqn.players["eq"], star)
+    ok, msg = eqn.apply_action("eq", {"action": "play_card", "instance_id": "star-1"})
+    assert ok, msg
+    eqn.turn_index = eqn.player_order.index("bot")
+    kill_sr = {
+        "id": "kill_low",
+        "name": "1阶杀",
+        "type": "basic",
+        "subtype": "kill",
+        "tier": 1,
+        "instance_id": "kill-sr",
+    }
+    _give(eqn.players["bot"], kill_sr)
+    ok, msg = eqn.apply_action("bot", {"action": "play_card", "instance_id": "kill-sr", "target": "eq"})
+    assert not ok and "星环" in msg
+
     # 甲栏已满时深海液可重铸；空槽时不可重铸
     eqr = GameSession.create("ARMOR_RECAST", ["arm", "bot"])
     _blank_skills(eqr, "arm", "bot")
@@ -629,7 +822,7 @@ def main() -> None:
     private = room.game.snapshot_for("smoke_a")
     assert private["phase"] in {"turn", "prompt", "dying"}
     assert isinstance(private["you"]["hand"], list)
-    assert private["you"]["role"]["role_id"] in {"guan_yifan", "friss"}
+    assert private["you"]["role"]["role_id"] in KNOWN_ROLES
 
     with c1.websocket_connect("/ws") as ws1:
         hello = json.loads(ws1.receive_text())

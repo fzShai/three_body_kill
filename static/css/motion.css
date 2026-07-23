@@ -1,0 +1,120 @@
+/* 静默猎手 · restrained motion */
+
+@keyframes star-breathe {
+    0%, 100% { opacity: 0.32; }
+    50% { opacity: 0.48; }
+}
+
+/* One-shot radar sweep on panels */
+@keyframes radar-fade-in {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes radar-sweep {
+    0% {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    30% { opacity: 0.35; }
+    100% {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+.motion-enter {
+    animation: radar-fade-in 0.55s ease-out both;
+}
+.motion-enter-delay-1 { animation-delay: 0.06s; }
+.motion-enter-delay-2 { animation-delay: 0.12s; }
+.motion-enter-delay-3 { animation-delay: 0.18s; }
+
+.panel.radar-once {
+    position: relative;
+    overflow: hidden;
+    animation: radar-fade-in 0.5s ease-out both;
+}
+.panel.radar-once::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 40%;
+    pointer-events: none;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(122, 158, 176, 0.08) 45%,
+        transparent 100%
+    );
+    animation: radar-sweep 0.9s ease-out 0.15s both;
+}
+
+/* Card lift (table) */
+.card-lift {
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.card-lift:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-ice) !important;
+}
+.card-lift.selected {
+    transform: translateY(-4px);
+    border-color: var(--accent-ice-bright) !important;
+    box-shadow: 0 0 0 1px var(--accent-ice-dim);
+}
+
+/* Swordholder deterrence pulse — dying only */
+@keyframes deterrence-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.72; }
+}
+
+.deterrence-pulse {
+    animation: deterrence-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes end-slide-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ended-banner {
+    animation: end-slide-in 0.45s ease-out both;
+}
+
+body.table-ended {
+    filter: brightness(0.82);
+}
+body.table-ended .ended-banner {
+    filter: brightness(1.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .motion-enter,
+    .panel.radar-once,
+    .panel.radar-once::after,
+    .deterrence-pulse,
+    .ended-banner,
+    body.shell-page::before {
+        animation: none !important;
+    }
+    .card-lift:hover,
+    .card-lift.selected {
+        transform: none;
+    }
+}

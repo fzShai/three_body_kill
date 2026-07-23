@@ -4,125 +4,151 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>三体杀 - 桌面</title>
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/shell.css" />
+    <link rel="stylesheet" href="/static/css/motion.css" />
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            min-height: 100vh;
-            background: radial-gradient(ellipse at 50% 0%, #1a3050 0%, #0a121c 55%, #05080e 100%);
-            color: #e8f4ff;
+        body.shell-page.table-page {
             padding: 20px 12px 32px;
+            background:
+                radial-gradient(ellipse 70% 45% at 50% -5%, rgba(28, 42, 58, 0.4) 0%, transparent 55%),
+                linear-gradient(180deg, var(--bg-void) 0%, #070c14 100%);
         }
-        .wrap { max-width: 960px; margin: 0 auto; }
-        h1 { font-size: 22px; color: #7fd9ff; margin-bottom: 4px; }
-        .meta { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
+        body.shell-page.table-page::before { opacity: 0.28; }
+
+        .table-meta {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--ink-muted);
+            letter-spacing: 0.06em;
+            margin-bottom: 16px;
+        }
+        .table-meta span { color: var(--accent-ice-bright); }
+
         .grid { display: grid; grid-template-columns: 1fr 280px; gap: 14px; }
         @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-        .panel {
-            background: rgba(10, 20, 34, 0.78);
-            border: 1px solid rgba(0, 200, 255, 0.16);
-            border-radius: 12px;
-            padding: 14px;
-        }
-        .panel h2 { font-size: 13px; color: rgba(160,200,230,0.65); margin-bottom: 10px; letter-spacing: 1px; }
+        .table-page .row { margin-top: 12px; }
+
         .players { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
         .player-chip {
             padding: 10px 12px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
             min-width: 120px;
-            background: rgba(0,40,70,0.35);
+            background: var(--bg-inset);
         }
-        .player-chip.turn { border-color: #00e5ff; box-shadow: 0 0 12px rgba(0,229,255,0.2); }
-        .player-chip.dying-victim { border-color: #ff8a8a; box-shadow: 0 0 12px rgba(255,120,120,0.25); }
-        .player-chip.dying-current { border-color: #ffcc66; box-shadow: 0 0 12px rgba(255,200,100,0.25); }
+        .player-chip.turn {
+            border-color: var(--accent-ice);
+            box-shadow: none;
+        }
+        /* Swordholder crisis — dying only */
+        .player-chip.dying-victim {
+            border-color: var(--danger-cold);
+            background: var(--danger-cold-dim);
+            box-shadow: none;
+        }
+        .player-chip.dying-current {
+            border-color: var(--accent-ice);
+            background: var(--accent-ice-glow);
+            box-shadow: none;
+        }
         .player-chip.dead { opacity: 0.4; }
-        .player-chip.offline { opacity: 0.65; border-color: rgba(255,120,120,0.35); }
-        .banner.dying {
-            background: rgba(255, 100, 80, 0.14); border-color: rgba(255,120,100,0.4);
-        }
-        .card.dim { opacity: 0.35; cursor: not-allowed; }
-        .badge-off { font-size: 11px; color: #ff8a8a; margin-left: 4px; }
+        .player-chip.offline { opacity: 0.65; border-color: rgba(184, 74, 74, 0.35); }
         .player-chip .n { font-weight: 700; font-size: 14px; }
-        .player-chip .s { font-size: 12px; color: rgba(200,220,240,0.55); margin-top: 4px; }
+        .player-chip .s {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--ink-dim);
+            margin-top: 4px;
+        }
         .player-chip .eq, .player-chip .st {
             margin-top: 6px; font-size: 11px; line-height: 1.4;
-            color: rgba(180,210,230,0.55);
+            color: var(--ink-muted);
         }
-        .player-chip .eq .filled { color: #9fd9ff; }
-        .player-chip .st .pos { color: #8fd9a8; }
-        .player-chip .st .neg { color: #ff9a8a; }
+        .player-chip .eq .filled { color: var(--accent-ice-bright); }
+        .player-chip .st .pos { color: var(--ok); }
+        .player-chip .st .neg { color: #c87878; }
+        .badge-off { font-size: 11px; color: #c87878; margin-left: 4px; }
+
         .role {
             display: inline-block; margin-bottom: 10px;
-            padding: 8px 12px; border-radius: 6px;
-            background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.22);
+            padding: 8px 12px; border-radius: var(--radius);
+            background: var(--accent-ice-glow);
+            border: 1px solid var(--line-strong);
             font-size: 13px;
         }
         .mode-hint {
-            font-size: 12px; color: rgba(180,210,230,0.65); margin-bottom: 8px; min-height: 18px;
+            font-size: 12px; color: var(--ink-dim); margin-bottom: 8px; min-height: 18px;
         }
         .hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 110px; }
         .card {
             width: 118px; min-height: 140px; padding: 10px;
-            border-radius: 8px; cursor: pointer;
-            background: linear-gradient(160deg, rgba(20,40,70,0.95), rgba(10,20,36,0.95));
-            border: 1px solid rgba(0,200,255,0.28);
-            transition: transform 0.15s, border-color 0.15s;
+            border-radius: var(--radius); cursor: pointer;
+            background: linear-gradient(160deg, rgba(14, 22, 34, 0.96), rgba(8, 12, 20, 0.96));
+            border: 1px solid var(--line-strong);
         }
-        .card:hover { transform: translateY(-4px); border-color: #00e5ff; }
-        .card.selected { border-color: #ffcc66; box-shadow: 0 0 14px rgba(255,200,100,0.25); }
-        .card .cname { font-weight: 800; font-size: 13px; color: #9fdfff; margin-bottom: 6px; }
-        .card .ctype { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 6px; }
-        .card .ctext { font-size: 11px; color: rgba(220,230,240,0.7); line-height: 1.35; }
-        .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
-        .btn {
-            padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer;
-            background: linear-gradient(135deg, #00e5ff, #0077ff); color: #fff; font-weight: 700; font-size: 13px;
-        }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-outline {
-            background: transparent; border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.7);
-        }
-        select {
-            padding: 10px 12px; border-radius: 8px;
-            background: rgba(0,40,60,0.5); color: #cfefff;
-            border: 1px solid rgba(0,180,220,0.25);
-        }
+        .card.dim { opacity: 0.35; cursor: not-allowed; }
+        .card .cname { font-weight: 700; font-size: 13px; color: var(--accent-ice-bright); margin-bottom: 6px; }
+        .card .ctype { font-size: 11px; color: var(--ink-muted); margin-bottom: 6px; font-family: var(--font-mono); }
+        .card .ctext { font-size: 11px; color: rgba(210, 225, 240, 0.7); line-height: 1.35; }
+
         .log {
-            font-size: 12px; color: rgba(200,220,240,0.6);
+            font-size: 12px; color: var(--ink-dim);
             max-height: 280px; overflow-y: auto; line-height: 1.5;
         }
-        .log div { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .status { margin-top: 10px; font-size: 13px; color: rgba(180,210,230,0.7); }
-        .status.error { color: #ff8a8a; }
+        .log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
+
         .banner {
-            margin-bottom: 12px; padding: 12px; border-radius: 8px;
-            background: rgba(255, 180, 60, 0.12); border: 1px solid rgba(255,180,60,0.3);
+            margin-bottom: 12px; padding: 14px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
+            background: var(--bg-panel);
             display: none;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            color: var(--ink);
         }
         .banner.show { display: block; }
+        .banner.dying {
+            background: var(--warn-amber-dim);
+            border-color: var(--warn-amber);
+            color: #e0c090;
+        }
+        .banner.ended {
+            background: var(--danger-cold-dim);
+            border-color: var(--danger-cold);
+            color: #e0a0a0;
+            font-size: 15px;
+            letter-spacing: 0.12em;
+        }
     </style>
 </head>
-<body>
-    <div class="wrap">
-        <h1>黑暗森林 · 对局桌</h1>
-        <div class="meta">房号 <span id="roomIdDisplay"></span> · 阶段 <span id="phaseLabel">—</span> · 弃牌堆 <span id="discardCount">0</span> · 倒计时 <span id="turnTimer">—</span></div>
+<body class="shell-page table-page">
+    <div class="wrap table">
+        <h1 class="page-title motion-enter">黑暗森林 · 对局桌</h1>
+        <div class="table-meta motion-enter motion-enter-delay-1">
+            房号 <span id="roomIdDisplay"></span>
+            · 阶段 <span id="phaseLabel">—</span>
+            · 弃牌堆 <span id="discardCount">0</span>
+            · 倒计时 <span id="turnTimer">—</span>
+        </div>
         <div class="banner" id="endBanner"></div>
 
         <div class="grid">
             <div>
-                <div class="panel" style="margin-bottom:14px;">
+                <div class="panel radar-once" style="margin-bottom:14px;">
                     <h2>战场</h2>
                     <div class="players" id="players"></div>
                 </div>
-                <div class="panel">
+                <div class="panel radar-once" style="animation-delay:0.06s;">
                     <h2>你的身份</h2>
                     <div class="role" id="roleBox">—</div>
                     <h2>手牌</h2>
                     <div class="mode-hint" id="modeHint"></div>
                     <div class="hand" id="hand"></div>
                     <div class="row">
-                        <label style="font-size:12px;color:rgba(255,255,255,0.45);">目标</label>
+                        <label style="font-size:12px;color:var(--ink-muted);">目标</label>
                         <select id="targetSelect"></select>
                         <button class="btn" id="playBtn">出牌</button>
                         <button class="btn btn-outline" id="endPlayBtn">结束出牌</button>
@@ -148,11 +174,11 @@
                     <div class="status" id="statusMsg"></div>
                 </div>
             </div>
-            <div class="panel">
+            <div class="panel radar-once" style="animation-delay:0.1s;">
                 <h2>战报</h2>
                 <div class="log" id="log"></div>
                 <div class="row" style="margin-top:14px;">
-                    <a class="btn btn-outline" href="/lobby" id="backLobbyLink" style="text-decoration:none;">回大厅</a>
+                    <a class="btn btn-outline" href="/lobby" id="backLobbyLink">回大厅</a>
                 </div>
             </div>
         </div>
@@ -347,9 +373,10 @@
 
                 const playersEl = document.getElementById('players');
                 playersEl.innerHTML = (snap.players || []).map((p) => {
+                    const isVictim = isDying && p.username === dying.victim;
                     const cls = [
                         (!isPrompt && !isDying && p.username === snap.current_player) ? 'turn' : '',
-                        (isDying && p.username === dying.victim) ? 'dying-victim' : '',
+                        isVictim ? 'dying-victim deterrence-pulse' : '',
                         (isPrompt && p.username === prompt.to) ? 'dying-current' : '',
                         p.alive ? '' : 'dead',
                         p.online === false ? 'offline' : '',
@@ -389,7 +416,7 @@
                     const selected = multiSelect
                         ? selectedIds.has(c.instance_id)
                         : selectedId === c.instance_id;
-                    return `<div class="card ${selected ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}" data-card-id="${c.id || ''}">
+                    return `<div class="card card-lift ${selected ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}" data-card-id="${c.id || ''}">
                         <div class="cname">${c.name}</div>
                         <div class="ctype">${cardTypeLabel(c)}</div>
                         <div class="ctext">${c.text || ''}</div>
@@ -559,38 +586,39 @@
                 document.getElementById('log').innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
 
                 const banner = document.getElementById('endBanner');
-                banner.classList.remove('dying');
+                banner.classList.remove('dying', 'ended', 'ended-banner', 'deterrence-pulse', 'show');
+                document.body.classList.toggle('table-ended', snap.phase === 'ended');
                 if (snap.phase === 'ended') {
-                    banner.classList.add('show');
+                    banner.classList.add('show', 'ended', 'ended-banner');
                     banner.textContent = snap.winner ? `对局结束 · 胜者 ${snap.winner}` : '对局结束';
+                } else if (isDying) {
+                    banner.classList.add('show', 'dying', 'deterrence-pulse');
+                    banner.textContent = myDying
+                        ? `${dying.victim} 濒死 · 打出桃自救或结算濒死`
+                        : `${dying.victim} 濒死 · 可打出桃救人`;
                 } else if (isChoice) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.to} 请选择：${(prompt.options || []).map((o) => o.label).join(' / ')}`;
                 } else if (isInterrupt) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = prompt.type === 'respond_toxic'
                         ? `${prompt.from} 对 ${prompt.to} 使用剧毒之水 · 可用杀/思想钢印响应`
                         : `${prompt.from} 打出${prompt.card_name || '锦囊'} · ${prompt.to} 可打断`;
                 } else if (isWander) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.to} 【流浪】：是否失去 1 体力并摸两张牌？`;
                 } else if (isBenevolence) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.to} 【仁心】：指定一名角色回复 2 点体力`;
                 } else if (isMadonna) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.to} 【圣母】：是否救治 ${prompt.victim}？`;
                 } else if (isGravity) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.to} 万有引力号：弃两张手牌使杀仍生效？`;
                 } else if (isPrompt) {
-                    banner.classList.add('show', 'dying');
+                    banner.classList.add('show');
                     banner.textContent = `${prompt.from} 对 ${prompt.to} 使用${prompt.card_name || '杀'} · 等待闪响应`;
-                } else if (isDying) {
-                    banner.classList.add('show', 'dying');
-                    banner.textContent = myDying
-                        ? `${dying.victim} 濒死 · 打出桃自救或结算濒死`
-                        : `${dying.victim} 濒死 · 可打出桃救人`;
                 } else {
                     banner.classList.remove('show');
                 }

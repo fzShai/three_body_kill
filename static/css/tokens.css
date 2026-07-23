@@ -1,0 +1,48 @@
+/* 静默猎手 · design tokens */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+    /* Void / panels */
+    --bg-void: #05080f;
+    --bg-void-mid: #0a1018;
+    --bg-panel: rgba(8, 12, 20, 0.82);
+    --bg-panel-solid: #0a1018;
+    --bg-inset: rgba(4, 8, 14, 0.55);
+
+    /* Ink */
+    --ink: #d8e4f0;
+    --ink-dim: rgba(180, 200, 220, 0.48);
+    --ink-muted: rgba(160, 185, 210, 0.32);
+
+    /* Quiet ice accent (normal play only) */
+    --accent-ice: #7a9eb0;
+    --accent-ice-bright: #9bb8c8;
+    --accent-ice-dim: rgba(122, 158, 176, 0.22);
+    --accent-ice-glow: rgba(122, 158, 176, 0.12);
+
+    /* Lines */
+    --line: rgba(140, 170, 190, 0.14);
+    --line-strong: rgba(140, 170, 190, 0.28);
+
+    /* Swordholder crisis (dying / ended ONLY) */
+    --warn-amber: #c9953a;
+    --warn-amber-dim: rgba(201, 149, 58, 0.18);
+    --danger-cold: #b84a4a;
+    --danger-cold-dim: rgba(184, 74, 74, 0.16);
+
+    /* Status helpers */
+    --ok: #6a9e88;
+    --ok-dim: rgba(106, 158, 136, 0.18);
+
+    /* Type */
+    --font-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+    /* Geometry — hard corners, quiet HUD */
+    --radius: 0;
+    --space-page: 32px 16px 48px;
+    --space-panel: 20px;
+    --max-narrow: 560px;
+    --max-wide: 880px;
+    --max-table: 960px;
+}

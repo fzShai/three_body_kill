@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🌌 三体杀 - 登录</title>
+    <title>三体杀 - 登录</title>
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/motion.css" />
     <style>
         /* 重置 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        /* 页面整体：夜幕向下渐变，右侧放置登录框 */
+        /* 页面整体：静默猎手夜空，右侧登录框 */
         body {
-            font-family: 'Inter', 'SF Pro Display', 'Segoe UI', sans-serif;
-            font-weight: 600;
+            font-family: var(--font-ui);
+            font-weight: 500;
             min-height: 100vh;
             position: relative;
             overflow: hidden;
@@ -19,8 +21,8 @@
             justify-content: flex-end;
             align-items: center;
             padding: 6vh 8vw;
-            color: #e6f7ff;
-            background: linear-gradient(to bottom, #071428 0%, #04151a 48%, #021012 100%);
+            color: var(--ink);
+            background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 48%, #02080c 100%);
         }
 
         /* 微小星星（铺满背景，左侧会有三颗独立闪烁的星）*/
@@ -45,16 +47,16 @@
             opacity: 0.95; will-change: left, top, transform, opacity, filter;
             animation-name: flicker-yellow; animation-iteration-count: infinite; animation-timing-function: ease-in-out;
         }
-        .drift-star:nth-of-type(1){ width:10px; height:10px; animation-duration: 2.6s; animation-delay: 0.2s; }
-        .drift-star:nth-of-type(2){ width:7px; height:7px; animation-duration: 3.6s; animation-delay: 0.6s; }
-        .drift-star:nth-of-type(3){ width:12px; height:12px; animation-duration: 4.2s; animation-delay: 1s; }
+        .drift-star:nth-of-type(1){ width:10px; height:10px; animation-duration: 5.2s; animation-delay: 0.2s; }
+        .drift-star:nth-of-type(2){ width:7px; height:7px; animation-duration: 7.2s; animation-delay: 0.6s; }
+        .drift-star:nth-of-type(3){ width:12px; height:12px; animation-duration: 8.4s; animation-delay: 1s; }
 
         @keyframes flicker-yellow {
-            0% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.9); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(2.0); }
-            60% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.12); }
-            100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+            0% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+            40% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.35); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+            60% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.08); }
+            100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
         }
 
         /* 拖尾粒子 */
@@ -188,7 +190,7 @@
                 /* 转场阶段 4：森林燃烧，显示火焰 Canvas */
                 body[data-scene="burning"] #fireCanvas{ opacity: 1; }
 
-        /* 登录框：右侧，硬边科幻风格 + 激光边框 */
+        /* 登录框：静默细线 HUD，无霓虹激光 */
                 .container{
                     position: relative;
                     z-index: 3;
@@ -196,77 +198,100 @@
                     margin-right: 6vw;
                     padding: 40px 36px;
                     border-radius: 0;
-                    background: rgba(8, 14, 20, 0.08);
-                    backdrop-filter: blur(10px) saturate(120%);
-                    -webkit-backdrop-filter: blur(10px) saturate(120%);
-                    border: 1px solid rgba(0,200,255,0.32);
-                    box-shadow: 0 0 30px rgba(0,180,220,0.16), inset 0 0 1px rgba(0,230,255,0.12), inset 0 0 20px rgba(0,150,200,0.04);
+                    background: rgba(8, 12, 20, 0.55);
+                    backdrop-filter: blur(12px) saturate(110%);
+                    -webkit-backdrop-filter: blur(12px) saturate(110%);
+                    border: 1px solid var(--line-strong);
+                    box-shadow: none;
                     overflow: visible;
                     transition: opacity 1s ease;
                 }
-        /* 激光边框发光效果 */
-        .container::before{
-            content: '';
-            position: absolute; inset: -2px; border-radius: 0; z-index: -1;
-            background: linear-gradient(90deg, rgba(0,200,255,0.2), rgba(0,150,220,0.1), rgba(0,200,255,0.2));
-            filter: blur(8px);
-            opacity: 0.6;
-            animation: laser-glow 3s ease-in-out infinite;
-        }
 
-        @keyframes laser-glow {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 0.9; }
+        .title{
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-align: left;
+            color: var(--ink);
         }
-
-        .title{ font-size: 30px; font-weight: 900; letter-spacing: 2px; text-align: left; color: #7fd9ff; }
-        .subtitle{ font-size: 12px; color: rgba(255,255,255,0.35); margin-bottom: 20px; text-align: left; }
+        .subtitle{
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--ink-muted);
+            margin-bottom: 20px;
+            text-align: left;
+        }
 
         .tabs{ display:flex; gap:8px; margin-bottom:18px; }
-        .tabs button{ flex: none; padding:8px 14px; border-radius:0; border:1px solid rgba(0,200,255,0.12); background: rgba(0,150,200,0.04); color: rgba(150,200,230,0.8); cursor:pointer; font-weight:700; transition: all 0.2s; }
-        .tabs button.active{ background: rgba(0,200,255,0.12); color: #a8d8ff; border-color: rgba(0,200,255,0.24); }
-        .tabs button:hover{ border-color: rgba(0,200,255,0.2); }
+        .tabs button{
+            flex: none; padding:8px 14px; border-radius:0;
+            border:1px solid var(--line); background: transparent;
+            color: var(--ink-dim); cursor:pointer; font-weight:600;
+            font-family: var(--font-ui); transition: border-color 0.2s, color 0.2s, background 0.2s;
+        }
+        .tabs button.active{
+            background: var(--accent-ice-glow);
+            color: var(--accent-ice-bright);
+            border-color: var(--accent-ice);
+        }
+        .tabs button:hover{ border-color: var(--accent-ice); color: var(--accent-ice-bright); }
 
         .form-panel{ display: none; flex-direction: column; gap:14px; }
         .form-panel.active{ display:flex; }
-        .form-panel label{ font-size:13px; color: rgba(180,200,220,0.8); font-weight: 600; }
-        /* 输入框：直角、细直线边框 */
+        .form-panel label{ font-size:13px; color: var(--ink-dim); font-weight: 600; }
         .form-panel input{
-            padding:12px 14px; border-radius:0; border:1px solid rgba(0,180,220,0.16);
-            background: rgba(0,50,80,0.3); color:#b8d8ff; font-size:15px; outline:none; font-weight: 500;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            padding:12px 14px; border-radius:0; border:1px solid var(--line);
+            background: var(--bg-inset); color: var(--ink); font-size:15px; outline:none; font-weight: 500;
+            font-family: var(--font-ui);
+            transition: border-color 0.2s, background 0.2s;
         }
         .form-panel input:focus{
-            box-shadow: 0 0 12px rgba(0,180,220,0.12), inset 0 0 1px rgba(0,200,255,0.16);
-            border-color: rgba(0,200,255,0.28);
-            background: rgba(0,80,120,0.25);
+            border-color: var(--accent-ice);
+            background: rgba(8, 16, 24, 0.7);
+            box-shadow: none;
         }
-        .form-panel input::placeholder{ color: rgba(150,180,210,0.4); }
+        .form-panel input::placeholder{ color: var(--ink-muted); }
 
         .password-row{ position: relative; }
         .password-row input{ width:100%; padding-right:46px; }
-        .password-toggle{ position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; color: #7fa8d8; cursor:pointer; font-size:20px; font-weight: 700; letter-spacing: -2px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; }
+        .password-toggle{
+            position:absolute; right:8px; top:50%; transform:translateY(-50%);
+            background:transparent; border:none; color: var(--accent-ice);
+            cursor:pointer; font-size:20px; font-weight: 700; letter-spacing: -2px;
+            display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+        }
         .password-toggle.hidden::after{ content: ''; position: absolute; width: 3px; height: 32px; background: currentColor; transform: rotate(-45deg); }
 
-        .form-panel button{ padding:12px; border-radius:0; border:1px solid rgba(0,180,220,0.24); background: rgba(0,150,200,0.24); color:#a8d8ff; font-weight:800; cursor:pointer; transition: all 0.2s; }
-        .form-panel button:hover{ background: rgba(0,180,220,0.32); border-color: rgba(0,200,255,0.32); box-shadow: 0 0 12px rgba(0,150,200,0.12); }
+        .form-panel button{
+            padding:12px; border-radius:0; border:1px solid var(--line-strong);
+            background: var(--accent-ice-dim); color: var(--ink); font-weight:700;
+            font-family: var(--font-ui); cursor:pointer; transition: border-color 0.2s, background 0.2s;
+        }
+        .form-panel button:hover{
+            background: rgba(122, 158, 176, 0.32);
+            border-color: var(--accent-ice);
+            box-shadow: none;
+        }
 
-        .message{ text-align:left; font-size:14px; margin-top:8px; min-height:20px; color: rgba(160,180,200,0.8); }
-        .message.success{ color:#6ad8ff; }
-        .message.error{ color:#ff8888; }
+        .message{ text-align:left; font-size:14px; margin-top:8px; min-height:20px; color: var(--ink-dim); }
+        .message.success{ color: var(--ok); }
+        .message.error{ color: #c87878; }
 
-        .hint-text{ font-size:13px; color: rgba(140,170,200,0.5); text-align:left; margin-top:6px; }
+        .hint-text{ font-size:13px; color: var(--ink-muted); text-align:left; margin-top:6px; }
 
-        /* 面板角标：小装饰线条，增加科幻感 */
         .panel-badge{
             position: absolute; top: 12px; left: 12px; width: 44px; height: 20px; z-index: 6; pointer-events: none;
             display: flex; gap:6px; align-items:center;
         }
-        .panel-badge .bar{ height:1px; background: rgba(0,200,255,0.2); box-shadow: 0 0 8px rgba(0,180,220,0.08); border-radius:0; }
+        .panel-badge .bar{ height:1px; background: var(--line-strong); border-radius:0; }
         .panel-badge .bar.short{ width:12px; opacity:0.9; }
         .panel-badge .bar.long{ width:28px; opacity:0.7; }
-        /* 小角标右下：微小矩形装饰线 */
-        .panel-badge::after{ content: ''; position: absolute; right:-8px; bottom:-6px; width:8px; height:8px; border-radius:0; background: rgba(0,180,220,0.16); box-shadow: 0 0 6px rgba(0,150,200,0.08); }
+        .panel-badge::after{
+            content: ''; position: absolute; right:-8px; bottom:-6px;
+            width:8px; height:8px; border-radius:0; background: var(--accent-ice-dim);
+        }
 
         /* 响应式：窄屏居中显示，调整星星位置避免重叠 */
         @media (max-width: 900px) {
@@ -320,7 +345,7 @@
             <div class="bar long"></div>
         </div>
         <div class="title">三体杀</div>
-        <div class="subtitle">✦ 黑暗森林 · 在线对决 ✦</div>
+        <div class="subtitle">Dark Forest · Sign in</div>
 
         <div class="tabs">
             <button id="loginTab" class="active">登录</button>

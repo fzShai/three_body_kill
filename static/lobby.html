@@ -7,8 +7,22 @@
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
     <link rel="stylesheet" href="/static/css/motion.css" />
+    <link rel="stylesheet" href="/static/css/atmosphere.css" />
 </head>
-<body class="shell-page">
+<body class="shell-page lobby-atmosphere">
+    <div class="atmosphere-stars" aria-hidden="true"></div>
+    <div class="atmosphere-forest" aria-hidden="true">
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+            <path class="layer-far" d="M0,200 C80,160 160,180 240,152 C320,124 400,160 480,148 C560,136 640,176 720,152 C800,128 880,156 960,140 C1040,124 1120,160 1200,148 C1280,136 1360,160 1440,140 L1440,320 L0,320 Z" />
+            <g class="layer-mid">
+                <path d="M40 220 L70 170 L88 188 L76 166 L100 166 L86 142 L110 160 L128 130 L146 166 L160 150 L174 186 L200 160 L220 190 L240 168 L260 202 L280 180 L300 206 L330 170 L360 200 L390 166 L420 198 L450 170 L480 200 L500 180 L520 208 L560 180 L600 210 L640 180 L680 210 L720 182 L760 210 L800 180 L840 212 L880 178 L920 210 L960 182 L1000 212 L1040 180 L1080 208 L1120 178 L1160 210 L1200 182 L1240 210 L1280 184 L1320 212 L1360 188 L1400 216 L1440 190 L1440 320 L0 320 Z"/>
+            </g>
+            <g class="layer-near">
+                <path d="M0 260 L28 220 L48 240 L44 210 L68 240 L82 204 L108 238 L122 200 L150 238 L168 204 L196 244 L220 200 L244 246 L268 206 L296 252 L320 200 L344 254 L372 210 L400 260 L428 210 L452 258 L480 208 L508 260 L540 212 L572 266 L600 214 L632 272 L660 212 L692 276 L720 216 L752 280 L780 220 L812 284 L840 224 L872 288 L900 228 L932 292 L960 234 L992 298 L1020 236 L1052 300 L1080 240 L1112 304 L1140 244 L1172 308 L1200 248 L1232 312 L1260 256 L1292 316 L1320 260 L1352 320 L0 320 Z"/>
+            </g>
+        </svg>
+    </div>
+
     <div class="wrap narrow">
         <h1 class="brand motion-enter">三体杀</h1>
         <div class="brand-sub motion-enter motion-enter-delay-1">Dark Forest · Lobby</div>
@@ -34,6 +48,16 @@
     </div>
     <script src="/static/app.js"></script>
     <script>
+        (function () {
+            try {
+                if (sessionStorage.getItem('tbk_enter') === 'ash') {
+                    document.body.classList.add('lobby-from-ash');
+                    sessionStorage.removeItem('tbk_enter');
+                    setTimeout(() => document.body.classList.remove('lobby-from-ash'), 1800);
+                }
+            } catch (e) { /* ignore */ }
+        })();
+
         const username = TBK.requireLogin();
         if (username) {
             document.getElementById('usernameDisplay').textContent = username;

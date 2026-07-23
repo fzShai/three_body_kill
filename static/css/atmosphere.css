@@ -1,0 +1,80 @@
+/* Shared Dark Forest atmosphere — login ash end-state & lobby */
+
+.atmosphere-stars {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.42;
+    mix-blend-mode: screen;
+    background-image:
+        radial-gradient(circle at 10px 20px, rgba(255,255,255,0.85) 0 1px, transparent 2px),
+        radial-gradient(circle at 40px 70px, rgba(255,255,255,0.7) 0 1px, transparent 2px),
+        radial-gradient(circle at 50px 160px, rgba(255,255,255,0.55) 0 1px, transparent 2px),
+        radial-gradient(circle at 90px 40px, rgba(255,255,255,0.5) 0 1px, transparent 2px),
+        radial-gradient(circle at 130px 80px, rgba(255,255,255,0.8) 0 1px, transparent 2px),
+        radial-gradient(circle at 180px 120px, rgba(255,255,255,0.4) 0 1px, transparent 2px);
+    background-size: 240px 240px;
+    animation: star-breathe 8s ease-in-out infinite;
+}
+
+.atmosphere-forest {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 32vh;
+    width: 100%;
+    z-index: 0;
+    pointer-events: none;
+    display: block;
+    opacity: 0.9;
+}
+.atmosphere-forest svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+.atmosphere-forest .layer-far { fill: rgba(6, 12, 10, 0.45); }
+.atmosphere-forest .layer-mid { fill: rgba(3, 6, 5, 0.65); }
+.atmosphere-forest .layer-near { fill: rgba(0, 0, 0, 0.88); }
+
+/* Lobby: match login ash void + forest */
+body.shell-page.lobby-atmosphere {
+    background:
+        radial-gradient(ellipse 70% 45% at 50% -8%, rgba(28, 42, 58, 0.28) 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg-void) 0%, #041018 50%, #02080c 100%);
+    overflow-x: hidden;
+}
+body.shell-page.lobby-atmosphere::before {
+    /* suppress default sparse dots; atmosphere-stars replaces them */
+    opacity: 0;
+    animation: none;
+}
+
+/* Residual ember after login handoff */
+body.lobby-from-ash::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(
+        ellipse 55% 40% at 50% 88%,
+        rgba(201, 149, 58, 0.14) 0%,
+        rgba(184, 74, 74, 0.06) 35%,
+        transparent 70%
+    );
+    animation: ash-ember-fade 1.6s ease-out forwards;
+}
+@keyframes ash-ember-fade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .atmosphere-stars { animation: none; }
+    body.lobby-from-ash::after { animation: none; opacity: 0; }
+}

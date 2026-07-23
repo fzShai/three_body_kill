@@ -20,44 +20,34 @@
             align-items: center;
             padding: 6vh 8vw;
             color: var(--ink);
-            background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 48%, #02080c 100%);
+            background: linear-gradient(to bottom, var(--bg-void) 0%, #041018 52%, #02080c 100%);
         }
 
+        /* Pure DOM starfield — no tiled CSS stars */
         .stars {
             position: fixed;
             inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
             z-index: 0;
-            opacity: 0.45;
-            mix-blend-mode: screen;
-            background-image:
-                radial-gradient(circle at 10px 20px, rgba(255,255,255,0.9) 0 1px, transparent 2px),
-                radial-gradient(circle at 40px 70px, rgba(255,255,255,0.75) 0 1px, transparent 2px),
-                radial-gradient(circle at 50px 160px, rgba(255,255,255,0.6) 0 1px, transparent 2px),
-                radial-gradient(circle at 90px 40px, rgba(255,255,255,0.55) 0 1px, transparent 2px),
-                radial-gradient(circle at 130px 80px, rgba(255,255,255,0.85) 0 1px, transparent 2px),
-                radial-gradient(circle at 180px 130px, rgba(255,255,255,0.4) 0 1px, transparent 2px);
-            background-size: 220px 220px;
-            transition: opacity 1.2s ease;
+            pointer-events: none;
+            overflow: hidden;
         }
-        .stars.extinguished { opacity: 0; }
 
         .star-dot {
             position: absolute;
-            width: 2px;
-            height: 2px;
             border-radius: 50%;
             background: #fff;
-            box-shadow: 0 0 6px rgba(255,255,255,0.8);
-            opacity: 0.7;
-            transition: opacity 0.55s ease, transform 0.55s ease;
+            box-shadow: 0 0 4px rgba(255,255,255,0.55);
             pointer-events: none;
+            transition:
+                opacity 1.25s ease,
+                filter 1.25s ease,
+                transform 1.25s ease;
+            will-change: opacity, filter, transform;
         }
         .star-dot.out {
-            opacity: 0;
-            transform: scale(0.2);
+            opacity: 0 !important;
+            filter: brightness(0);
+            transform: scale(0.35);
         }
 
         .drift-star {
@@ -65,126 +55,185 @@
             border-radius: 50%;
             pointer-events: none;
             z-index: 1;
-            display: block;
-            transform: translate(-50%, -50%) scale(1);
-            background: radial-gradient(circle at 50% 45%, #fff 0%, #fff 34%, #f8fbff 50%, transparent 100%);
-            box-shadow: 0 0 28px rgba(255,255,255,0.9), 0 0 70px rgba(210,230,245,0.25);
-            opacity: 0.9;
-            transition: opacity 0.7s ease, transform 0.7s ease, filter 0.4s ease;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle at 50% 45%, #fff 0%, #fff 40%, transparent 100%);
+            box-shadow: 0 0 22px rgba(255,255,255,0.85), 0 0 56px rgba(200,220,235,0.22);
+            transition:
+                opacity 1.35s ease,
+                filter 1.35s ease,
+                transform 1.35s ease,
+                box-shadow 1.35s ease;
             animation: star-flicker ease-in-out infinite;
         }
-        .drift-star:nth-of-type(1) { width: 10px; height: 10px; animation-duration: 5.2s; }
-        .drift-star:nth-of-type(2) { width: 7px; height: 7px; animation-duration: 7.2s; animation-delay: 0.4s; }
-        .drift-star:nth-of-type(3) { width: 12px; height: 12px; animation-duration: 8.4s; animation-delay: 0.8s; }
+        .drift-star:nth-of-type(1) { width: 9px; height: 9px; animation-duration: 5.2s; }
+        .drift-star:nth-of-type(2) { width: 6px; height: 6px; animation-duration: 7s; animation-delay: 0.4s; }
+        .drift-star:nth-of-type(3) { width: 11px; height: 11px; animation-duration: 8.2s; animation-delay: 0.8s; }
         .drift-star.out {
             opacity: 0 !important;
-            transform: translate(-50%, -50%) scale(0.15);
+            filter: brightness(0);
+            transform: translate(-50%, -50%) scale(0.2);
+            box-shadow: none;
             animation: none;
-            filter: brightness(0.2);
         }
         @keyframes star-flicker {
             0%, 100% { opacity: 0.55; }
-            50% { opacity: 1; }
+            50% { opacity: 0.95; }
+        }
+
+        /* Minimal clearing — sparse silhouette only */
+        .forest-clearing {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 34vh;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .forest-clearing svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .forest-clearing .ridge {
+            fill: rgba(4, 8, 12, 0.72);
+        }
+        .forest-clearing .trees {
+            fill: rgba(0, 0, 0, 0.92);
         }
 
         .coord-flash {
             position: fixed;
             left: 50%;
-            top: 42%;
+            top: 36%;
             transform: translate(-50%, -50%);
             z-index: 5;
             pointer-events: none;
             font-family: var(--font-mono);
-            font-size: 12px;
+            font-size: 11px;
             letter-spacing: 0.28em;
-            color: rgba(200, 220, 235, 0.45);
+            color: rgba(200, 220, 235, 0.4);
             opacity: 0;
-            transition: opacity 0.25s ease;
+            transition: opacity 0.35s ease;
         }
         .coord-flash.show { opacity: 1; }
 
-        .strike-particle {
+        /* Meteor: behind forest (z < forest) */
+        .meteor {
             position: fixed;
-            left: 50%;
-            top: 48%;
-            width: 4px;
-            height: 4px;
-            margin: -2px 0 0 -2px;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 3px;
             border-radius: 50%;
-            z-index: 6;
+            z-index: 1;
             pointer-events: none;
             opacity: 0;
-            background: radial-gradient(circle, #fff 0%, rgba(200, 230, 245, 0.9) 35%, transparent 70%);
-            box-shadow:
-                0 0 12px rgba(255,255,255,0.95),
-                0 0 40px rgba(180, 210, 230, 0.45);
-            transform: translate3d(0, 0, 0) scale(0.08);
+            background: #fff;
+            box-shadow: 0 0 8px rgba(255,255,255,0.95);
             will-change: transform, opacity;
         }
-        .strike-particle.tail::after {
+        .meteor::before {
             content: '';
             position: absolute;
-            left: 50%;
+            right: 50%;
             top: 50%;
-            width: 2px;
-            height: 28px;
-            transform: translate(-50%, -100%);
-            background: linear-gradient(to top, rgba(255,255,255,0.55), transparent);
-            filter: blur(1px);
-            opacity: 0.6;
+            width: 72px;
+            height: 2px;
+            transform: translateY(-50%) rotate(45deg);
+            transform-origin: right center;
+            background: linear-gradient(90deg, transparent 0%, rgba(230,240,250,0.15) 40%, rgba(255,255,255,0.85) 100%);
+            filter: blur(0.4px);
         }
-        .strike-particle.fly {
+        .meteor.fly {
             opacity: 1;
-            animation: strike-rush 1.8s cubic-bezier(0.15, 0.05, 0.35, 1) forwards;
+            animation: meteor-fall 1.65s cubic-bezier(0.22, 0.05, 0.45, 1) forwards;
         }
-        @keyframes strike-rush {
+        /* 45° from upper-left toward impact ~55% x, 72% y (behind treeline) */
+        @keyframes meteor-fall {
             0% {
-                opacity: 0.2;
-                transform: translate3d(0, 8vh, 0) scale(0.06);
-                filter: blur(1.5px);
+                opacity: 0;
+                transform: translate(8vw, 4vh);
+                filter: blur(0.8px);
             }
-            40% {
-                opacity: 1;
-                transform: translate3d(0, 0, 0) scale(0.35);
-                filter: blur(0.4px);
+            8% {
+                opacity: 0.85;
+                filter: blur(0.35px);
             }
-            85% {
+            70% {
                 opacity: 1;
-                transform: translate3d(0, -2vh, 0) scale(18);
                 filter: blur(0);
+                transform: translate(48vw, 58vh);
+            }
+            92% {
+                opacity: 0.7;
+                filter: blur(0);
+                transform: translate(54vw, 70vh);
             }
             100% {
-                opacity: 0.95;
-                transform: translate3d(0, -2vh, 0) scale(48);
+                opacity: 0;
+                transform: translate(55vw, 72vh);
                 filter: blur(0);
             }
         }
 
-        .flash-veil,
+        .impact-core {
+            position: fixed;
+            left: 55%;
+            top: 72%;
+            width: 6px;
+            height: 6px;
+            margin: -3px 0 0 -3px;
+            border-radius: 50%;
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0;
+            background: #fff;
+            box-shadow: 0 0 16px rgba(255,255,255,0.9);
+        }
+        .impact-core.on {
+            animation: impact-ping 0.35s ease-out forwards;
+        }
+        @keyframes impact-ping {
+            0% { opacity: 0; transform: scale(0.4); }
+            40% { opacity: 1; transform: scale(1.4); }
+            100% { opacity: 0; transform: scale(0.8); }
+        }
+
+        /* Radial white bloom from impact — sharp, not blurry */
+        .bloom-veil {
+            position: fixed;
+            left: 55%;
+            top: 72%;
+            width: 24px;
+            height: 24px;
+            margin: -12px 0 0 -12px;
+            border-radius: 50%;
+            z-index: 8;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(circle, #ffffff 0%, #f2f6fa 55%, #e8eef4 100%);
+            transform: scale(0.01);
+            will-change: transform, opacity;
+        }
+        .bloom-veil.expand {
+            opacity: 1;
+            animation: bloom-expand 1s cubic-bezier(0.15, 0.2, 0.25, 1) forwards;
+        }
+        @keyframes bloom-expand {
+            0% { opacity: 1; transform: scale(0.01); }
+            70% { opacity: 1; transform: scale(55); }
+            100% { opacity: 1; transform: scale(90); }
+        }
+
         .void-veil {
             position: fixed;
             inset: 0;
-            z-index: 7;
+            z-index: 9;
             pointer-events: none;
             opacity: 0;
-        }
-        .flash-veil {
-            background: #f5f8fc;
-            z-index: 8;
-        }
-        .flash-veil.on {
-            animation: hard-flash 0.5s ease-out forwards;
-        }
-        @keyframes hard-flash {
-            0% { opacity: 0; }
-            12% { opacity: 1; }
-            55% { opacity: 1; }
-            100% { opacity: 0; }
-        }
-        .void-veil {
             background: #000;
-            z-index: 9;
-            transition: opacity 0.35s ease;
+            transition: opacity 0.3s ease;
         }
         .void-veil.on { opacity: 1; }
 
@@ -198,13 +247,10 @@
         body[data-scene="void"] {
             background: #000;
         }
-        body[data-scene="void"] .stars {
-            opacity: 0;
-        }
 
         .container {
             position: relative;
-            z-index: 3;
+            z-index: 4;
             width: 100%;
             max-width: 420px;
             margin-right: 6vw;
@@ -368,21 +414,33 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .strike-particle.fly,
-            .flash-veil.on,
+            .meteor.fly,
+            .bloom-veil.expand,
+            .impact-core.on,
             .drift-star { animation: none !important; }
+            .star-dot, .drift-star { transition-duration: 0.2s !important; }
         }
     </style>
 </head>
 <body>
     <div class="stars" id="starField" aria-hidden="true">
-        <div class="drift-star" data-l="8vw" data-t="20vh"></div>
-        <div class="drift-star" data-l="6vw" data-t="34vh"></div>
-        <div class="drift-star" data-l="11vw" data-t="46vh"></div>
+        <div class="drift-star" data-l="8vw" data-t="18vh"></div>
+        <div class="drift-star" data-l="6vw" data-t="32vh"></div>
+        <div class="drift-star" data-l="12vw" data-t="44vh"></div>
     </div>
+
+    <div class="meteor" id="meteor" aria-hidden="true"></div>
+    <div class="impact-core" id="impactCore" aria-hidden="true"></div>
+
+    <div class="forest-clearing" aria-hidden="true">
+        <svg viewBox="0 0 1440 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+            <path class="ridge" d="M0,210 C120,188 240,198 360,180 C480,162 600,190 720,175 C840,160 960,185 1080,170 C1200,155 1320,175 1440,165 L1440,320 L0,320 Z"/>
+            <path class="trees" d="M0,250 L40,210 L55,235 L70,195 L95,240 L120,200 L145,245 L170,205 L200,250 L230,210 L255,248 L280,215 L310,255 L340,218 L370,258 L400,220 L430,260 L460,222 L490,262 L520,225 L550,265 L580,228 L610,268 L640,230 L670,270 L700,232 L730,272 L760,235 L790,274 L820,238 L850,276 L880,240 L910,278 L940,242 L970,280 L1000,245 L1030,282 L1060,248 L1090,284 L1120,250 L1150,286 L1180,252 L1210,288 L1240,255 L1270,290 L1300,258 L1330,292 L1360,262 L1390,294 L1440,268 L1440,320 L0,320 Z"/>
+        </svg>
+    </div>
+
     <div class="coord-flash" id="coordFlash" aria-hidden="true"></div>
-    <div class="strike-particle tail" id="strikeParticle" aria-hidden="true"></div>
-    <div class="flash-veil" id="flashVeil" aria-hidden="true"></div>
+    <div class="bloom-veil" id="bloomVeil" aria-hidden="true"></div>
     <div class="void-veil" id="voidVeil" aria-hidden="true"></div>
 
     <div class="container">
@@ -447,9 +505,12 @@
         }
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
-            const username = document.getElementById('loginUsername').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-            await doRequest('/api/login', username, password, '登录成功！');
+            await doRequest(
+                '/api/login',
+                document.getElementById('loginUsername').value.trim(),
+                document.getElementById('loginPassword').value.trim(),
+                '登录成功！'
+            );
         });
 
         document.getElementById('registerBtn').addEventListener('click', async () => {
@@ -478,7 +539,6 @@
             btn.disabled = true;
             btn.textContent = '处理中...';
             showMessage('', '');
-
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), 10000);
             try {
@@ -493,13 +553,9 @@
                 if (res.ok && data.success) {
                     showMessage(data.message || successMsg, 'success');
                     if (url === '/api/login') {
-                        const loginUsername = data.username || username;
-                        localStorage.setItem('username', loginUsername);
-                        if (login_animation) {
-                            startSceneTransition(loginUsername);
-                        } else {
-                            window.location.href = '/lobby';
-                        }
+                        localStorage.setItem('username', data.username || username);
+                        if (login_animation) startSceneTransition();
+                        else window.location.href = '/lobby';
                     } else {
                         document.getElementById('regUsername').value = '';
                         document.getElementById('regPassword').value = '';
@@ -511,11 +567,10 @@
                     showMessage(data.message || '操作失败', 'error');
                 }
             } catch (err) {
-                if (err.name === 'AbortError') {
-                    showMessage('请求超时，请检查网络后重试', 'error');
-                } else {
-                    showMessage('网络错误，请稍后重试', 'error');
-                }
+                showMessage(
+                    err.name === 'AbortError' ? '请求超时，请检查网络后重试' : '网络错误，请稍后重试',
+                    'error'
+                );
             } finally {
                 clearTimeout(timer);
                 btn.disabled = false;
@@ -551,7 +606,6 @@
             let rafId = null;
             let nextEventIndex = 0;
             let cancelled = false;
-
             function at(ms, fn) {
                 events.push({ at: ms, fn });
                 return api;
@@ -577,11 +631,8 @@
                     try { events[nextEventIndex].fn(); } catch (e) { console.error(e); }
                     nextEventIndex++;
                 }
-                if (nextEventIndex < events.length) {
-                    rafId = requestAnimationFrame(tick);
-                } else {
-                    rafId = null;
-                }
+                if (nextEventIndex < events.length) rafId = requestAnimationFrame(tick);
+                else rafId = null;
             }
             const api = { at, start, cancel };
             return api;
@@ -589,20 +640,22 @@
 
         function seedFieldStars() {
             const field = document.getElementById('starField');
-            const positions = [
-                [12, 14], [28, 22], [44, 11], [61, 19], [78, 15], [88, 28],
-                [18, 38], [35, 44], [52, 36], [69, 48], [84, 41],
-                [8, 58], [25, 62], [41, 55], [58, 68], [74, 59], [91, 72],
-                [15, 78], [32, 84], [48, 76], [66, 88], [82, 81],
-            ];
-            positions.forEach(([x, y], i) => {
+            /* Dense DOM-only field (no CSS tile). Keep above treeline. */
+            const positions = [];
+            for (let i = 0; i < 52; i++) {
+                const x = 3 + (i * 17) % 94;
+                const y = 4 + ((i * 29) % 58);
+                positions.push([x, y, i]);
+            }
+            positions.forEach(([x, y, i]) => {
                 const d = document.createElement('div');
                 d.className = 'star-dot';
                 d.style.left = x + '%';
                 d.style.top = y + '%';
-                d.style.width = (i % 5 === 0 ? 2.5 : 1.5) + 'px';
-                d.style.height = d.style.width;
-                d.style.opacity = String(0.35 + (i % 7) * 0.07);
+                const size = i % 6 === 0 ? 2.4 : (i % 3 === 0 ? 1.8 : 1.3);
+                d.style.width = size + 'px';
+                d.style.height = size + 'px';
+                d.style.opacity = String(0.28 + (i % 8) * 0.07);
                 field.appendChild(d);
             });
         }
@@ -640,75 +693,71 @@
 
             const dots = Array.from(document.querySelectorAll('.star-dot'));
             const drifts = Array.from(document.querySelectorAll('.drift-star'));
-            const extinguishTargets = [...dots, ...drifts];
-            // Shuffle for uneven kill order
-            for (let i = extinguishTargets.length - 1; i > 0; i--) {
+            const targets = [...dots, ...drifts];
+            for (let i = targets.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [extinguishTargets[i], extinguishTargets[j]] = [extinguishTargets[j], extinguishTargets[i]];
+                [targets[i], targets[j]] = [targets[j], targets[i]];
             }
 
             const timeline = createTimeline();
             const coord = document.getElementById('coordFlash');
-            const strike = document.getElementById('strikeParticle');
-            const flash = document.getElementById('flashVeil');
+            const meteor = document.getElementById('meteor');
+            const impact = document.getElementById('impactCore');
+            const bloom = document.getElementById('bloomVeil');
             const voidEl = document.getElementById('voidVeil');
-            const field = document.getElementById('starField');
 
-            // Extinguish stars: slow then fast across ~0.3–3.2s
-            const n = extinguishTargets.length;
-            extinguishTargets.forEach((el, idx) => {
+            /* Gradual extinguish: staggered starts, each fades ~1.25s */
+            const n = targets.length;
+            targets.forEach((el, idx) => {
                 const t = idx / Math.max(1, n - 1);
-                const atMs = 300 + Math.pow(t, 1.35) * 2900;
+                const atMs = 250 + Math.pow(t, 1.25) * 3000;
                 timeline.at(atMs, () => {
                     document.body.dataset.scene = 'extinguish';
                     el.classList.add('out');
                 });
             });
 
-            timeline.at(3100, () => {
-                field.classList.add('extinguished');
-            });
-
-            // Coordinate flash — erased
-            timeline.at(3200, () => {
+            timeline.at(3400, () => {
                 const a = Math.floor(Math.random() * 90 + 10);
                 const b = Math.floor(Math.random() * 900 + 100);
                 const c = Math.floor(Math.random() * 900 + 100);
                 coord.textContent = `α · ${a}.${b} · ${c}`;
                 coord.classList.add('show');
             });
-            timeline.at(3550, () => {
+            timeline.at(3750, () => {
                 coord.classList.remove('show');
                 coord.textContent = '';
             });
 
-            // Strike particle toward camera
-            timeline.at(3600, () => {
-                document.body.dataset.scene = 'strike';
-                strike.classList.add('fly');
+            /* Meteor 45° — falls behind forest */
+            timeline.at(3900, () => {
+                document.body.dataset.scene = 'meteor';
+                meteor.classList.add('fly');
             });
 
-            // Hard white flash — our civilization hit
-            timeline.at(5400, () => {
-                document.body.dataset.scene = 'flash';
-                flash.classList.add('on');
-                strike.classList.remove('fly');
-                strike.style.opacity = '0';
+            timeline.at(5450, () => {
+                meteor.classList.remove('fly');
+                meteor.style.opacity = '0';
+                impact.classList.add('on');
             });
 
-            // Absolute void
-            timeline.at(5900, () => {
+            /* White bloom from impact behind treeline */
+            timeline.at(5600, () => {
+                document.body.dataset.scene = 'bloom';
+                bloom.classList.add('expand');
+            });
+
+            timeline.at(6550, () => {
                 document.body.dataset.scene = 'void';
                 voidEl.classList.add('on');
-                flash.classList.remove('on');
             });
 
-            timeline.at(7500, () => {
+            timeline.at(7800, () => {
                 const announcer = document.getElementById('transition-announcer');
                 if (announcer) announcer.remove();
             });
 
-            timeline.at(8200, goLobby);
+            timeline.at(8500, goLobby);
             timeline.start();
             window._sceneTimeline = timeline;
         }
@@ -721,8 +770,7 @@
         });
 
         (async () => {
-            const savedUser = localStorage.getItem('username');
-            if (!savedUser) return;
+            if (!localStorage.getItem('username')) return;
             try {
                 const res = await fetch('/api/rooms', { credentials: 'include' });
                 if (res.ok) window.location.href = '/lobby';
@@ -735,7 +783,6 @@
         });
     </script>
     <script>
-        /* Idle drift for three bright stars */
         (function () {
             const stars = Array.from(document.querySelectorAll('.drift-star'));
             if (!stars.length) return;
@@ -747,7 +794,7 @@
 
             stars.forEach((el) => {
                 el.style.left = el.getAttribute('data-l') || '8vw';
-                el.style.top = el.getAttribute('data-t') || '20vh';
+                el.style.top = el.getAttribute('data-t') || '18vh';
             });
 
             class Walker {
@@ -758,8 +805,8 @@
                         ? container.getBoundingClientRect().left
                         : window.innerWidth - 140;
                     this.maxX = Math.max(this.minX + 20, containerLeft - 60);
-                    this.minY = 6 * vh();
-                    this.maxY = 88 * vh();
+                    this.minY = 5 * vh();
+                    this.maxY = 52 * vh();
                     const cs = getComputedStyle(el);
                     this.baseX = parseFloat(cs.left) || this.minX + 20;
                     this.baseY = parseFloat(cs.top) || this.minY + 20;
@@ -770,7 +817,7 @@
                     this.startY = this.baseY;
                     this.targetX = rand(this.minX, this.maxX);
                     this.targetY = rand(this.minY, this.maxY);
-                    this.duration = rand(4000, 12000);
+                    this.duration = rand(4500, 12000);
                     this.startTime = undefined;
                 }
                 step(ts) {
@@ -789,9 +836,8 @@
                 }
             }
 
-            let walkers = stars.map((s) => new Walker(s));
+            const walkers = stars.map((s) => new Walker(s));
             window.stopStarDrift = () => { running = false; };
-
             function loop(ts) {
                 if (!running) return;
                 walkers.forEach((w) => w.step(ts));

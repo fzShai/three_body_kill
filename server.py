@@ -264,6 +264,22 @@ async def root():
     return JSONResponse({"message": "请在 static/login.html 中提供登录页"})
 
 
+# #region agent log
+@app.post("/api/debug-log")
+async def debug_log(request: Request):
+    """Temporary debug ingest → workspace NDJSON (session c8052d)."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {"message": "invalid json"}
+    line = json.dumps(data if isinstance(data, dict) else {"data": data}, ensure_ascii=False) + "\n"
+    log_path = BASE_DIR / "debug-c8052d.log"
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(line)
+    return JSONResponse({"ok": True})
+# #endregion
+
+
 @app.post("/api/register")
 async def register(request: Request):
     data = await request.json()

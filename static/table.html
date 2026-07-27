@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
     <link rel="stylesheet" href="/static/css/motion.css" />
-    <link rel="stylesheet" href="/static/css/table-board.css" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260727b" />
 </head>
 <body class="shell-page table-page">
     <button type="button" class="btn btn-outline log-toggle" id="logToggleBtn">战报</button>
@@ -87,6 +87,57 @@
         else if (!roomId) { window.location.href = '/lobby'; }
         else {
             document.getElementById('roomIdDisplay').textContent = roomId;
+            // #region agent log
+            function dbgLog(hypothesisId, location, message, data) {
+                const payload = {sessionId:'c8052d',runId:'pre-fix',hypothesisId,location,message,data:data||{},timestamp:Date.now()};
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c8052d'},body:JSON.stringify(payload)}).catch(()=>{});
+                fetch('/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
+            }
+            function dbgLayoutSnapshot(tag) {
+                const board = document.querySelector('.board');
+                const arena = document.querySelector('.board-arena');
+                const drawer = document.getElementById('logDrawer');
+                const toggle = document.getElementById('logToggleBtn');
+                const stage = document.getElementById('stage');
+                const hand = document.getElementById('hand');
+                const cssHref = [...document.styleSheets].map((s) => { try { return s.href; } catch (e) { return 'opaque'; } });
+                const boardCs = board ? getComputedStyle(board) : null;
+                const drawerCs = drawer ? getComputedStyle(drawer) : null;
+                const br = board ? board.getBoundingClientRect() : null;
+                const ar = arena ? arena.getBoundingClientRect() : null;
+                const dr = drawer ? drawer.getBoundingClientRect() : null;
+                const sr = stage ? stage.getBoundingClientRect() : null;
+                dbgLog('A', 'table.html:layout', tag, {
+                    cssHref,
+                    tableBoardLinked: !!document.querySelector('link[href*="table-board"]'),
+                    boardDisplay: boardCs && boardCs.display,
+                    boardGrid: boardCs && boardCs.gridTemplateRows,
+                    boardH: br && { w: br.width, h: br.height, top: br.top, left: br.left },
+                    arenaH: ar && { w: ar.width, h: ar.height, top: ar.top },
+                    stageH: sr && { w: sr.width, h: sr.height, top: sr.top, left: sr.left },
+                    drawer: drawer && {
+                        className: drawer.className,
+                        position: drawerCs.position,
+                        transform: drawerCs.transform,
+                        right: drawerCs.right,
+                        left: drawerCs.left,
+                        rect: { w: dr.width, h: dr.height, top: dr.top, left: dr.left },
+                        visible: dr.width > 0 && dr.left < window.innerWidth && dr.right > 0,
+                    },
+                    toggleRect: toggle && (() => { const r = toggle.getBoundingClientRect(); return { left: r.left, top: r.top, w: r.width }; })(),
+                    handChildren: hand ? hand.children.length : -1,
+                    seatChildren: document.getElementById('seatRing') ? document.getElementById('seatRing').children.length : -1,
+                    bodyOverflow: getComputedStyle(document.body).overflow,
+                    vw: window.innerWidth,
+                    vh: window.innerHeight,
+                });
+            }
+            window.addEventListener('error', (ev) => {
+                dbgLog('D', 'table.html:onerror', String(ev.message || 'error'), { file: ev.filename, line: ev.lineno, col: ev.colno });
+            });
+            setTimeout(() => dbgLayoutSnapshot('onload+0ms'), 0);
+            setTimeout(() => dbgLayoutSnapshot('onload+500ms'), 500);
+            // #endregion
             let state = null;
             let selectedId = null;
             let selectedIds = new Set();
@@ -392,6 +443,9 @@
             }
 
             function render(snap) {
+                // #region agent log
+                try {
+                // #endregion
                 state = snap;
                 turnDeadlineMs = snap.turn_deadline_ms || null;
                 syncUiMode(snap);
@@ -672,6 +726,20 @@
                 document.getElementById('dyingPassBtn').disabled = !myDying;
 
                 document.getElementById('log').innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
+                // #region agent log
+                dbgLog('D', 'table.html:render-ok', 'render finished', {
+                    phase: snap.phase,
+                    players: (snap.players || []).length,
+                    hand: (snap.you && snap.you.hand || []).length,
+                    seatDom: document.getElementById('seatRing').children.length,
+                    handDom: document.getElementById('hand').children.length,
+                });
+                dbgLayoutSnapshot('after-render');
+                } catch (err) {
+                    dbgLog('D', 'table.html:render-err', String(err && err.message || err), { stack: String(err && err.stack || '').slice(0, 500) });
+                    throw err;
+                }
+                // #endregion
             }
 
             function clearSelection() {

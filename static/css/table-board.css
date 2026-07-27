@@ -359,9 +359,18 @@ body.shell-page.table-page::before { opacity: 0.28; }
     gap: 8px;
 }
 
-/* —— Log drawer —— */
+/* —— Log drawer ——
+ * shell.css sets `body.shell-page > * { position: relative }`, which beats
+ * bare `.log-drawer { position: fixed }` and parks the 100vh drawer in-flow,
+ * pushing `.board` below the fold under overflow:hidden. Override with higher specificity.
+ */
+body.shell-page.table-page > .log-drawer,
+body.shell-page.table-page > .log-toggle,
+body.shell-page.table-page > .log-backdrop {
+    position: fixed !important;
+}
+
 .log-drawer {
-    position: fixed;
     top: 0;
     right: 0;
     width: min(300px, 92vw);
@@ -395,13 +404,11 @@ body.shell-page.table-page::before { opacity: 0.28; }
     border-bottom: 1px solid var(--line);
 }
 .log-toggle {
-    position: fixed;
     top: 12px;
     right: 12px;
     z-index: 41;
 }
 .log-backdrop {
-    position: fixed;
     inset: 0;
     z-index: 39;
     background: rgba(0, 0, 0, 0.35);

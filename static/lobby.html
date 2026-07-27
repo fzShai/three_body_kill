@@ -42,6 +42,9 @@
                     document.body.classList.add('lobby-from-void');
                     sessionStorage.removeItem('tbk_enter');
                     setTimeout(() => document.body.classList.remove('lobby-from-void'), 1600);
+                } else if (enter === 'skip') {
+                    /* Esc skip: enter lobby immediately, no void veil */
+                    sessionStorage.removeItem('tbk_enter');
                 }
             } catch (e) { /* ignore */ }
         })();

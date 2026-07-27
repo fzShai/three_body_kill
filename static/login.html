@@ -410,6 +410,34 @@
             .blast-grain.on,
             .drift-star { animation: none !important; }
         }
+
+        .skip-hint {
+            position: fixed;
+            right: 1.25rem;
+            bottom: 1.25rem;
+            z-index: 10000;
+            font-family: var(--font-mono, 'IBM Plex Mono', ui-monospace, monospace);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            color: rgba(200, 220, 230, 0.55);
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(140, 170, 180, 0.25);
+            padding: 0.45rem 0.7rem;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+        .skip-hint.on {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .skip-hint:hover,
+        .skip-hint:focus-visible {
+            color: rgba(220, 235, 240, 0.9);
+            border-color: rgba(160, 190, 200, 0.45);
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -429,6 +457,7 @@
     <div class="blast-exposure" id="blastExposure" aria-hidden="true"></div>
     <div class="blast-grain" id="blastGrain" aria-hidden="true"></div>
     <div class="void-veil" id="voidVeil" aria-hidden="true"></div>
+    <button type="button" class="skip-hint" id="skipHint" hidden>Esc · 跳过</button>
 
     <div class="container">
         <div class="panel-badge" aria-hidden="true">
@@ -478,6 +507,8 @@
     <script>
         const login_animation = true;
         const messageEl = document.getElementById('message');
+        let pendingSkip = false;
+        let transitionArmed = false;
 
         document.getElementById('loginTab').addEventListener('click', () => setTab('login'));
         document.getElementById('registerTab').addEventListener('click', () => setTab('register'));
@@ -492,6 +523,9 @@
         }
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
+            pendingSkip = false;
+            // Arm Esc as soon as login is requested so early Esc still skips the coming transition
+            armEarlyEscSkip();
             await doRequest(
                 '/api/login',
                 document.getElementById('loginUsername').value.trim(),
@@ -777,10 +811,46 @@
             });
         }
 
+        function isEscapeKey(e) {
+            return e.key === 'Escape' || e.key === 'Esc' || e.code === 'Escape';
+        }
+
+        function armEarlyEscSkip() {
+            if (window.__earlyEscArmed) return;
+            window.__earlyEscArmed = true;
+            const onEarly = (e) => {
+                if (!isEscapeKey(e)) return;
+                // #region agent log
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'E',location:'login.html:earlyEsc',message:'esc before/during arm',data:{transitionArmed,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+                e.preventDefault();
+                pendingSkip = true;
+                if (transitionArmed && typeof window._skipLoginScene === 'function') {
+                    window._skipLoginScene();
+                }
+            };
+            document.addEventListener('keydown', onEarly, true);
+            window.__earlyEscHandler = onEarly;
+        }
+
+        function disarmEarlyEscSkip() {
+            if (window.__earlyEscHandler) {
+                document.removeEventListener('keydown', window.__earlyEscHandler, true);
+                window.__earlyEscHandler = null;
+            }
+            window.__earlyEscArmed = false;
+        }
+
         function startSceneTransition() {
             let aborted = false;
             const timers = [];
             const timelines = [];
+            transitionArmed = true;
+            armEarlyEscSkip();
+
+            // #region agent log
+            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:startSceneTransition',message:'transition started',data:{reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
 
             const schedule = (fn, ms) => {
                 const id = setTimeout(() => {
@@ -791,29 +861,69 @@
                 return id;
             };
 
-            const goLobby = () => {
-                try { sessionStorage.setItem('tbk_enter', 'void'); } catch (e) {}
+            const goLobby = (enterMode) => {
+                // #region agent log
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'D',location:'login.html:goLobby',message:'navigating to lobby',data:{aborted,enterMode,href:window.location.href},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+                try { sessionStorage.setItem('tbk_enter', enterMode || 'void'); } catch (e) {}
                 window.location.href = '/lobby';
             };
 
+            const hideSkipHint = () => {
+                const hint = document.getElementById('skipHint');
+                if (!hint) return;
+                hint.classList.remove('on');
+                hint.hidden = true;
+            };
+
             const skipToLobby = () => {
+                // #region agent log
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'D',location:'login.html:skipToLobby',message:'skip invoked',data:{aborted,timerCount:timers.length,timelineCount:timelines.length,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 if (aborted) return;
                 aborted = true;
+                pendingSkip = false;
                 timers.forEach((id) => clearTimeout(id));
                 timelines.forEach((tl) => { try { tl.cancel(); } catch (e) {} });
+                document.removeEventListener('keydown', onEscSkip, true);
                 window.removeEventListener('keydown', onEscSkip);
+                disarmEarlyEscSkip();
+                hideSkipHint();
                 const announcer = document.getElementById('transition-announcer');
                 if (announcer) announcer.remove();
-                goLobby();
+                /* Instant black so skip feels immediate before navigation */
+                document.body.dataset.scene = 'void';
+                const voidEl = document.getElementById('voidVeil');
+                if (voidEl) voidEl.classList.add('on');
+                const blast = document.getElementById('blastExposure');
+                if (blast) {
+                    blast.classList.remove('afterimage', 'climb', 'hold');
+                    blast.style.opacity = '0';
+                }
+                goLobby('skip');
             };
 
             const onEscSkip = (e) => {
-                if (e.key === 'Escape' || e.key === 'Esc') {
-                    e.preventDefault();
-                    skipToLobby();
-                }
+                // #region agent log
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:onEscSkip',message:'keydown during transition',data:{key:e.key,code:e.code,type:e.type,targetTag:e.target&&e.target.tagName},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+                if (!isEscapeKey(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                skipToLobby();
             };
+            document.addEventListener('keydown', onEscSkip, true);
             window.addEventListener('keydown', onEscSkip);
+            // #region agent log
+            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'C',location:'login.html:listenerAttached',message:'esc listener attached capture+window',data:{pendingSkip},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+
+            const hint = document.getElementById('skipHint');
+            if (hint) {
+                hint.hidden = false;
+                hint.classList.add('on');
+                hint.onclick = () => skipToLobby();
+            }
 
             const container = document.querySelector('.container');
             if (container) {
@@ -830,9 +940,14 @@
                 live.textContent = '登录成功，正在前往大厅... 按 Esc 跳过';
             }
 
+            if (pendingSkip) {
+                skipToLobby();
+                return;
+            }
+
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 document.body.dataset.scene = 'start';
-                schedule(goLobby, 400);
+                schedule(() => goLobby('void'), 400);
                 return;
             }
 
@@ -932,8 +1047,11 @@
                         schedule(() => {
                             const announcer = document.getElementById('transition-announcer');
                             if (announcer) announcer.remove();
+                            document.removeEventListener('keydown', onEscSkip, true);
                             window.removeEventListener('keydown', onEscSkip);
-                            goLobby();
+                            disarmEarlyEscSkip();
+                            hideSkipHint();
+                            goLobby('void');
                         }, 500 + 1700 + 650 + 420 + 850 + 900);
                     });
                     killTimeline.start();

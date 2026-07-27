@@ -67,9 +67,39 @@
     border-color: var(--accent-ice) !important;
 }
 .card-lift.selected {
-    transform: translateY(-4px);
+    transform: translateY(-14px);
     border-color: var(--accent-ice-bright) !important;
     box-shadow: 0 0 0 1px var(--accent-ice-dim);
+}
+.hand .card.card-lift:hover {
+    transform: translateY(-10px);
+}
+.hand .card.card-lift.selected {
+    transform: translateY(-14px);
+}
+
+/* Seat / stage / action bar (table board) */
+@keyframes stage-card-in {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.96);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.stage-card.stage-enter {
+    animation: stage-card-in 0.28s ease-out both;
+}
+
+.seat-panel.selected-target {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.action-bar .btn {
+    transition: opacity 0.15s ease, border-color 0.15s ease;
 }
 
 /* Swordholder deterrence pulse — dying only */
@@ -110,11 +140,14 @@ body.table-ended .ended-banner {
     .panel.radar-once::after,
     .deterrence-pulse,
     .ended-banner,
+    .stage-card.stage-enter,
     body.shell-page::before {
         animation: none !important;
     }
     .card-lift:hover,
-    .card-lift.selected {
+    .card-lift.selected,
+    .hand .card.card-lift:hover,
+    .hand .card.card-lift.selected {
         transform: none;
     }
 }

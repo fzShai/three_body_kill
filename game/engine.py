@@ -138,6 +138,7 @@ class GameSession:
         self.turn_deadline_at = 0.0
         self.prompt: dict[str, Any] | None = None
         self.dying: dict[str, Any] | None = None
+        self.stage: dict[str, Any] = {"kind": "idle", "card": None, "from": None, "to": None, "text": ""}
         self._pending_conclude: str | None = None
         self.fields: list[dict[str, Any]] = []
         self.field_multiplier: int = 1
@@ -158,6 +159,140 @@ class GameSession:
         self.log.append(text)
         if len(self.log) > 100:
             self.log = self.log[-100:]
+
+    def _set_stage(
+        self,
+        kind: str,
+        *,
+        card: dict[str, Any] | None = None,
+        from_name: str | None = None,
+        to_name: str | None = None,
+        text: str = "",
+    ) -> None:
+        card_view = None
+        if card:
+            card_view = {
+                "name": card.get("name"),
+                "id": card.get("id"),
+                "type": card.get("type"),
+                "subtype": card.get("subtype"),
+                "tier": card.get("tier"),
+            }
+        self.stage = {
+            "kind": kind,
+            "card": card_view,
+            "from": from_name,
+            "to": to_name,
+            "text": text,
+        }
+
+    def _compute_stage(self) -> dict[str, Any]:
+        """Live stage for UI: prefer prompt/dying over last play."""
+        if self.phase == "ended":
+            text = f"对局结束 · 胜者 {self.winner}" if self.winner else "对局结束"
+            return {"kind": "ended", "card": None, "from": None, "to": self.winner, "text": text}
+        if self.phase == "dying" and self.dying:
+            victim = self.dying.get("victim")
+            return {
+                "kind": "dying",
+                "card": {"name": "桃", "subtype": "heal"},
+                "from": self.dying.get("source"),
+                "to": victim,
+                "text": f"{victim} 濒死 · 求桃",
+            }
+        if self.phase == "prompt" and self.prompt:
+            p = self.prompt
+            ptype = p.get("type")
+            card_name = p.get("card_name")
+            card = {"name": card_name} if card_name else None
+            if ptype == "respond_dodge":
+                return {
+                    "kind": "kill",
+                    "card": card or {"name": "杀", "subtype": "kill"},
+                    "from": p.get("from"),
+                    "to": p.get("to"),
+                    "text": f"{p.get('from')} 对 {p.get('to')} 使用{card_name or '杀'}",
+                }
+            if ptype == "interrupt_trick":
+                return {
+                    "kind": "trick",
+                    "card": card or {"name": "锦囊"},
+                    "from": p.get("from"),
+                    "to": p.get("to"),
+                    "text": f"{p.get('from')} 打出{card_name or '锦囊'} · 可打断",
+                }
+            if ptype == "respond_toxic":
+                return {
+                    "kind": "trick",
+                    "card": card or {"name": "剧毒之水"},
+                    "from": p.get("from"),
+                    "to": p.get("to"),
+                    "text": f"{p.get('from')} 对 {p.get('to')} 使用剧毒之水",
+                }
+            if ptype == "choice":
+                labels = " / ".join(o.get("label", "") for o in (p.get("options") or []))
+                return {
+                    "kind": "choice",
+                    "card": card,
+                    "from": p.get("from"),
+                    "to": p.get("to"),
+                    "text": f"{p.get('to')} 请选择：{labels}",
+                }
+            if ptype == "wander_draw":
+                return {
+                    "kind": "skill",
+                    "card": None,
+                    "from": p.get("to"),
+                    "to": p.get("to"),
+                    "text": f"{p.get('to')} 【流浪】：是否失去 1 体力并摸两张？",
+                }
+            if ptype == "benevolence_heal":
+                return {
+                    "kind": "skill",
+                    "card": None,
+                    "from": p.get("to"),
+                    "to": None,
+                    "text": f"{p.get('to')} 【仁心】：指定一名角色回复 2 点",
+                }
+            if ptype == "madonna_save":
+                return {
+                    "kind": "skill",
+                    "card": None,
+                    "from": p.get("to"),
+                    "to": p.get("victim"),
+                    "text": f"{p.get('to')} 【圣母】：是否救治 {p.get('victim')}？",
+                }
+            if ptype == "gravity_override":
+                return {
+                    "kind": "skill",
+                    "card": None,
+                    "from": p.get("to"),
+                    "to": None,
+                    "text": f"{p.get('to')} 万有引力号：弃两张使杀仍生效？",
+                }
+            return {
+                "kind": "prompt",
+                "card": card,
+                "from": p.get("from"),
+                "to": p.get("to"),
+                "text": str(ptype or "响应"),
+            }
+        if self.phase == "turn" and self.turn_phase == "discard":
+            who = self.current_player()
+            return {
+                "kind": "discard",
+                "card": None,
+                "from": who,
+                "to": None,
+                "text": f"{who} 弃牌阶段",
+            }
+        return dict(self.stage) if self.stage else {
+            "kind": "idle",
+            "card": None,
+            "from": None,
+            "to": None,
+            "text": "",
+        }
 
     def current_player(self) -> str:
         return self.player_order[self.turn_index % len(self.player_order)]
@@ -787,6 +922,13 @@ class GameSession:
         self.phase = "dying"
         self.dying = {"victim": victim, "source": source}
         self.prompt = None
+        self._set_stage(
+            "dying",
+            card={"name": "桃", "subtype": "heal"},
+            from_name=source,
+            to_name=victim,
+            text=f"{victim} 濒死 · 求桃",
+        )
         self._log(f"{victim} 进入濒死")
         self._start_turn_timer()
         return f"{victim} 濒死"
@@ -871,6 +1013,11 @@ class GameSession:
 
         if act == "end_play":
             self.turn_phase = "discard"
+            self._set_stage(
+                "discard",
+                from_name=username,
+                text=f"{username} 弃牌阶段",
+            )
             self._log(f"{username} 进入弃牌阶段")
             self.refresh_turn_timer()
             self.seq += 1
@@ -1159,6 +1306,13 @@ class GameSession:
             self._log(f"{username} 唐号入场：摸 {len(drawn)} 张")
         label = SLOT_LABELS.get(slot, slot)
         note = f"（{', '.join(notes)}）" if notes else ""
+        self._set_stage(
+            "equip",
+            card=card,
+            from_name=username,
+            to_name=username,
+            text=f"{username} 装备 {card.get('name')}",
+        )
         self._log(f"{username} 装备[{label}] {card.get('name')}{note}")
         return True, f"已装备 {card.get('name')}"
 
@@ -1220,6 +1374,13 @@ class GameSession:
             heal = int(card.get("heal", 2))
             self._heal(username, heal)
             self.discard.append(card)
+            self._set_stage(
+                "heal",
+                card=card,
+                from_name=username,
+                to_name=username,
+                text=f"{username} 使用桃",
+            )
             self._on_basic_played(username, card)
             self._on_card_used(username)
             self._log(f"{username} 使用桃，HP {self.players[username]['hp']}")
@@ -1230,6 +1391,13 @@ class GameSession:
 
         if subtype == "visitor" or cid == "visitor":
             self.discard.append(card)
+            self._set_stage(
+                "basic",
+                card=card,
+                from_name=username,
+                to_name=None,
+                text=f"{username} 使用天外来客",
+            )
             self._on_basic_played(username, card)
             self._on_card_used(username)
             self._raise_tech(username, 1)
@@ -1433,6 +1601,13 @@ class GameSession:
             "nullified": False,
         }
         self.phase = "prompt"
+        self._set_stage(
+            "trick",
+            card=card,
+            from_name=username,
+            to_name=target,
+            text=f"{username} 打出{card.get('name')}",
+        )
         self._log(f"{username} 打出{card.get('name')}，等待打断（{responders[0]}）")
         self._start_turn_timer()
 
@@ -1660,6 +1835,13 @@ class GameSession:
                 "undodgeable": True,
             }
             self.phase = "prompt"
+            self._set_stage(
+                "kill",
+                card=card,
+                from_name=username,
+                to_name=target,
+                text=f"{username} 对 {target} 使用{card.get('name')}",
+            )
             reason = "领袖" if skill_active(p, SKILL_LEADER) else "执剑人"
             self._log(f"{username} 对 {target} 使用{card.get('name')}（{reason}：无法响应）")
             self._finish_kill_prompt(dodged=False)
@@ -1677,6 +1859,13 @@ class GameSession:
             "curvature": bool(tgt.get("curvature")),
         }
         self.phase = "prompt"
+        self._set_stage(
+            "kill",
+            card=card,
+            from_name=username,
+            to_name=target,
+            text=f"{username} 对 {target} 使用{card.get('name')}",
+        )
         if is_native_repeat:
             self._log(f"{username} 【土著】：对 {target} 再次结算{card.get('name')}，等待闪响应")
         else:
@@ -1998,6 +2187,7 @@ class GameSession:
             "turn_deadline_ms": int(self.turn_deadline_at * 1000) if timed else None,
             "prompt": deepcopy(self.prompt),
             "dying": deepcopy(self.dying),
+            "stage": self._compute_stage(),
             "fields": deepcopy(self.fields),
             "field_multiplier": self.field_multiplier,
             "trisolaris_era": self.trisolaris_era,

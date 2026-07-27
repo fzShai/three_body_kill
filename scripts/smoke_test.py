@@ -110,6 +110,9 @@ def main() -> None:
     ok, msg = g.apply_action(cur, {"action": "play_card", "instance_id": "peach-t1"})
     assert ok, msg
     assert g.players[cur]["hp"] == 4
+    snap = g.snapshot_for(cur)
+    assert snap.get("stage", {}).get("kind") == "heal"
+    assert snap["stage"].get("card", {}).get("name") == "桃"
 
     # visitor raises tech
     visitor = {

@@ -413,20 +413,22 @@
 
         .skip-hint {
             position: fixed;
-            right: 1.25rem;
-            bottom: 1.25rem;
+            left: 50%;
+            top: 1.35rem;
+            transform: translateX(-50%);
             z-index: 10000;
             font-family: var(--font-mono, 'IBM Plex Mono', ui-monospace, monospace);
-            font-size: 0.72rem;
-            letter-spacing: 0.08em;
-            color: rgba(200, 220, 230, 0.55);
-            background: rgba(0, 0, 0, 0.45);
-            border: 1px solid rgba(140, 170, 180, 0.25);
-            padding: 0.45rem 0.7rem;
+            font-size: 0.85rem;
+            letter-spacing: 0.12em;
+            color: #e8f4f8;
+            background: rgba(6, 12, 20, 0.88);
+            border: 1px solid rgba(160, 210, 220, 0.65);
+            padding: 0.55rem 1rem;
             cursor: pointer;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.25s ease;
+            transition: opacity 0.2s ease;
+            text-shadow: 0 0 12px rgba(140, 200, 220, 0.35);
         }
         .skip-hint.on {
             opacity: 1;
@@ -434,8 +436,9 @@
         }
         .skip-hint:hover,
         .skip-hint:focus-visible {
-            color: rgba(220, 235, 240, 0.9);
-            border-color: rgba(160, 190, 200, 0.45);
+            color: #fff;
+            border-color: rgba(190, 230, 240, 0.95);
+            background: rgba(10, 18, 28, 0.95);
             outline: none;
         }
     </style>
@@ -923,6 +926,11 @@
                 hint.hidden = false;
                 hint.classList.add('on');
                 hint.onclick = () => skipToLobby();
+                // #region agent log
+                const hr = hint.getBoundingClientRect();
+                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'V',location:'login.html:hintShown',message:'skip hint shown',data:{opacity:getComputedStyle(hint).opacity,color:getComputedStyle(hint).color,top:hr.top,left:hr.left,vw:innerWidth,vh:innerHeight,inView:hr.top>=0&&hr.bottom<=innerHeight},timestamp:Date.now()})}).catch(()=>{});
+                try { sessionStorage.setItem('tbk_dbg_hint', JSON.stringify({shown:true,t:Date.now(),top:hr.top,vh:innerHeight})); } catch (e) {}
+                // #endregion
             }
 
             const container = document.querySelector('.container');

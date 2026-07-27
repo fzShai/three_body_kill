@@ -743,7 +743,7 @@
         }
         buildForest();
 
-        function dropBigStars(done) {
+        function dropBigStars(done, isAborted) {
             const stars = Array.from(document.querySelectorAll('.drift-star'));
             let left = stars.length;
             if (!left) {
@@ -759,6 +759,7 @@
                 const duration = 1600 + idx * 180;
                 const t0 = performance.now();
                 function step(ts) {
+                    if (isAborted && isAborted()) return;
                     const t = Math.min(1, (ts - t0) / duration);
                     const ease = t * t;
                     el.style.left = startX + 'px';
@@ -777,10 +778,42 @@
         }
 
         function startSceneTransition() {
+            let aborted = false;
+            const timers = [];
+            const timelines = [];
+
+            const schedule = (fn, ms) => {
+                const id = setTimeout(() => {
+                    if (aborted) return;
+                    fn();
+                }, ms);
+                timers.push(id);
+                return id;
+            };
+
             const goLobby = () => {
                 try { sessionStorage.setItem('tbk_enter', 'void'); } catch (e) {}
                 window.location.href = '/lobby';
             };
+
+            const skipToLobby = () => {
+                if (aborted) return;
+                aborted = true;
+                timers.forEach((id) => clearTimeout(id));
+                timelines.forEach((tl) => { try { tl.cancel(); } catch (e) {} });
+                window.removeEventListener('keydown', onEscSkip);
+                const announcer = document.getElementById('transition-announcer');
+                if (announcer) announcer.remove();
+                goLobby();
+            };
+
+            const onEscSkip = (e) => {
+                if (e.key === 'Escape' || e.key === 'Esc') {
+                    e.preventDefault();
+                    skipToLobby();
+                }
+            };
+            window.addEventListener('keydown', onEscSkip);
 
             const container = document.querySelector('.container');
             if (container) {
@@ -794,12 +827,12 @@
                     live.style.cssText = 'position:fixed;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);';
                     document.body.appendChild(live);
                 }
-                live.textContent = '登录成功，正在前往大厅...';
+                live.textContent = '登录成功，正在前往大厅... 按 Esc 跳过';
             }
 
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 document.body.dataset.scene = 'start';
-                setTimeout(goLobby, 400);
+                schedule(goLobby, 400);
                 return;
             }
 
@@ -807,6 +840,7 @@
             if (window.stopStarDrift) window.stopStarDrift();
 
             const timeline = createTimeline();
+            timelines.push(timeline);
             const coord = document.getElementById('coordFlash');
             const meteor = document.getElementById('meteor');
             const blast = document.getElementById('blastExposure');
@@ -816,12 +850,12 @@
             /* Phase A: big stars fall below horizon, then small-star kill */
             timeline.at(0, () => {
                 dropBigStars(() => {
+                    if (aborted) return;
                     document.body.dataset.scene = 'extinguish';
                     const dots = Array.from(document.querySelectorAll('.star-dot'));
                     const fades = dots.filter((d) => d.classList.contains('mode-fade'));
                     const snaps = dots.filter((d) => d.classList.contains('mode-snap'));
 
-                    /* shuffle */
                     const shuffle = (arr) => {
                         for (let i = arr.length - 1; i > 0; i--) {
                             const j = Math.floor(Math.random() * (i + 1));
@@ -833,15 +867,19 @@
                     shuffle(snaps);
 
                     const killTimeline = createTimeline();
-                    /* some fades first as bed */
+                    timelines.push(killTimeline);
                     fades.forEach((el, i) => {
-                        killTimeline.at(80 + i * 70, () => el.classList.add('out'));
+                        killTimeline.at(80 + i * 70, () => {
+                            if (!aborted) el.classList.add('out');
+                        });
                     });
-                    /* rhythmic snaps */
                     snaps.forEach((el, i) => {
                         const at = 400 + i * (95 + Math.floor(Math.random() * 55));
-                        killTimeline.at(at, () => el.classList.add('flash'));
+                        killTimeline.at(at, () => {
+                            if (!aborted) el.classList.add('flash');
+                        });
                         killTimeline.at(at + 140, () => {
+                            if (aborted) return;
                             el.classList.remove('flash');
                             el.classList.add('out');
                         });
@@ -849,23 +887,23 @@
 
                     const snapEnd = 400 + snaps.length * 150 + 200;
                     killTimeline.at(Math.max(snapEnd, fades.length * 70 + 900), () => {
-                        /* continue main narrative */
+                        if (aborted) return;
                         const a = Math.floor(Math.random() * 90 + 10);
                         const b = Math.floor(Math.random() * 900 + 100);
                         const c = Math.floor(Math.random() * 900 + 100);
                         coord.textContent = `α · ${a}.${b} · ${c}`;
                         coord.classList.add('show');
-                        setTimeout(() => {
+                        schedule(() => {
                             coord.classList.remove('show');
                             coord.textContent = '';
                         }, 380);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             document.body.dataset.scene = 'meteor';
                             meteor.classList.add('fly');
                         }, 500);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             meteor.classList.remove('fly');
                             meteor.style.opacity = '0';
                             document.body.dataset.scene = 'blast';
@@ -873,17 +911,17 @@
                             grain.classList.add('on');
                         }, 500 + 1700);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             blast.classList.remove('climb');
                             blast.classList.add('hold');
                         }, 500 + 1700 + 650);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             blast.classList.remove('hold');
                             blast.classList.add('afterimage');
                         }, 500 + 1700 + 650 + 420);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             document.body.dataset.scene = 'void';
                             voidEl.classList.add('on');
                             blast.classList.remove('afterimage', 'climb', 'hold');
@@ -891,18 +929,20 @@
                             grain.classList.remove('on');
                         }, 500 + 1700 + 650 + 420 + 850);
 
-                        setTimeout(() => {
+                        schedule(() => {
                             const announcer = document.getElementById('transition-announcer');
                             if (announcer) announcer.remove();
+                            window.removeEventListener('keydown', onEscSkip);
                             goLobby();
                         }, 500 + 1700 + 650 + 420 + 850 + 900);
                     });
                     killTimeline.start();
-                });
+                }, () => aborted);
             });
 
             timeline.start();
             window._sceneTimeline = timeline;
+            window._skipLoginScene = skipToLobby;
         }
 
         document.getElementById('loginPassword').addEventListener('keydown', (e) => {

@@ -823,9 +823,6 @@
             window.__earlyEscArmed = true;
             const onEarly = (e) => {
                 if (!isEscapeKey(e)) return;
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'E',location:'login.html:earlyEsc',message:'esc before/during arm',data:{transitionArmed,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 e.preventDefault();
                 pendingSkip = true;
                 if (transitionArmed && typeof window._skipLoginScene === 'function') {
@@ -851,10 +848,6 @@
             transitionArmed = true;
             armEarlyEscSkip();
 
-            // #region agent log
-            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'A',location:'login.html:startSceneTransition',message:'transition started',data:{reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
-
             const schedule = (fn, ms) => {
                 const id = setTimeout(() => {
                     if (aborted) return;
@@ -865,9 +858,6 @@
             };
 
             const goLobby = (enterMode) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'D',location:'login.html:goLobby',message:'navigating to lobby',data:{aborted,enterMode,href:window.location.href},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 try { sessionStorage.setItem('tbk_enter', enterMode || 'void'); } catch (e) {}
                 window.location.href = '/lobby';
             };
@@ -880,9 +870,6 @@
             };
 
             const skipToLobby = () => {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'D',location:'login.html:skipToLobby',message:'skip invoked',data:{aborted,timerCount:timers.length,timelineCount:timelines.length,pendingSkip},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 if (aborted) return;
                 aborted = true;
                 pendingSkip = false;
@@ -907,9 +894,6 @@
             };
 
             const onEscSkip = (e) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'B',location:'login.html:onEscSkip',message:'keydown during transition',data:{key:e.key,code:e.code,type:e.type,targetTag:e.target&&e.target.tagName},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
                 if (!isEscapeKey(e)) return;
                 e.preventDefault();
                 e.stopPropagation();
@@ -917,20 +901,12 @@
             };
             document.addEventListener('keydown', onEscSkip, true);
             window.addEventListener('keydown', onEscSkip);
-            // #region agent log
-            fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'C',location:'login.html:listenerAttached',message:'esc listener attached capture+window',data:{pendingSkip},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
 
             const hint = document.getElementById('skipHint');
             if (hint) {
                 hint.hidden = false;
                 hint.classList.add('on');
                 hint.onclick = () => skipToLobby();
-                // #region agent log
-                const hr = hint.getBoundingClientRect();
-                fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bf8eb7'},body:JSON.stringify({sessionId:'bf8eb7',runId:'post-fix',hypothesisId:'V',location:'login.html:hintShown',message:'skip hint shown',data:{opacity:getComputedStyle(hint).opacity,color:getComputedStyle(hint).color,top:hr.top,left:hr.left,vw:innerWidth,vh:innerHeight,inView:hr.top>=0&&hr.bottom<=innerHeight},timestamp:Date.now()})}).catch(()=>{});
-                try { sessionStorage.setItem('tbk_dbg_hint', JSON.stringify({shown:true,t:Date.now(),top:hr.top,vh:innerHeight})); } catch (e) {}
-                // #endregion
             }
 
             const container = document.querySelector('.container');

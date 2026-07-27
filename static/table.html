@@ -498,17 +498,25 @@
                 const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || myGravity;
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
-                    if (isWander || isBenevolence || isMadonna) dim = 'dim';
-                    else if (isGravity) dim = '';
+                    let dimBranch = 'none';
+                    if (isWander || isBenevolence || isMadonna) { dim = 'dim'; dimBranch = 'skill'; }
+                    else if (isGravity) { dim = ''; dimBranch = 'gravity'; }
                     else if (isInterrupt) {
                         const ok = c.id === 'thought_stamp' || c.id === 'return_motion'
                             || (prompt.type === 'respond_toxic' && (c.subtype === 'kill' || c.id === 'thought_stamp'));
                         dim = ok ? '' : 'dim';
+                        dimBranch = ok ? 'interrupt_ok' : 'interrupt_dim';
                     } else if (isPrompt) {
                         dim = c.subtype === 'dodge' ? '' : 'dim';
+                        dimBranch = c.subtype === 'dodge' ? 'prompt_dodge_ok' : 'prompt_dodge_only_dim';
                     }
                     if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
                     if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
+                    // #region agent log
+                    if (c.id === 'thought_stamp' || c.id === 'guzheng_plan' || c.id === 'return_motion' || (isPrompt && c.subtype === 'dodge')) {
+                        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'A',location:'table.html:hand-dim',message:'card dim decision',data:{cardId:c.id,subtype:c.subtype,dim:!!dim,dimBranch,phase:snap.phase,promptType:prompt&&prompt.type,isInterrupt,isPrompt,myInterrupt,myPrompt,uiMode},timestamp:Date.now()})}).catch(()=>{});
+                    }
+                    // #endregion
                     const selected = multiSelect
                         ? selectedIds.has(c.instance_id)
                         : selectedId === c.instance_id;
@@ -696,6 +704,9 @@
                 if (!selectedId) return;
                 const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
                 if (state.phase === 'prompt') {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'B',location:'table.html:tryConfirmPlay',message:'prompt play sending respond_dodge',data:{cardId:card&&card.id,subtype:card&&card.subtype,promptType:state.prompt&&state.prompt.type,promptTo:state.prompt&&state.prompt.to,actionSent:'respond_dodge'},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
                     sock.send('game_action', { action: 'respond_dodge', instance_id: selectedId }, roomId);
                 } else if (state.phase === 'dying') {
                     sock.send('game_action', { action: 'play_card', instance_id: selectedId }, roomId);
@@ -710,6 +721,11 @@
                     } else if (selectedTarget) {
                         payload.target = selectedTarget;
                     }
+                    // #region agent log
+                    if (card && (card.id === 'guzheng_plan' || card.id === 'thought_stamp')) {
+                        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'C',location:'table.html:tryConfirmPlay',message:'play_card payload',data:{cardId:card.id,payload,handIds:(state.you.hand||[]).map(c=>({id:c.id,iid:c.instance_id})),hasDiscardField:!!payload.discard_instance_id},timestamp:Date.now()})}).catch(()=>{});
+                    }
+                    // #endregion
                     sock.send('game_action', payload, roomId);
                 }
                 selectedId = null;

@@ -1,4 +1,5 @@
 {
+  "success": true,
   "source": "catalog",
   "cards": [
     {
@@ -7,7 +8,7 @@
       "type": "equipment",
       "slot": "armor",
       "phase": "B",
-      "text": "抽中后随机一件甲装备",
+      "text": "抽中后随机一件甲装备。",
       "implemented": true
     },
     {
@@ -15,26 +16,23 @@
       "name": "球状闪电",
       "type": "trick",
       "phase": "C",
-      "text": "令一名角色的所有非锁定技失效，直到其下个回合结束。",
+      "text": "选择一名其他角色，封锁其非锁定技。",
       "implemented": true
     },
     {
       "id": "black_hole",
       "name": "黑洞",
-      "type": "equipment",
+      "type": "trick",
       "phase": "B",
-      "text": "累积3张基本牌后复制（待实现）",
-      "implemented": false,
-      "needs": [
-        "equip_hooks"
-      ]
+      "text": "获得正面状态[黑洞]（不可叠加）：敌方累计使用3张基本牌时，获得这3张牌的原始复制，然后移除本状态。",
+      "implemented": true
     },
     {
       "id": "broadcast",
       "name": "广播",
       "type": "trick",
       "phase": "C",
-      "text": "对一名视野未暴露的其他角色造成1点基础伤害并暴露其视野至其回合结束。",
+      "text": "对自己外所有未暴露视野的人各造成2点基础伤害，然后暴露其余所有人的视野至其回合结束。",
       "implemented": true
     },
     {
@@ -43,7 +41,7 @@
       "type": "equipment",
       "slot": "temp_ascend",
       "phase": "B",
-      "text": "临时飞升：每回合摸牌+1",
+      "text": "临时飞升：每回合摸牌数+1。",
       "implemented": true
     },
     {
@@ -51,7 +49,7 @@
       "name": "宇宙安全声明",
       "type": "trick",
       "phase": "C",
-      "text": "清除所有场地与控制类状态。",
+      "text": "清除任意名角色的场地效果或控制效果。若清除成功，摸两张牌。",
       "implemented": true
     },
     {
@@ -59,7 +57,7 @@
       "name": "摇篮",
       "type": "trick",
       "phase": "C",
-      "text": "获得「摇篮」：你受到伤害时，对伤害来源造成等量反弹伤害。",
+      "text": "获得[摇篮]（不可叠加）：下次受到伤害时，对伤害来源造成相等的最终伤害（不超过3点）。",
       "implemented": true
     },
     {
@@ -68,7 +66,7 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：每名角色回合结束时受到1～2点最终伤害。",
+      "text": "场地效果：每名角色回合结束时，对场上一名随机角色造成(0,3)点最终伤害。",
       "implemented": true
     },
     {
@@ -76,7 +74,7 @@
       "name": "咒语",
       "type": "trick",
       "phase": "D",
-      "text": "若有场地则效果翻倍；否则随机布置一个场地。",
+      "text": "若当前存在场地效果则使所有场地效果翻倍；否则随机产生一个场地效果。",
       "implemented": true
     },
     {
@@ -84,7 +82,7 @@
       "name": "帷幕",
       "type": "trick",
       "phase": "C",
-      "text": "清除你的所有负面状态，并摸两张牌。",
+      "text": "清除你的所有负面状态，然后摸1张牌。",
       "implemented": true
     },
     {
@@ -93,7 +91,7 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：全员受到伤害时额外减免2点。",
+      "text": "场地效果：所有人获得两点伤害减免。",
       "implemented": true
     },
     {
@@ -102,7 +100,7 @@
       "type": "trick",
       "field": true,
       "phase": "D",
-      "text": "场地：全员造成伤害时额外加成2点。",
+      "text": "场地效果：所有人获得2点伤害加成。",
       "implemented": true
     },
     {
@@ -110,26 +108,23 @@
       "name": "死线",
       "type": "trick",
       "phase": "D",
-      "text": "令目标科技-1，并将其科技锁定至其回合结束。",
+      "text": "降低一名角色的科技等级1级，并使其科技等级无法变化直至其回合结束。",
       "implemented": true
     },
     {
       "id": "death_immortal",
       "name": "死神永生",
-      "type": "equipment",
+      "type": "trick",
       "phase": "D",
-      "text": "即将死亡时回2摸2并移出（待实现）",
-      "implemented": false,
-      "needs": [
-        "death_interrupt"
-      ]
+      "text": "获得正面状态[死神永生]：即将因濒死出局时，回复2点血并摸2张牌，然后移除本状态。",
+      "implemented": true
     },
     {
       "id": "deterrence",
       "name": "威慑",
       "type": "trick",
       "phase": "C",
-      "text": "你的下一张杀额外结算一次。",
+      "text": "本回合内，你的下一张基本牌指定目标+1。",
       "implemented": true
     },
     {
@@ -159,7 +154,7 @@
       "subtype": "dodge",
       "tier": 3,
       "phase": "A",
-      "text": "三阶闪。",
+      "text": "三阶闪：可响应任意阶杀。",
       "implemented": true
     },
     {
@@ -167,7 +162,7 @@
       "name": "二向箔",
       "type": "trick",
       "phase": "D",
-      "text": "对一名其他角色造成3点真实伤害；若其视野已暴露，改为造成等于其当前体力的真实伤害。",
+      "text": "选择一名角色，对其造成3点真实伤害；若其暴露视野，改为x点（x为其当前生命值）。",
       "implemented": true
     },
     {
@@ -175,7 +170,7 @@
       "name": "DX3906",
       "type": "trick",
       "phase": "C",
-      "text": "摸一张牌。",
+      "text": "选择一名角色，获得其一张手牌：若为基本牌则你再摸一张；若为锦囊或场地则再弃置其一张牌；若为装备则你弃置所有手牌。",
       "implemented": true
     },
     {
@@ -183,7 +178,7 @@
       "name": "四维空间",
       "type": "trick",
       "phase": "C",
-      "text": "弃置目标所有装备，并暴露其视野至其回合结束。",
+      "text": "选择任意名角色，弃置他们的装备牌（至多弃置四张），并暴露以此法失去装备的玩家的视野直到回合结束。",
       "implemented": true
     },
     {
@@ -191,7 +186,7 @@
       "name": "大低谷",
       "type": "trick",
       "phase": "C",
-      "text": "令一名其他角色翻面（跳过其下一回合），且其伤害加成-1。",
+      "text": "选择一名角色[翻面]（跳过下次出牌阶段），且其受到伤害-1。",
       "implemented": true
     },
     {
@@ -199,7 +194,7 @@
       "name": "古筝计划",
       "type": "trick",
       "phase": "C",
-      "text": "弃一张手牌，然后三选一：摸两张 / 回复2点 / 科技+1。",
+      "text": "至少有一张手牌时才能使用。弃置一张手牌，然后三选一：摸2张牌 / 选择一名角色弃置其2张手牌 / 回复2点血量。",
       "implemented": true
     },
     {
@@ -207,7 +202,7 @@
       "name": "冬眠",
       "type": "trick",
       "phase": "C",
-      "text": "你进入冬眠：不可被选为目标，直到你的下个回合开始。",
+      "text": "可重铸。使用后体力上限-2，获得状态[冬眠]：无法被其他人的牌选中，持续到自己的下个回合开始。",
       "implemented": true
     },
     {
@@ -217,7 +212,7 @@
       "subtype": "kill",
       "tier_mode": "high",
       "phase": "A",
-      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害。",
+      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害（视野暴露时伤害+1）。",
       "implemented": true
     },
     {
@@ -227,7 +222,7 @@
       "subtype": "kill",
       "tier_mode": "low",
       "phase": "A",
-      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害。",
+      "text": "对一名其他角色使用。其可用足够阶数的闪响应，否则受到基础伤害（视野暴露时伤害+1）。",
       "implemented": true
     },
     {
@@ -237,7 +232,7 @@
       "subtype": "kill",
       "tier": 3,
       "phase": "A",
-      "text": "三阶杀。",
+      "text": "三阶杀：造成3点基础伤害，若敌方有视野则造成4点。",
       "implemented": true
     },
     {
@@ -245,7 +240,7 @@
       "name": "Killer.5.2",
       "type": "trick",
       "phase": "C",
-      "text": "指定任意名其他角色各受到1点基础伤害，然后你摸一张牌。",
+      "text": "指定一名其他角色为「猎物」。除你与猎物外按座位取至多3名存活角色各摸1张牌：若摸到杀则立即对猎物结算该杀（可被闪响应）；否则加入手牌。然后你摸1张牌。",
       "implemented": true
     },
     {
@@ -253,19 +248,16 @@
       "name": "阶梯计划",
       "type": "trick",
       "phase": "C",
-      "text": "指定一名视野未暴露的其他角色：暴露其视野至该角色回合结束。",
+      "text": "暴露一名角色的视野，持续至该角色回合结束。",
       "implemented": true
     },
     {
       "id": "micro_universe",
       "name": "小宇宙",
-      "type": "equipment",
+      "type": "trick",
       "phase": "D",
-      "text": "获得5点护盾（待实现）",
-      "implemented": false,
-      "needs": [
-        "shield"
-      ]
+      "text": "获得正面状态[小宇宙]：获得5点护盾；护盾优先吸收最终伤害；护盾归零后移除状态。",
+      "implemented": true
     },
     {
       "id": "nano_center",
@@ -273,7 +265,7 @@
       "type": "equipment",
       "slot": "temp_ascend",
       "phase": "B",
-      "text": "临时飞升：受到伤害-1",
+      "text": "临时飞升（只能装备一个）：受到伤害-1。可被思想钢印响应。",
       "implemented": true
     },
     {
@@ -283,30 +275,25 @@
       "subtype": "heal",
       "heal": 2,
       "phase": "A",
-      "text": "对自己使用，回复 2 点生命。濒死时可自救；其他角色也可在濒死阶段对濒死者使用。",
+      "text": "对自己使用，回复2点生命。濒死时可自救；其他角色也可在濒死阶段对濒死者使用。",
       "implemented": true
     },
     {
       "id": "plan_part",
       "name": "计划的一部分",
-      "type": "equipment",
+      "type": "trick",
       "phase": "B",
-      "text": "下2次受伤减半等（待实现）",
-      "implemented": false,
-      "needs": [
-        "equip_hooks"
-      ]
+      "text": "获得正面状态[计划的一部分]：接下来2次受到的伤害减半（向下取整）；每次受伤时二选一：摸2张牌 / 对伤害来源造成1点基础伤害。2次用尽后移除状态。",
+      "implemented": true
     },
     {
       "id": "quantum_ghost",
       "name": "量子幽灵",
       "type": "equipment",
+      "slot": "armor",
       "phase": "D",
-      "text": "创造嘲讽替身（待实现）",
-      "implemented": false,
-      "needs": [
-        "summon"
-      ]
+      "text": "创造一个8点血的具有嘲讽的角色：当你受到伤害时改为其受到伤害，其受到的伤害+1。",
+      "implemented": true
     },
     {
       "id": "realm_bucket",
@@ -321,7 +308,7 @@
       "name": "红岸计划",
       "type": "trick",
       "phase": "C",
-      "text": "摸两张牌。每回合限一次。",
+      "text": "使用时摸两张牌。每回合最多使用1次。",
       "implemented": true
     },
     {
@@ -329,7 +316,7 @@
       "name": "回归运动",
       "type": "trick",
       "phase": "D",
-      "text": "任意时刻：使正在结算的非基本牌无效。",
+      "text": "可在任意时刻使用。使一名角色的非基本牌对某名角色无效。",
       "implemented": true
     },
     {
@@ -338,7 +325,7 @@
       "type": "equipment",
       "slot": "ship",
       "phase": "B",
-      "text": "抽中后随机一艘舰船装备",
+      "text": "抽中后随机一艘舰船装备。",
       "implemented": true
     },
     {
@@ -346,7 +333,7 @@
       "name": "香皂",
       "type": "trick",
       "phase": "C",
-      "text": "选择一名其他角色，你与其各回复等同于你科技等级的体力。",
+      "text": "不可在濒死时使用。询问「令哪一名角色+1血」，循环x次（x为你的科技等级），每次独立选人。",
       "implemented": true
     },
     {
@@ -354,7 +341,7 @@
       "name": "智子",
       "type": "trick",
       "phase": "C",
-      "text": "指定一名角色：其科技等级无法变化，直到其回合结束。",
+      "text": "选择一名角色，使其下回合科技等级无法变化。",
       "implemented": true
     },
     {
@@ -363,7 +350,7 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：无法用闪响应基本牌。",
+      "text": "场地效果：所有人无法响应基本牌。",
       "implemented": true
     },
     {
@@ -371,7 +358,7 @@
       "name": "星环城",
       "type": "trick",
       "phase": "C",
-      "text": "从你开始，每名存活角色二选一：摸一张或弃一张。",
+      "text": "对所有人使用，各选一项：给予你两张牌 / 受到1点基础伤害并使你回复等量血量。",
       "implemented": true
     },
     {
@@ -380,7 +367,7 @@
       "type": "equipment",
       "slot": "temp_ascend",
       "phase": "B",
-      "text": "临时飞升：造成伤害+1",
+      "text": "临时飞升：造成伤害+1。",
       "implemented": true
     },
     {
@@ -388,7 +375,7 @@
       "name": "执剑",
       "type": "trick",
       "phase": "C",
-      "text": "你的下一张造成伤害的牌按最终伤害回复你等量体力。",
+      "text": "你的下一张牌若造成伤害，回复x点生命（x为你造成的最终伤害）。",
       "implemented": true
     },
     {
@@ -396,7 +383,7 @@
       "name": "思想钢印",
       "type": "trick",
       "phase": "C",
-      "text": "任意时刻：使正在结算的锦囊对目标无效。",
+      "text": "可在任意时刻使用。使一名角色的1-3阶锦囊牌对某名角色无效。",
       "implemented": true
     },
     {
@@ -404,7 +391,7 @@
       "name": "剧毒之水",
       "type": "trick",
       "phase": "C",
-      "text": "对一名其他角色使用。其可用杀或思想钢印响应，否则受到2点基础伤害。",
+      "text": "对所有除自身以外的角色造成2点基础伤害，只能被杀、思想钢印响应。",
       "implemented": true
     },
     {
@@ -413,7 +400,7 @@
       "type": "trick",
       "field": true,
       "phase": "C",
-      "text": "场地：随机恒纪元（回合额外摸1）或乱纪元（回合开始失去1体力）。",
+      "text": "场地效果。初始恒纪元。每名角色回合开始时判定(1,4)，若为1则切换纪元。恒纪元：摸牌阶段摸牌数+1。乱纪元：出牌阶段每使用2张牌受到1点最终伤害。",
       "implemented": true
     },
     {
@@ -430,7 +417,7 @@
       "name": "面壁计划",
       "type": "trick",
       "phase": "C",
-      "text": "弃置目标一张手牌；若其视野已暴露则弃两张。",
+      "text": "选择一名角色，弃置其一张牌；若其暴露视野，则改为弃置两张。",
       "implemented": true
     },
     {
@@ -438,7 +425,7 @@
       "name": "归零",
       "type": "trick",
       "phase": "D",
-      "text": "对每名其他角色：若体力大于1则造成1点基础伤害，否则科技-1。",
+      "text": "所有其他角色选择一项：受到x/2点伤害（向上取整，x为其科技等级） / 降低1级科技等级并弃置1张牌。",
       "implemented": true
     }
   ],
@@ -457,7 +444,7 @@
       "name": "万有引力号",
       "text": "你的牌被响应时，你可弃两张手牌，使其仍然生效",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "response_override"
       ],
@@ -505,7 +492,7 @@
       "name": "星环号",
       "text": "无法成为基本牌目标；受锦囊伤害后失去此装备",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "untargetable_basic",
         "trick_damage_hook"
@@ -518,7 +505,7 @@
       "name": "终极规律号",
       "text": "每回合限一次观看并复制一张手牌",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "copy_hand_prompt"
       ],
@@ -541,7 +528,7 @@
       "name": "曲率引擎",
       "text": "需闪/杀响应时可判定，1则视为出闪",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "judge"
       ],
@@ -562,7 +549,7 @@
       "name": "太阳系观测单元",
       "text": "回合内每使用四张牌摸一张",
       "phase": "B",
-      "implemented": false,
+      "implemented": true,
       "needs": [
         "cards_used_counter"
       ],
@@ -583,42 +570,42 @@
     {
       "id": "finale",
       "name": "终末",
-      "text": "目标伤害+3、多摸2、解负面并免疫场地，其下回合结束后死亡",
+      "text": "对场上任意一名角色使用：造成伤害+3，摸牌时额外摸2张，解除负面并免疫场地效果，其下回合结束后死亡。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "reckoning",
       "name": "清算",
-      "text": "你与目标生命值均扣至1",
+      "text": "对除你外场上任何一名角色使用：扣除你和他的生命值至一点。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "illusion",
       "name": "幻梦",
-      "text": "全员弃光手牌并受到等于弃牌数的最终伤害",
+      "text": "对场上所有角色使用：使其失去所有手牌，并受到等于弃掉手牌数的最终伤害。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "cold_silence",
       "name": "冷寂",
-      "text": "全员科技降至1且无法改变",
+      "text": "对场上所有角色使用：使其科技等级降至一级，且无法改变。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "myriad",
       "name": "万象",
-      "text": "（文档未完整，占位）",
+      "text": "（原文文档未完整，占位）",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "afterglow",
       "name": "回光",
-      "text": "（文档未完整，占位）",
+      "text": "（原文文档未完整，占位）",
       "phase": "D",
       "implemented": true
     }

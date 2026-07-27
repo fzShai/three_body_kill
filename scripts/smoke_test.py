@@ -571,7 +571,7 @@ def main() -> None:
     assert ok, msg
     assert wm.players["wang"]["next_damage_true"] is True
 
-    # 新装备：小宇宙护盾 / 星环号不可被杀 / 太阳系观测
+    # 新装备/状态：小宇宙护盾 / 星环号不可被杀 / 太阳系观测
     eqn = GameSession.create("EQUIP_NEW", ["eq", "bot"])
     _blank_skills(eqn, "eq", "bot")
     eqn.turn_index = eqn.player_order.index("eq")
@@ -580,8 +580,7 @@ def main() -> None:
     micro = {
         "id": "micro_universe",
         "name": "小宇宙",
-        "type": "equipment",
-        "slot": "armor",
+        "type": "trick",
         "implemented": True,
         "instance_id": "micro-1",
     }
@@ -589,6 +588,7 @@ def main() -> None:
     ok, msg = eqn.apply_action("eq", {"action": "play_card", "instance_id": "micro-1"})
     assert ok, msg
     assert eqn.players["eq"]["shield"] == 5
+    assert any(s["id"] == "micro_universe" for s in eqn.players["eq"]["statuses"])
     eqn._deal_damage("bot", "eq", 3)
     assert eqn.players["eq"]["shield"] == 2
     assert eqn.players["eq"]["hp"] == eqn.players["eq"]["max_hp"]
@@ -708,7 +708,7 @@ def main() -> None:
 
     ok, msg = _trick(tg, "t1", {"id": "curtain", "name": "帷幕", "type": "trick", "implemented": True, "instance_id": "cu1"})
     assert ok, msg
-    assert len(tg.players["t1"]["hand"]) >= 2
+    assert len(tg.players["t1"]["hand"]) >= 1
 
     tg.players["t2"]["hand"] = [{"id": "peach", "name": "桃", "instance_id": "px"}]
     tg.players["t2"]["vision_exposed"] = True
@@ -716,16 +716,14 @@ def main() -> None:
     assert ok, msg
     assert len(tg.players["t2"]["hand"]) == 0
 
-    ok, msg = _trick(tg, "t1", {"id": "broadcast", "name": "广播", "type": "trick", "implemented": True, "instance_id": "br1"}, target="t2")
-    # t2 may already be exposed from above — reset
     tg.players["t2"]["vision_exposed"] = False
-    ok, msg = _trick(tg, "t1", {"id": "broadcast", "name": "广播", "type": "trick", "implemented": True, "instance_id": "br2"}, target="t2")
+    ok, msg = _trick(tg, "t1", {"id": "broadcast", "name": "广播", "type": "trick", "implemented": True, "instance_id": "br2"})
     assert ok, msg
     assert tg.players["t2"]["vision_exposed"]
 
     # toxic with response window
     hp_before = tg.players["t2"]["hp"]
-    ok, msg = _trick(tg, "t1", {"id": "toxic_water", "name": "剧毒", "type": "trick", "implemented": True, "instance_id": "tw1"}, target="t2")
+    ok, msg = _trick(tg, "t1", {"id": "toxic_water", "name": "剧毒", "type": "trick", "implemented": True, "instance_id": "tw1"})
     assert ok, msg
     assert tg.phase == "prompt" and tg.prompt and tg.prompt.get("type") == "respond_toxic"
     ok, msg = tg.apply_action("t2", {"action": "respond_pass"})
@@ -735,23 +733,47 @@ def main() -> None:
     ok, msg = _trick(tg, "t1", {"id": "cradle", "name": "摇篮", "type": "trick", "implemented": True, "instance_id": "cr1"})
     assert ok and any(s["id"] == "cradle" for s in tg.players["t1"]["statuses"]), msg
 
+    max_before = tg.players["t1"]["max_hp"]
     ok, msg = _trick(tg, "t1", {"id": "hibernation", "name": "冬眠", "type": "trick", "implemented": True, "instance_id": "hi1"})
     assert ok and any(s["id"] == "hibernation" for s in tg.players["t1"]["statuses"]), msg
+    assert tg.players["t1"]["max_hp"] == max_before - 2
+
+    # clear hibernation so later targeted tricks on t1 still work if needed
+    tg._remove_status("t1", "hibernation")
+    tg.players["t1"]["hibernation_clear_at_turn_start"] = False
 
     ok, msg = _trick(tg, "t1", {"id": "deterrence", "name": "威慑", "type": "trick", "implemented": True, "instance_id": "de1"})
-    assert ok and tg.players["t1"].get("deterrence_extra", 0) >= 1, msg
+    assert ok and tg.players["t1"].get("deterrence_extra_target"), msg
 
     ok, msg = _trick(tg, "t1", {"id": "swordholder", "name": "执剑", "type": "trick", "implemented": True, "instance_id": "sw1"})
     assert ok and tg.players["t1"].get("swordholder_ready"), msg
 
     tg.players["t2"]["vision_exposed"] = False
     tg.players["t2"]["hp"] = 5
+    tg.dying = None
+    tg.phase = "turn"
     ok, msg = _trick(tg, "t1", {"id": "dual_vector", "name": "二向箔", "type": "trick", "implemented": True, "instance_id": "dv1"}, target="t2")
     assert ok, msg
     assert tg.players["t2"]["hp"] <= 2  # 5-3 true, maybe heal from swordholder on t1
 
-    ok, msg = _trick(tg, "t1", {"id": "soap", "name": "香皂", "type": "trick", "implemented": True, "instance_id": "so1"}, target="t2")
+    # reset dying / phase for subsequent tricks
+    tg.dying = None
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    tg.prompt = None
+    for n in ("t1", "t2"):
+        if tg.players[n]["hp"] <= 0:
+            tg.players[n]["hp"] = 4
+            tg.players[n]["alive"] = True
+    tg.players["t1"]["tech_level"] = 2
+    ok, msg = _trick(tg, "t1", {"id": "soap", "name": "香皂", "type": "trick", "implemented": True, "instance_id": "so1"})
     assert ok, msg
+    assert tg.prompt and tg.prompt.get("type") == "soap_heal"
+    ok, msg = tg.apply_action("t1", {"action": "choose", "target": "t2"})
+    assert ok, msg
+    ok, msg = tg.apply_action("t1", {"action": "choose", "target": "t1"})
+    assert ok, msg
+    assert tg.phase == "turn"
 
     # guzheng choice
     tg.players["t1"]["hand"] = [

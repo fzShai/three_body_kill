@@ -9,9 +9,7 @@ from typing import Any
 PRIMARY_SLOTS = ("ship", "armor")
 ALL_SLOTS = ("ship", "armor", "temp_ascend", "stellar_track", "stability_system")
 TEMP_ASCEND_IDS = frozenset({"nano_center", "chip_workshop", "stars_plan"})
-SPECIAL_ARMOR_IDS = frozenset(
-    {"plan_part", "black_hole", "micro_universe", "death_immortal", "quantum_ghost"}
-)
+SPECIAL_ARMOR_IDS = frozenset({"quantum_ghost"})
 SLOT_LABELS = {
     "ship": "船",
     "armor": "甲",
@@ -135,36 +133,10 @@ def apply_equip_bonuses(player: dict[str, Any], card: dict[str, Any], *, equippi
             player.pop("solar_observe", None)
             player.pop("cards_used_this_turn", None)
         notes.append("太阳系观测单元" + ("启用" if equipping else "卸下"))
-    elif cid == "plan_part":
-        if equipping:
-            player["plan_part_charges"] = 2
-        else:
-            player.pop("plan_part_charges", None)
-        notes.append("计划的一部分" + ("启用" if equipping else "卸下"))
-    elif cid == "black_hole":
-        if equipping:
-            player["black_hole_basics"] = 0
-        else:
-            player.pop("black_hole_basics", None)
-        notes.append("黑洞" + ("启用" if equipping else "卸下"))
-    elif cid == "micro_universe":
-        if equipping:
-            player["shield"] = int(player.get("shield", 0)) + 5
-            notes.append("护盾+5")
-        else:
-            # leave remaining shield; only strip if we track source — keep simple: clamp down by leftover mark
-            player["shield"] = max(0, int(player.get("shield", 0)) - int(player.get("micro_universe_shield", 5)))
-            player.pop("micro_universe_shield", None)
-            notes.append("卸下小宇宙")
-        if equipping:
-            player["micro_universe_shield"] = 5
-    elif cid == "death_immortal":
-        player["death_immortal"] = equipping
-        notes.append("死神永生" + ("启用" if equipping else "卸下"))
     elif cid == "quantum_ghost":
         if equipping:
-            player["quantum_ghost_hp"] = 1
-            notes.append("嘲讽替身+1")
+            player["quantum_ghost_hp"] = 8
+            notes.append("嘲讽替身+8")
         else:
             player.pop("quantum_ghost_hp", None)
             notes.append("替身消散")

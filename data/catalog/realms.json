@@ -3,42 +3,42 @@
     {
       "id": "finale",
       "name": "终末",
-      "text": "目标伤害+3、多摸2、解负面并免疫场地，其下回合结束后死亡",
+      "text": "对场上任意一名角色使用：造成伤害+3，摸牌时额外摸2张，解除负面并免疫场地效果，其下回合结束后死亡。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "reckoning",
       "name": "清算",
-      "text": "你与目标生命值均扣至1",
+      "text": "对除你外场上任何一名角色使用：扣除你和他的生命值至一点。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "illusion",
       "name": "幻梦",
-      "text": "全员弃光手牌并受到等于弃牌数的最终伤害",
+      "text": "对场上所有角色使用：使其失去所有手牌，并受到等于弃掉手牌数的最终伤害。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "cold_silence",
       "name": "冷寂",
-      "text": "全员科技降至1且无法改变",
+      "text": "对场上所有角色使用：使其科技等级降至一级，且无法改变。",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "myriad",
       "name": "万象",
-      "text": "（文档未完整，占位）",
+      "text": "（原文文档未完整，占位）",
       "phase": "D",
       "implemented": true
     },
     {
       "id": "afterglow",
       "name": "回光",
-      "text": "（文档未完整，占位）",
+      "text": "（原文文档未完整，占位）",
       "phase": "D",
       "implemented": true
     }

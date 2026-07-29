@@ -76,6 +76,9 @@ def main() -> None:
     assert g.turn_phase == "play"
     assert all(len(g.players[n]["hand"]) >= 6 for n in ("alice", "bob"))
     assert {g.players[n]["role_id"] for n in ("alice", "bob")} <= KNOWN_ROLES
+    snap_alice = g.snapshot_for("alice")
+    bob_pub = next(p for p in snap_alice["players"] if p["username"] == "bob")
+    assert bob_pub.get("role_name"), "对局中应公开他人角色名"
     _blank_skills(g, "alice", "bob")
     assert g.players["alice"]["tech_level"] == 1
 

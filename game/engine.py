@@ -55,7 +55,7 @@ from game.trick_effects import (
 from game.turn import hand_limit
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-TURN_SECONDS = 20.0
+TURN_SECONDS = 25.0
 STATUS_LOCKED = "locked"
 STATUS_KINDS = ("positive", "negative")
 EQUIP_SLOTS = ALL_SLOTS
@@ -2293,7 +2293,7 @@ class GameSession:
             "damage_bonus": p["damage_bonus"],
             "damage_reduction": p["damage_reduction"],
             "ascension": p.get("ascension"),
-            "role_name": p["role_name"] if self.phase == "ended" else None,
+            "role_name": p["role_name"],
             "skills_sealed": self._has_status(name, STATUS_SKILLS_SEALED),
             "shield": int(p.get("shield") or 0),
         }

@@ -6,20 +6,11 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260727b" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260729u" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729u" />
 </head>
 <body class="shell-page table-page">
-    <button type="button" class="btn btn-outline log-toggle" id="logToggleBtn">战报</button>
-    <div class="log-backdrop" id="logBackdrop"></div>
-    <aside class="log-drawer" id="logDrawer" aria-hidden="true">
-        <h2>战报</h2>
-        <div class="log" id="log"></div>
-        <div class="row" style="margin-top:14px;">
-            <a class="btn btn-outline" href="/lobby" id="backLobbyLink">回大厅</a>
-        </div>
-    </aside>
-
+    <div class="table-shell">
     <div class="board">
         <header class="board-top">
             <div class="brand-mini">黑暗森林</div>
@@ -70,6 +61,15 @@
             <button class="btn btn-outline" id="recastBtn" type="button">重铸</button>
             <div class="status" id="statusMsg"></div>
         </div>
+    </div>
+
+    <aside class="log-panel">
+        <h2>战报</h2>
+        <div class="log" id="log"></div>
+        <div class="log-panel-foot">
+            <a class="btn btn-outline" href="/lobby" id="backLobbyLink">回大厅</a>
+        </div>
+    </aside>
     </div>
 
     <script src="/static/app.js"></script>
@@ -148,6 +148,13 @@
                 gene: '基因飞升',
                 psychic: '灵能飞升',
             };
+
+            function statusLines(statuses) {
+                const list = statuses || [];
+                const pos = list.filter((s) => s.kind === 'positive').map((s) => s.name);
+                const neg = list.filter((s) => s.kind === 'negative').map((s) => s.name);
+                return `<div class="seat-st"><div class="pos">正面：${pos.length ? pos.join('、') : '无'}</div><div class="neg">负面：${neg.length ? neg.join('、') : '无'}</div></div>`;
+            }
 
             function equipLine(equipment, slot) {
                 const card = equipment && equipment[slot];
@@ -301,12 +308,33 @@
             }
 
             setInterval(() => {
+                const felt = document.querySelector('.table-felt');
+                const stageEl = document.getElementById('stage');
                 if (!turnDeadlineMs || !state || !['turn', 'prompt', 'dying'].includes(state.phase)) {
                     turnTimerEl.textContent = '—';
+                    felt?.classList.remove('urgency-pulse');
+                    stageEl?.classList.remove('urgency-pulse');
                     return;
                 }
-                const left = Math.max(0, Math.ceil((turnDeadlineMs - Date.now()) / 1000));
+                const remainingSec = Math.max(0, (turnDeadlineMs - Date.now()) / 1000);
+                const left = Math.ceil(remainingSec);
                 turnTimerEl.textContent = left + 's';
+
+                const total = Number(state.turn_seconds) || 25;
+                const urgencyWindow = Math.max(0.1, total - 10);
+                const elapsed = total - remainingSec;
+                const active = elapsed >= 10 && remainingSec > 0;
+                const ratio = Math.min(1, Math.max(0, remainingSec / urgencyWindow));
+                const period = Math.min(2.4, Math.max(0.3, 0.3 + 2.1 * ratio));
+                const periodStr = period.toFixed(2) + 's';
+                if (felt) {
+                    felt.style.setProperty('--urgency-period', periodStr);
+                    felt.classList.toggle('urgency-pulse', active);
+                }
+                if (stageEl) {
+                    stageEl.style.setProperty('--urgency-period', periodStr);
+                    stageEl.classList.toggle('urgency-pulse', active);
+                }
             }, 200);
 
             function renderStage(snap) {
@@ -380,11 +408,14 @@
                     if (p.skills_sealed) flags.push('技封');
                     if (p.ascension) flags.push(ASCENSION_LABEL[p.ascension] || p.ascension);
                     if (!p.alive) flags.push('出局');
+                    const roleLabel = p.role_name ? `<div class="seat-role">${p.role_name}</div>` : '';
                     return `<div class="${cls}" data-user="${p.username}" style="left:${pos.left};top:${pos.top}">
                         <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
+                        ${roleLabel}
                         <div class="seat-stats">科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${p.shield ? ` · 盾${p.shield}` : ''}</div>
                         <div class="hp-row">${hpPips(p.hp, p.max_hp)}</div>
                         <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
+                        ${statusLines(p.statuses)}
                         ${flags.length ? `<div class="seat-flags">${flags.join(' · ')}</div>` : ''}
                     </div>`;
                 }).join('');
@@ -512,7 +543,8 @@
                     ? `<div class="role-name">${role.role_name}</div>
                         HP ${you.hp}/${mePublic.max_hp ?? you.hp} · 科技${you.tech_level ?? 1} · 上限${you.hand_limit ?? '—'}${sealedYou}
                         <div class="hp-row">${hpPips(you.hp, mePublic.max_hp || you.hp)}</div>
-                        ${skillText ? `<div class="role-skills">${skillText}</div>` : ''}`
+                        ${skillText ? `<div class="role-skills">${skillText}</div>` : ''}
+                        ${statusLines(mePublic.statuses)}`
                     : '—';
 
                 const roleBox = document.getElementById('roleBox');
@@ -914,17 +946,6 @@
                 selectedTarget = null;
             });
 
-            const logDrawer = document.getElementById('logDrawer');
-            const logBackdrop = document.getElementById('logBackdrop');
-            function setLogOpen(open) {
-                logDrawer.classList.toggle('open', open);
-                logBackdrop.classList.toggle('open', open);
-                logDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-            }
-            document.getElementById('logToggleBtn').addEventListener('click', () => {
-                setLogOpen(!logDrawer.classList.contains('open'));
-            });
-            logBackdrop.addEventListener('click', () => setLogOpen(false));
             document.getElementById('backLobbyLink')?.addEventListener('click', () => {
                 window.location.href = '/lobby';
             });

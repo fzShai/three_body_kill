@@ -58,6 +58,18 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 TURN_SECONDS = 25.0
 STATUS_LOCKED = "locked"
 STATUS_KINDS = ("positive", "negative")
+
+# Fallback status blurbs when card_defs has no matching id
+STATUS_TEXT_FALLBACK: dict[str, str] = {
+    STATUS_SKILLS_SEALED: "非锁定技失效，直至状态移除（通常至其下个回合结束）。",
+    STATUS_TECH_LOCK: "科技等级无法变化。",
+    STATUS_CRADLE: "受到致命伤害时可能触发摇篮相关效果。",
+    STATUS_HIBERNATION: "冬眠中：不可被选为目标。",
+    STATUS_FLIPPED: "翻面：跳过下一回合。",
+    STATUS_BLACK_HOLE: "黑洞：相关结算按牌面效果执行。",
+    STATUS_DEATH_IMMORTAL: "濒死出局时可触发死神永生相关效果。",
+    "locked": "被锁死：跳过回合。",
+}
 EQUIP_SLOTS = ALL_SLOTS
 
 
@@ -2277,8 +2289,33 @@ class GameSession:
         return True, f"复制了 {copy.get('name')}"
 
 
+    def _status_text(self, status_id: str) -> str:
+        cdef = (self.card_defs or {}).get(status_id) or {}
+        text = str(cdef.get("text") or "").strip()
+        if text:
+            return text
+        return STATUS_TEXT_FALLBACK.get(status_id, "")
+
+    def _enrich_status(self, name: str, status: dict[str, Any]) -> dict[str, Any]:
+        p = self.players[name]
+        out = deepcopy(status)
+        sid = str(out.get("id") or "")
+        out["text"] = self._status_text(sid)
+        if sid == STATUS_PLAN_PART:
+            charges = int(p.get("plan_part_charges") or 0)
+            out["value"] = charges
+            out["unit"] = "次"
+        elif sid == STATUS_MICRO_UNIVERSE:
+            shield = int(p.get("micro_universe_shield") or 0)
+            out["value"] = shield
+            out["unit"] = "点"
+        elif sid == "countdown" or p.get("countdown") is not None and sid == "countdown":
+            pass
+        return out
+
     def public_player_view(self, name: str) -> dict[str, Any]:
         p = self.players[name]
+        statuses = [self._enrich_status(name, s) for s in (p.get("statuses") or [])]
         return {
             "username": name,
             "hp": p["hp"],
@@ -2287,15 +2324,24 @@ class GameSession:
             "hand_count": len(p["hand"]),
             "online": self.player_online.get(name, True),
             "equipment": deepcopy(p["equipment"]),
-            "statuses": deepcopy(p["statuses"]),
+            "statuses": statuses,
             "tech_level": p["tech_level"],
             "vision_exposed": p["vision_exposed"],
             "damage_bonus": p["damage_bonus"],
             "damage_reduction": p["damage_reduction"],
             "ascension": p.get("ascension"),
+            "role_id": p.get("role_id"),
             "role_name": p["role_name"],
+            "skills": deepcopy(p.get("skills") or []),
             "skills_sealed": self._has_status(name, STATUS_SKILLS_SEALED),
             "shield": int(p.get("shield") or 0),
+            "countdown": p.get("countdown"),
+            "plan_part_charges": int(p.get("plan_part_charges") or 0) or None,
+            "micro_universe_shield": (
+                int(p["micro_universe_shield"])
+                if p.get("micro_universe_shield") is not None
+                else None
+            ),
         }
 
     def _viewer_actions(self, viewer: str) -> list[dict[str, Any]]:

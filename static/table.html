@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260729v" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729v" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260729w" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729w" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -71,6 +71,8 @@
         </div>
     </aside>
     </div>
+
+    <div class="inspect-panel" id="inspectPanel" hidden></div>
 
     <script src="/static/app.js"></script>
     <script>
@@ -163,6 +165,140 @@
                     return `<div class="filled">${label}：${card.name}</div>`;
                 }
                 return `<div>${label}：空</div>`;
+            }
+
+            const inspectPanel = document.getElementById('inspectPanel');
+            let inspectHideTimer = null;
+            let inspectSourceEl = null;
+
+            function hideInspect() {
+                if (inspectHideTimer) {
+                    clearTimeout(inspectHideTimer);
+                    inspectHideTimer = null;
+                }
+                inspectSourceEl = null;
+                if (!inspectPanel) return;
+                inspectPanel.hidden = true;
+                inspectPanel.innerHTML = '';
+            }
+
+            function scheduleHideInspect() {
+                if (inspectHideTimer) clearTimeout(inspectHideTimer);
+                inspectHideTimer = setTimeout(() => {
+                    inspectHideTimer = null;
+                    hideInspect();
+                }, 60);
+            }
+
+            function escHtml(s) {
+                return String(s ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function equipDetailHtml(equipment, slot) {
+                const card = equipment && equipment[slot];
+                const label = SLOT_LABEL[slot] || slot;
+                if (!card || !card.name) {
+                    return `<div class="inspect-block"><div class="inspect-h">${label}</div><div class="inspect-muted">空</div></div>`;
+                }
+                return `<div class="inspect-block"><div class="inspect-h">${label} · ${escHtml(card.name)}</div>
+                    <div class="inspect-body">${escHtml(card.text || '（暂无说明）')}</div></div>`;
+            }
+
+            function statusDetailHtml(statuses) {
+                const list = statuses || [];
+                if (!list.length) {
+                    return `<div class="inspect-block"><div class="inspect-h">状态</div><div class="inspect-muted">无</div></div>`;
+                }
+                return `<div class="inspect-block"><div class="inspect-h">状态</div>${list.map((s) => {
+                    const kind = s.kind === 'negative' ? 'neg' : 'pos';
+                    let meta = '';
+                    if (s.value != null && s.unit) meta = ` · 剩余 ${s.value}${s.unit}`;
+                    return `<div class="inspect-item ${kind}"><div class="inspect-item-title">${escHtml(s.name || s.id)}${escHtml(meta)}</div>
+                        <div class="inspect-body">${escHtml(s.text || '（暂无说明）')}</div></div>`;
+                }).join('')}</div>`;
+            }
+
+            function skillsDetailHtml(skills) {
+                const list = skills || [];
+                if (!list.length) {
+                    return `<div class="inspect-block"><div class="inspect-h">技能</div><div class="inspect-muted">无</div></div>`;
+                }
+                return `<div class="inspect-block"><div class="inspect-h">技能</div>${list.map((s) =>
+                    `<div class="inspect-item"><div class="inspect-item-title">${s.locked ? '【锁定】' : ''}${escHtml(s.name)}</div>
+                        <div class="inspect-body">${escHtml(s.text || '（暂无说明）')}</div></div>`
+                ).join('')}</div>`;
+            }
+
+            function buildInspectHtml(player, mode) {
+                if (!player) return '<div class="inspect-muted">无数据</div>';
+                const bits = [];
+                if (mode === 'role' || mode === 'seat') {
+                    bits.push(`<div class="inspect-title">${escHtml(player.role_name || '未知角色')} · ${escHtml(player.username)}</div>`);
+                    bits.push(`<div class="inspect-meta">HP ${player.hp}/${player.max_hp} · 科技${player.tech_level ?? 1} · 手牌 ${player.hand_count ?? 0}`
+                        + (player.shield ? ` · 盾${player.shield}` : '')
+                        + (player.countdown != null ? ` · 倒计时${player.countdown}` : '')
+                        + (player.skills_sealed ? ' · 非锁定技失效' : '')
+                        + `</div>`);
+                    bits.push(skillsDetailHtml(player.skills));
+                    bits.push(statusDetailHtml(player.statuses));
+                    if (mode === 'seat') {
+                        bits.push(equipDetailHtml(player.equipment, 'ship'));
+                        bits.push(equipDetailHtml(player.equipment, 'armor'));
+                    }
+                } else if (mode === 'equip') {
+                    bits.push(`<div class="inspect-title">装备 · ${escHtml(player.username)}</div>`);
+                    bits.push(equipDetailHtml(player.equipment, 'ship'));
+                    bits.push(equipDetailHtml(player.equipment, 'armor'));
+                }
+                return bits.join('');
+            }
+
+            function positionInspect(anchorEl) {
+                const panel = inspectPanel;
+                const r = anchorEl.getBoundingClientRect();
+                panel.hidden = false;
+                const pw = panel.offsetWidth || 280;
+                const ph = panel.offsetHeight || 120;
+                let left = r.right + 10;
+                let top = r.top;
+                if (left + pw > window.innerWidth - 8) left = Math.max(8, r.left - pw - 10);
+                if (top + ph > window.innerHeight - 8) top = Math.max(8, window.innerHeight - ph - 8);
+                if (top < 8) top = 8;
+                panel.style.left = `${Math.round(left)}px`;
+                panel.style.top = `${Math.round(top)}px`;
+            }
+
+            function showInspect(anchorEl, player, mode) {
+                if (inspectHideTimer) {
+                    clearTimeout(inspectHideTimer);
+                    inspectHideTimer = null;
+                }
+                inspectSourceEl = anchorEl;
+                inspectPanel.innerHTML = buildInspectHtml(player, mode);
+                positionInspect(anchorEl);
+            }
+
+            function bindInspect(el, getPlayer, mode) {
+                if (!el) return;
+                el.classList.add('inspect-hot');
+                el.onmouseenter = () => {
+                    const p = typeof getPlayer === 'function' ? getPlayer() : getPlayer;
+                    if (!p) return;
+                    showInspect(el, p, mode);
+                };
+                el.onmouseleave = () => scheduleHideInspect();
+                // Touch: press to show, release to hide
+                el.ontouchstart = (ev) => {
+                    const p = typeof getPlayer === 'function' ? getPlayer() : getPlayer;
+                    if (!p) return;
+                    showInspect(el, p, mode);
+                };
+                el.ontouchend = () => scheduleHideInspect();
+                el.ontouchcancel = () => hideInspect();
             }
 
             function cardTypeLabel(c) {
@@ -448,6 +584,13 @@
                         render(state);
                     });
                 });
+                ring.querySelectorAll('.seat-panel').forEach((el) => {
+                    const uname = el.getAttribute('data-user');
+                    bindInspect(el, () => (state?.players || []).find((p) => p.username === uname), 'seat');
+                });
+                if (inspectSourceEl && !document.body.contains(inspectSourceEl)) {
+                    hideInspect();
+                }
             }
 
             function render(snap) {
@@ -563,6 +706,9 @@
                 document.getElementById('selfEquipBody').innerHTML =
                     equipLine(mePublic.equipment || you.equipment, 'ship')
                     + equipLine(mePublic.equipment || you.equipment, 'armor');
+
+                bindInspect(roleBox, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
+                bindInspect(document.getElementById('selfEquip'), () => (state?.players || []).find((p) => p.username === username) || mePublic, 'equip');
 
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');

@@ -440,6 +440,63 @@ body.shell-page.table-page::before { opacity: 0.28; }
 .seat-panel .seat-st .neg,
 .self-role .seat-st .neg { color: #c87878; }
 
+/* —— Inspect popover (hover details) —— */
+.inspect-hot {
+    cursor: help;
+}
+.inspect-panel {
+    position: fixed;
+    z-index: 80;
+    width: min(300px, calc(100vw - 16px));
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 12px 14px;
+    border: 1px solid var(--line-strong);
+    background: rgba(8, 12, 20, 0.96);
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.45;
+    pointer-events: none;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.inspect-panel[hidden] { display: none !important; }
+.inspect-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--accent-ice-bright);
+    margin-bottom: 6px;
+}
+.inspect-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+}
+.inspect-block {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+}
+.inspect-h {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+}
+.inspect-item { margin-bottom: 8px; }
+.inspect-item-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.inspect-item.pos .inspect-item-title { color: var(--ok); }
+.inspect-item.neg .inspect-item-title { color: #c87878; }
+.inspect-body {
+    color: var(--ink-dim);
+    font-size: 11px;
+}
+.inspect-muted { color: var(--ink-muted); }
+
 /* —— Mobile —— */
 @media (max-width: 800px) {
     .table-shell {

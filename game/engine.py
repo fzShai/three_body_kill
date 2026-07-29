@@ -500,6 +500,13 @@ class GameSession:
             "to": username,
             "from": username,
             "after": after,
+            "confirm": {
+                "accept_label": "发动流浪",
+                "pass_label": "放弃流浪",
+                "accept_action": "wander_accept",
+                "pass_action": "wander_pass",
+                "needs_cards": 0,
+            },
         }
         self.phase = "prompt"
         self._log(f"{username} 【流浪】：是否失去 1 点体力并摸两张牌？")
@@ -1965,6 +1972,11 @@ class GameSession:
             "is_native_repeat": is_native_repeat,
             "deterrence_extra_target": deterrence_extra_target,
             "curvature": bool(tgt.get("curvature")),
+            "extra_actions": (
+                [{"id": "curvature", "label": "曲率判定", "action": "curvature_judge"}]
+                if tgt.get("curvature")
+                else []
+            ),
         }
         self.phase = "prompt"
         self._set_stage(
@@ -2000,6 +2012,13 @@ class GameSession:
                     "to": src,
                     "from": src,
                     "saved_kill": saved,
+                    "confirm": {
+                        "accept_label": "引力覆盖",
+                        "pass_label": "放弃引力",
+                        "accept_action": "gravity_accept",
+                        "pass_action": "gravity_pass",
+                        "needs_cards": 2,
+                    },
                 }
                 self.phase = "prompt"
                 self._log(f"{src} 万有引力号：是否弃两张手牌使杀仍生效？")
@@ -2279,6 +2298,25 @@ class GameSession:
             "shield": int(p.get("shield") or 0),
         }
 
+    def _viewer_actions(self, viewer: str) -> list[dict[str, Any]]:
+        """Play-phase voluntary actions for the viewer (role/equipment actives)."""
+        me = self.players.get(viewer)
+        if not me or not me.get("alive"):
+            return []
+        if self.phase != "turn" or self.turn_phase != "play" or self.current_player() != viewer:
+            return []
+        out: list[dict[str, Any]] = []
+        if has_ship(me, "ultimate_law") and not me.get("ultimate_law_used"):
+            out.append(
+                {
+                    "id": "ultimate_law",
+                    "label": "终极规律",
+                    "action": "ultimate_law",
+                    "needs_target": True,
+                }
+            )
+        return out
+
     def snapshot_for(self, viewer: str) -> dict[str, Any]:
         me = self.players.get(viewer)
         private_hand = deepcopy(me["hand"]) if me else []
@@ -2292,6 +2330,7 @@ class GameSession:
         timed = self.phase in {"turn", "prompt", "dying"}
         remaining = max(0.0, self.turn_deadline_at - time.time()) if timed else 0.0
         limit = hand_limit(me["max_hp"]) if me else 0
+        actions = self._viewer_actions(viewer)
         return {
             "room_id": self.room_id,
             "phase": self.phase,
@@ -2325,8 +2364,8 @@ class GameSession:
                 "kills_used_this_turn": me["kills_used_this_turn"] if me else 0,
                 "skills_sealed": self._has_status(viewer, STATUS_SKILLS_SEALED) if me else False,
                 "shield": int(me.get("shield") or 0) if me else 0,
-                "ultimate_law_ready": bool(
-                    me and has_ship(me, "ultimate_law") and not me.get("ultimate_law_used")
-                ),
+                "actions": actions,
+                # compat for older clients
+                "ultimate_law_ready": any(a.get("id") == "ultimate_law" for a in actions),
             },
         }

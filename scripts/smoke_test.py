@@ -412,6 +412,9 @@ def main() -> None:
     ok, msg = gy.apply_action("guan", {"action": "discard_done"})
     assert ok, msg
     assert gy.phase == "prompt" and gy.prompt and gy.prompt.get("type") == "wander_draw"
+    conf = gy.prompt.get("confirm") or {}
+    assert conf.get("accept_action") == "wander_accept"
+    assert conf.get("pass_action") == "wander_pass"
     assert gy.players["guan"]["tech_level"] == 3
     ok, msg = gy.apply_action("guan", {"action": "wander_pass"})
     assert ok, msg
@@ -595,6 +598,32 @@ def main() -> None:
         yw.apply_action("victim", {"action": "dying_resolve"})
     assert not yw.players["victim"]["alive"]
     assert len(yw.players["ye"]["hand"]) >= hand0 + 1
+
+    # you.actions：终极规律号主动技由 snapshot 下发
+    law = GameSession.create("LAW", ["law", "bot"])
+    _blank_skills(law, "law", "bot")
+    law.turn_index = law.player_order.index("law")
+    law.phase = "turn"
+    law.turn_phase = "play"
+    law_ship = {
+        "id": "ultimate_law",
+        "name": "终极规律号",
+        "type": "equipment",
+        "slot": "ship",
+        "ship_id": "ultimate_law",
+        "implemented": True,
+        "instance_id": "law-ship",
+    }
+    _give(law.players["law"], law_ship)
+    ok, msg = law.apply_action("law", {"action": "play_card", "instance_id": "law-ship"})
+    assert ok, msg
+    snap_law = law.snapshot_for("law")
+    assert any(a.get("id") == "ultimate_law" for a in (snap_law["you"].get("actions") or []))
+    _give(law.players["bot"], {"id": "peach", "name": "桃", "subtype": "heal", "instance_id": "bot-p", "implemented": True})
+    ok, msg = law.apply_action("law", {"action": "ultimate_law", "target": "bot"})
+    assert ok, msg
+    snap_law2 = law.snapshot_for("law")
+    assert not any(a.get("id") == "ultimate_law" for a in (snap_law2["you"].get("actions") or []))
 
     # 新装备/状态：小宇宙护盾 / 星环号不可被杀 / 太阳系观测
     eqn = GameSession.create("EQUIP_NEW", ["eq", "bot"])

@@ -63,12 +63,9 @@
             <button class="btn btn-outline" id="techCancelBtn" type="button" hidden>取消</button>
             <button class="btn btn-outline" id="respondPassBtn" type="button" hidden>不响应</button>
             <span id="choiceBtns" hidden></span>
-            <button class="btn btn-outline" id="wanderAcceptBtn" type="button" hidden>发动流浪</button>
-            <button class="btn btn-outline" id="wanderPassBtn" type="button" hidden>放弃流浪</button>
-            <button class="btn btn-outline" id="curvatureBtn" type="button" hidden>曲率判定</button>
-            <button class="btn btn-outline" id="gravityAcceptBtn" type="button" hidden>引力覆盖</button>
-            <button class="btn btn-outline" id="gravityPassBtn" type="button" hidden>放弃引力</button>
-            <button class="btn btn-outline" id="ultimateLawBtn" type="button" hidden>终极规律</button>
+            <button class="btn btn-outline" id="confirmAcceptBtn" type="button" hidden>确认</button>
+            <button class="btn btn-outline" id="confirmPassBtn" type="button" hidden>放弃</button>
+            <span id="dynamicActionBtns" hidden></span>
             <button class="btn btn-outline" id="dyingPassBtn" type="button" hidden>结算濒死</button>
             <button class="btn btn-outline" id="recastBtn" type="button">重铸</button>
             <div class="status" id="statusMsg"></div>
@@ -88,8 +85,9 @@
             let selectedIds = new Set();
             let discardCostId = null; // 古筝等：额外弃置的手牌
             let selectedTarget = null;
-            let targetingMode = null; // null | 'card' | 'ultimate_law' | 'choice_target'
+            let targetingMode = null; // null | 'card' | 'action' | 'choice_target' | 'soap_heal'
             let pendingChoiceId = null; // choice 选项需选目标时暂存
+            let pendingAction = null; // { id, label, action, needs_target } 主动技选目标
             let uiMode = 'play'; // play | discard | tech_discard
             let turnDeadlineMs = null;
             let lastStageKey = '';
@@ -244,8 +242,8 @@
                 const players = snap.players || [];
                 const others = players.filter((p) => p.alive && p.username !== username);
                 const allAlive = players.filter((p) => p.alive);
-                if (mode === 'ultimate_law') return others.map((p) => p.username);
-                if (mode === 'choice_target') return allAlive.map((p) => p.username);
+                if (mode === 'action') return others.map((p) => p.username);
+                if (mode === 'choice_target' || mode === 'soap_heal') return allAlive.map((p) => p.username);
                 if (!card) return [];
                 if (isPeach(card) && snap.phase === 'dying' && snap.dying) {
                     return [snap.dying.victim];
@@ -262,36 +260,43 @@
                 const hand = snap.you?.hand || [];
                 const card = hand.find((c) => c.instance_id === selectedId);
                 const prompt = snap.prompt;
-                const inPlay = snap.current_player === username && snap.phase === 'turn' && snap.turn_phase === 'play';
 
                 if (targetingMode === 'choice_target' && pendingChoiceId && prompt?.type === 'choice' && prompt.to === username) {
                     return;
                 }
-                if (inPlay && snap.you?.ultimate_law_ready && !selectedId && targetingMode === 'ultimate_law') {
+                if (targetingMode === 'soap_heal' && prompt?.type === 'soap_heal' && prompt.to === username) {
+                    return;
+                }
+                if (targetingMode === 'action' && pendingAction && !selectedId) {
+                    return;
+                }
+                if (prompt?.type === 'soap_heal' && prompt.to === username) {
+                    targetingMode = 'soap_heal';
+                    pendingAction = null;
                     return;
                 }
                 if (uiMode === 'discard' || uiMode === 'tech_discard') {
                     targetingMode = null;
+                    pendingAction = null;
                     selectedTarget = null;
                     return;
                 }
                 if (card && needsOtherTarget(card) && !(isPeach(card))) {
                     targetingMode = 'card';
+                    pendingAction = null;
                     const legal = legalTargets(snap, 'card', card);
                     if (selectedTarget && !legal.includes(selectedTarget)) selectedTarget = null;
                     return;
                 }
                 if (card && isPeach(card) && snap.phase === 'dying') {
                     targetingMode = null;
+                    pendingAction = null;
                     selectedTarget = snap.dying?.victim || null;
                     return;
                 }
-                if (targetingMode === 'ultimate_law' && !selectedId) return;
                 targetingMode = null;
                 pendingChoiceId = null;
-                if (!(card && isPeach(card))) {
-                    // keep target only when still in card targeting
-                }
+                pendingAction = null;
                 if (!needsOtherTarget(card)) selectedTarget = isPeach(card) ? username : null;
             }
 
@@ -341,8 +346,9 @@
                 const positions = seatPositions(rotated.length);
                 const playersByName = Object.fromEntries((snap.players || []).map((p) => [p.username, p]));
                 const legal = (() => {
-                    if (targetingMode === 'ultimate_law') return legalTargets(snap, 'ultimate_law', null);
+                    if (targetingMode === 'action') return legalTargets(snap, 'action', null);
                     if (targetingMode === 'choice_target') return legalTargets(snap, 'choice_target', null);
+                    if (targetingMode === 'soap_heal') return legalTargets(snap, 'soap_heal', null);
                     if (targetingMode === 'card') {
                         const card = (snap.you?.hand || []).find((c) => c.instance_id === selectedId);
                         return legalTargets(snap, 'card', card);
@@ -397,6 +403,22 @@
                             selectedTarget = null;
                             return;
                         }
+                        if (targetingMode === 'soap_heal') {
+                            sock.send('game_action', { action: 'choose', target: user }, roomId);
+                            selectedTarget = null;
+                            return;
+                        }
+                        if (targetingMode === 'action' && pendingAction) {
+                            selectedTarget = user;
+                            sock.send('game_action', {
+                                action: pendingAction.action,
+                                target: user,
+                            }, roomId);
+                            pendingAction = null;
+                            targetingMode = null;
+                            selectedTarget = null;
+                            return;
+                        }
                         selectedTarget = user;
                         setStatus(`目标：${selectedTarget}`);
                         render(state);
@@ -419,15 +441,17 @@
                 const isPrompt = snap.phase === 'prompt' && prompt;
                 const isDying = snap.phase === 'dying' && dying;
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
-                const isWander = isPrompt && prompt.type === 'wander_draw';
-                const myWander = isWander && prompt.to === username;
-                const isGravity = isPrompt && prompt.type === 'gravity_override';
-                const myGravity = isGravity && prompt.to === username;
+                const confirmMeta = isPrompt && prompt.confirm ? prompt.confirm : null;
+                const myConfirm = !!(confirmMeta && prompt.to === username);
+                const needsConfirmCards = myConfirm && Number(confirmMeta.needs_cards || 0) > 0;
+                const confirmCardNeed = needsConfirmCards ? Number(confirmMeta.needs_cards) : 0;
                 const isChoice = isPrompt && prompt.type === 'choice';
                 const isInterrupt = isPrompt && (prompt.type === 'interrupt_trick' || prompt.type === 'respond_toxic');
                 const myChoice = isChoice && prompt.to === username;
                 const myInterrupt = isInterrupt && prompt.to === username;
                 const isDodgePrompt = isPrompt && prompt.type === 'respond_dodge';
+                const isSoapPrompt = isPrompt && prompt.type === 'soap_heal';
+                const mySoap = isSoapPrompt && prompt.to === username;
                 const myPrompt = isPrompt && prompt.to === username;
                 const myDying = isDying && dying.victim === username;
                 const canSaveDying = isDying && snap.you?.alive !== false;
@@ -447,18 +471,20 @@
                     hint.textContent = need > 0
                         ? `弃牌阶段：还需弃置 ${need} 张（已选 ${selectedIds.size}）`
                         : '手牌已达上限，可点击「完成弃牌」';
-                } else if (myWander) {
-                    hint.textContent = '【流浪】：是否失去 1 点体力并摸两张牌？';
-                } else if (myGravity) {
-                    hint.textContent = '万有引力号：先选两张手牌，再点「引力覆盖」';
+                } else if (myConfirm && needsConfirmCards) {
+                    hint.textContent = `请先选 ${confirmCardNeed} 张手牌，再点「${confirmMeta.accept_label}」`;
+                } else if (myConfirm) {
+                    hint.textContent = snap.stage?.text || '请选择确认或放弃';
+                } else if (mySoap) {
+                    hint.textContent = '香皂：点击座位选择回复目标';
                 } else if (isDying) {
                     hint.textContent = myDying
                         ? '你濒死：打出桃自救，或点击「结算濒死」'
                         : `${dying.victim} 濒死：可打出桃救人`;
-                } else if (targetingMode === 'ultimate_law') {
+                } else if (targetingMode === 'action' && pendingAction) {
                     hint.textContent = selectedTarget
-                        ? `终极规律目标 ${selectedTarget} · 点击「终极规律」确认`
-                        : '终极规律：点击座位选择复制目标';
+                        ? `${pendingAction.label}目标 ${selectedTarget}`
+                        : `${pendingAction.label}：点击座位选择目标`;
                 } else if (targetingMode === 'choice_target' && pendingChoiceId) {
                     hint.textContent = '古筝：点击座位选择要弃牌的角色';
                 } else if (selectedId && needsDiscardCost((snap.you?.hand || []).find((c) => c.instance_id === selectedId))) {
@@ -490,10 +516,15 @@
                     : '—';
 
                 const roleBox = document.getElementById('roleBox');
-                const canPickSelfChoice = targetingMode === 'choice_target' && !!pendingChoiceId;
+                const canPickSelfChoice = (targetingMode === 'choice_target' && !!pendingChoiceId)
+                    || targetingMode === 'soap_heal';
                 roleBox.classList.toggle('selected-target', selectedTarget === username && canPickSelfChoice);
                 roleBox.style.cursor = canPickSelfChoice ? 'pointer' : '';
                 roleBox.onclick = canPickSelfChoice ? () => {
+                    if (targetingMode === 'soap_heal') {
+                        sock.send('game_action', { action: 'choose', target: username }, roomId);
+                        return;
+                    }
                     sock.send('game_action', {
                         action: 'choose',
                         choice: pendingChoiceId,
@@ -510,14 +541,12 @@
 
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');
-                const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || myGravity;
+                const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || needsConfirmCards;
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
                     const ptype = prompt && prompt.type;
-                    if (isWander || isBenevolence || isMadonna || isChoice || ptype === 'soap_heal') {
-                        dim = 'dim';
-                    } else if (isGravity) {
-                        dim = '';
+                    if (myConfirm || isChoice || isSoapPrompt) {
+                        dim = needsConfirmCards ? '' : 'dim';
                     } else if (ptype === 'interrupt_trick' || ptype === 'respond_toxic') {
                         const ok = c.id === 'thought_stamp' || c.id === 'return_motion'
                             || (ptype === 'respond_toxic' && (c.subtype === 'kill' || c.id === 'thought_stamp'));
@@ -559,9 +588,9 @@
                             render(state);
                             return;
                         }
-                        if (myGravity) {
+                        if (needsConfirmCards) {
                             if (selectedIds.has(id)) selectedIds.delete(id);
-                            else if (selectedIds.size < 2) selectedIds.add(id);
+                            else if (selectedIds.size < confirmCardNeed) selectedIds.add(id);
                             selectedId = null;
                             render(state);
                             return;
@@ -577,11 +606,12 @@
                             selectedId = null;
                             discardCostId = null;
                             selectedTarget = null;
-                            targetingMode = targetingMode === 'ultimate_law' ? 'ultimate_law' : null;
+                            if (targetingMode !== 'action') targetingMode = null;
                         } else {
                             selectedId = id;
                             discardCostId = null;
                             selectedIds.clear();
+                            pendingAction = null;
                             targetingMode = null;
                             const card = hand.find((c) => c.instance_id === id);
                             if (card && needsOtherTarget(card) && !isPeach(card)) {
@@ -604,8 +634,7 @@
                 const needsTarget = selectedCard && needsOtherTarget(selectedCard) && !isPeach(selectedCard);
                 const hasRequiredTarget = !needsTarget || !!selectedTarget;
                 const hasDiscardCost = !needsDiscardCost(selectedCard) || !!discardCostId;
-                const isSoapPrompt = isPrompt && prompt && prompt.type === 'soap_heal';
-                const allowPromptPlay = myPrompt && !isWander && !isBenevolence && !isMadonna && !isGravity && !isChoice && !isSoapPrompt;
+                const allowPromptPlay = myPrompt && !myConfirm && !isChoice && !isSoapPrompt;
 
                 let canPlay = ((inPlay && uiMode === 'play') || allowPromptPlay || canSaveDying) && selectedId && hasRequiredTarget && hasDiscardCost;
                 playBtn.disabled = !canPlay;
@@ -620,16 +649,16 @@
                     playBtn.disabled = selectedIds.size === 0;
                     playBtn.textContent = '弃置所选';
                     setHidden(playBtn, false);
-                } else if (uiMode === 'tech_discard' || isWander || isBenevolence || isMadonna || isChoice || isSoapPrompt || myGravity) {
+                } else if (uiMode === 'tech_discard' || myConfirm || isChoice || isSoapPrompt) {
                     setHidden(playBtn, true);
                 } else {
                     setHidden(playBtn, false);
                 }
 
-                setHidden(cancelSelectBtn, !(selectedId || selectedIds.size || discardCostId || targetingMode === 'ultimate_law'));
+                setHidden(cancelSelectBtn, !(selectedId || selectedIds.size || discardCostId || targetingMode === 'action'));
                 cancelSelectBtn.disabled = false;
 
-                setHidden(document.getElementById('endPlayBtn'), inDiscard || uiMode === 'tech_discard' || isWander || isPrompt || isDying);
+                setHidden(document.getElementById('endPlayBtn'), inDiscard || uiMode === 'tech_discard' || myConfirm || isPrompt || isDying);
                 document.getElementById('endPlayBtn').disabled = !(inPlay && uiMode === 'play');
 
                 const discardDoneBtn = document.getElementById('discardDoneBtn');
@@ -645,11 +674,11 @@
                 setHidden(techCancelBtn, uiMode !== 'tech_discard');
                 techConfirmBtn.disabled = !(uiMode === 'tech_discard' && selectedIds.size === 4);
 
-                setHidden(document.getElementById('recastBtn'), inDiscard || uiMode === 'tech_discard' || isWander || isPrompt || isDying);
+                setHidden(document.getElementById('recastBtn'), inDiscard || uiMode === 'tech_discard' || myConfirm || isPrompt || isDying);
                 document.getElementById('recastBtn').disabled = !(inPlay && uiMode === 'play' && selectedId);
 
                 const respondPassBtn = document.getElementById('respondPassBtn');
-                const hidePassTypes = isWander || isChoice || isBenevolence || isMadonna || isGravity || isSoapPrompt;
+                const hidePassTypes = myConfirm || isChoice || isSoapPrompt;
                 setHidden(respondPassBtn, !(isPrompt && !hidePassTypes));
                 respondPassBtn.disabled = !(myPrompt || myInterrupt) || hidePassTypes;
                 respondPassBtn.textContent = isInterrupt ? '不响应/不打断' : '不响应';
@@ -663,8 +692,8 @@
                     choiceBtns.querySelectorAll('button').forEach((btn) => {
                         btn.addEventListener('click', () => {
                             const choice = btn.getAttribute('data-choice');
-                            const needsTarget = btn.getAttribute('data-needs-target') === '1';
-                            if (needsTarget) {
+                            const needsT = btn.getAttribute('data-needs-target') === '1';
+                            if (needsT) {
                                 pendingChoiceId = choice;
                                 targetingMode = 'choice_target';
                                 selectedTarget = null;
@@ -686,24 +715,53 @@
                     }
                 }
 
-                setHidden(document.getElementById('wanderAcceptBtn'), !isWander);
-                setHidden(document.getElementById('wanderPassBtn'), !isWander);
-                document.getElementById('wanderAcceptBtn').disabled = !myWander;
-                document.getElementById('wanderPassBtn').disabled = !myWander;
+                const confirmAcceptBtn = document.getElementById('confirmAcceptBtn');
+                const confirmPassBtn = document.getElementById('confirmPassBtn');
+                setHidden(confirmAcceptBtn, !myConfirm);
+                setHidden(confirmPassBtn, !myConfirm);
+                if (myConfirm) {
+                    confirmAcceptBtn.textContent = confirmMeta.accept_label || '确认';
+                    confirmPassBtn.textContent = confirmMeta.pass_label || '放弃';
+                    confirmAcceptBtn.disabled = needsConfirmCards && selectedIds.size !== confirmCardNeed;
+                    confirmPassBtn.disabled = false;
+                }
 
-                setHidden(document.getElementById('curvatureBtn'), !(isDodgePrompt && myPrompt && prompt.curvature));
-                document.getElementById('curvatureBtn').disabled = !(isDodgePrompt && myPrompt && prompt.curvature);
-
-                setHidden(document.getElementById('gravityAcceptBtn'), !isGravity);
-                setHidden(document.getElementById('gravityPassBtn'), !isGravity);
-                document.getElementById('gravityAcceptBtn').disabled = !myGravity || selectedIds.size !== 2;
-                document.getElementById('gravityPassBtn').disabled = !myGravity;
-
-                const ultimateLawBtn = document.getElementById('ultimateLawBtn');
-                setHidden(ultimateLawBtn, !(inPlay && you.ultimate_law_ready));
-                ultimateLawBtn.disabled = !(inPlay && you.ultimate_law_ready && selectedTarget && targetingMode === 'ultimate_law');
-                if (inPlay && you.ultimate_law_ready && targetingMode !== 'ultimate_law') {
-                    ultimateLawBtn.disabled = false;
+                const dynamicActionBtns = document.getElementById('dynamicActionBtns');
+                const playActions = (inPlay && uiMode === 'play') ? (you.actions || []) : [];
+                const promptExtras = (myPrompt && Array.isArray(prompt?.extra_actions)) ? prompt.extra_actions : [];
+                const dynActions = [...playActions, ...promptExtras];
+                if (dynActions.length) {
+                    setHidden(dynamicActionBtns, false);
+                    dynamicActionBtns.innerHTML = dynActions.map((a) => {
+                        const active = targetingMode === 'action' && pendingAction && pendingAction.id === a.id;
+                        return `<button class="btn btn-outline${active ? ' selected' : ''}" type="button" data-action-id="${a.id}">${a.label}</button>`;
+                    }).join('');
+                    dynamicActionBtns.querySelectorAll('button').forEach((btn) => {
+                        btn.addEventListener('click', () => {
+                            const id = btn.getAttribute('data-action-id');
+                            const meta = dynActions.find((a) => a.id === id);
+                            if (!meta) return;
+                            if (meta.needs_target) {
+                                pendingAction = meta;
+                                targetingMode = 'action';
+                                selectedId = null;
+                                selectedTarget = null;
+                                setStatus(`请点击座位选择${meta.label}目标`);
+                                render(state);
+                                return;
+                            }
+                            sock.send('game_action', { action: meta.action }, roomId);
+                            pendingAction = null;
+                            targetingMode = null;
+                        });
+                    });
+                } else {
+                    setHidden(dynamicActionBtns, true);
+                    dynamicActionBtns.innerHTML = '';
+                    if (targetingMode === 'action' && !(you.actions || []).length) {
+                        pendingAction = null;
+                        targetingMode = null;
+                    }
                 }
 
                 setHidden(document.getElementById('dyingPassBtn'), !myDying);
@@ -718,6 +776,7 @@
                 discardCostId = null;
                 selectedTarget = null;
                 pendingChoiceId = null;
+                pendingAction = null;
                 targetingMode = null;
                 if (state) render(state);
             }
@@ -821,40 +880,29 @@
             document.getElementById('respondPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'respond_pass' }, roomId);
             });
-            document.getElementById('wanderAcceptBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'wander_accept' }, roomId);
-            });
-            document.getElementById('wanderPassBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'wander_pass' }, roomId);
-            });
-            document.getElementById('curvatureBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'curvature_judge' }, roomId);
-            });
-            document.getElementById('gravityAcceptBtn').addEventListener('click', () => {
-                if (selectedIds.size !== 2) { setStatus('请选择两张手牌', 'error'); return; }
-                sock.send('game_action', {
-                    action: 'gravity_accept',
-                    instance_ids: [...selectedIds],
-                }, roomId);
-                selectedIds.clear();
-            });
-            document.getElementById('gravityPassBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'gravity_pass' }, roomId);
-                selectedIds.clear();
-            });
-            document.getElementById('ultimateLawBtn').addEventListener('click', () => {
-                if (targetingMode !== 'ultimate_law') {
-                    targetingMode = 'ultimate_law';
-                    selectedId = null;
-                    selectedTarget = null;
-                    if (state) render(state);
-                    setStatus('请点击座位选择复制目标');
+            document.getElementById('confirmAcceptBtn').addEventListener('click', () => {
+                const meta = state?.prompt?.confirm;
+                if (!meta || state?.prompt?.to !== username) return;
+                const needCards = Number(meta.needs_cards || 0);
+                if (needCards > 0) {
+                    if (selectedIds.size !== needCards) {
+                        setStatus(`请选择恰好 ${needCards} 张手牌`, 'error');
+                        return;
+                    }
+                    sock.send('game_action', {
+                        action: meta.accept_action,
+                        instance_ids: [...selectedIds],
+                    }, roomId);
+                    selectedIds.clear();
                     return;
                 }
-                if (!selectedTarget) { setStatus('请选择复制目标', 'error'); return; }
-                sock.send('game_action', { action: 'ultimate_law', target: selectedTarget }, roomId);
-                selectedTarget = null;
-                targetingMode = null;
+                sock.send('game_action', { action: meta.accept_action }, roomId);
+            });
+            document.getElementById('confirmPassBtn').addEventListener('click', () => {
+                const meta = state?.prompt?.confirm;
+                if (!meta || state?.prompt?.to !== username) return;
+                sock.send('game_action', { action: meta.pass_action }, roomId);
+                selectedIds.clear();
             });
             document.getElementById('dyingPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'dying_resolve' }, roomId);

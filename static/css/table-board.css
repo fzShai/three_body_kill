@@ -73,14 +73,27 @@ body.shell-page.table-page::before { opacity: 0.28; }
     inset: 6% 8% 10%;
     border-radius: 50%;
     background:
-        radial-gradient(ellipse 55% 50% at 50% 48%, rgba(18, 28, 40, 0.85) 0%, rgba(8, 12, 20, 0.4) 55%, transparent 72%),
-        radial-gradient(ellipse 70% 60% at 50% 50%, rgba(122, 158, 176, 0.04) 0%, transparent 60%);
+        radial-gradient(ellipse 55% 50% at 50% 48%, rgba(18, 28, 40, 0.85) 0%, rgba(8, 12, 20, 0.4) 55%, transparent 72%);
     border: 1px solid rgba(122, 158, 176, 0.08);
     pointer-events: none;
-    --urgency-period: 2.4s;
+    --urgency-period: 4s;
 }
-.table-felt.urgency-pulse {
-    animation: felt-urgency-pulse var(--urgency-period, 2.4s) ease-in-out infinite;
+.table-felt::after {
+    content: '';
+    position: absolute;
+    inset: 8% 10%;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(
+        ellipse 70% 60% at 50% 50%,
+        rgba(122, 158, 176, 0.22) 0%,
+        rgba(122, 158, 176, 0.08) 40%,
+        transparent 70%
+    );
+    opacity: 0.22;
+}
+.table-felt.urgency-pulse::after {
+    animation: felt-urgency-pulse var(--urgency-period, 4s) ease-in-out infinite;
 }
 
 .seat-ring {
@@ -198,10 +211,6 @@ body.shell-page.table-page::before { opacity: 0.28; }
     justify-content: center;
     gap: 8px;
     text-align: center;
-    --urgency-period: 2.4s;
-}
-.stage.urgency-pulse {
-    animation: stage-urgency-pulse var(--urgency-period, 2.4s) ease-in-out infinite;
 }
 .stage.dying {
     border-color: var(--warn-amber);
@@ -457,7 +466,13 @@ body.shell-page.table-page::before { opacity: 0.28; }
         border-top: 1px solid var(--line-strong);
         order: 2;
     }
-    .table-felt { display: none; }
+    /* Keep soft halo on mobile; hide hard desk border */
+    .table-felt {
+        display: block;
+        inset: 12% 4% 18%;
+        border: none;
+        background: transparent;
+    }
     .board-arena {
         position: relative;
         display: flex;

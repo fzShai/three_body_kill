@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260729u" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729u" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260729v" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729v" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -309,11 +309,9 @@
 
             setInterval(() => {
                 const felt = document.querySelector('.table-felt');
-                const stageEl = document.getElementById('stage');
                 if (!turnDeadlineMs || !state || !['turn', 'prompt', 'dying'].includes(state.phase)) {
                     turnTimerEl.textContent = '—';
                     felt?.classList.remove('urgency-pulse');
-                    stageEl?.classList.remove('urgency-pulse');
                     return;
                 }
                 const remainingSec = Math.max(0, (turnDeadlineMs - Date.now()) / 1000);
@@ -325,15 +323,10 @@
                 const elapsed = total - remainingSec;
                 const active = elapsed >= 10 && remainingSec > 0;
                 const ratio = Math.min(1, Math.max(0, remainingSec / urgencyWindow));
-                const period = Math.min(2.4, Math.max(0.3, 0.3 + 2.1 * ratio));
-                const periodStr = period.toFixed(2) + 's';
+                const period = Math.min(4.0, Math.max(1.2, 1.2 + 2.8 * ratio));
                 if (felt) {
-                    felt.style.setProperty('--urgency-period', periodStr);
+                    felt.style.setProperty('--urgency-period', period.toFixed(2) + 's');
                     felt.classList.toggle('urgency-pulse', active);
-                }
-                if (stageEl) {
-                    stageEl.style.setProperty('--urgency-period', periodStr);
-                    stageEl.classList.toggle('urgency-pulse', active);
                 }
             }, 200);
 

@@ -134,31 +134,10 @@ body.table-ended .ended-banner {
     filter: brightness(1.22);
 }
 
-/* Turn urgency glow (period driven by --urgency-period) */
+/* Turn urgency glow — soft felt halo only (period via --urgency-period) */
 @keyframes felt-urgency-pulse {
-    0%, 100% {
-        border-color: rgba(122, 158, 176, 0.08);
-        box-shadow: 0 0 0 0 transparent;
-        filter: brightness(1);
-    }
-    50% {
-        border-color: rgba(155, 184, 200, 0.45);
-        box-shadow:
-            0 0 28px 4px rgba(122, 158, 176, 0.18),
-            inset 0 0 40px rgba(122, 158, 176, 0.1);
-        filter: brightness(1.08);
-    }
-}
-
-@keyframes stage-urgency-pulse {
-    0%, 100% {
-        border-color: var(--line);
-        box-shadow: none;
-    }
-    50% {
-        border-color: var(--accent-ice);
-        box-shadow: 0 0 18px 2px var(--accent-ice-dim);
-    }
+    0%, 100% { opacity: 0.18; }
+    50% { opacity: 0.42; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -168,8 +147,7 @@ body.table-ended .ended-banner {
     .deterrence-pulse,
     .ended-banner,
     .stage-card.stage-enter,
-    .table-felt.urgency-pulse,
-    .stage.urgency-pulse,
+    .table-felt.urgency-pulse::after,
     body.shell-page::before {
         animation: none !important;
     }

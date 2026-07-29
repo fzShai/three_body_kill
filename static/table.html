@@ -65,10 +65,6 @@
             <span id="choiceBtns" hidden></span>
             <button class="btn btn-outline" id="wanderAcceptBtn" type="button" hidden>发动流浪</button>
             <button class="btn btn-outline" id="wanderPassBtn" type="button" hidden>放弃流浪</button>
-            <button class="btn btn-outline" id="benevolenceBtn" type="button" hidden>仁心治疗</button>
-            <button class="btn btn-outline" id="madonnaAcceptBtn" type="button" hidden>发动圣母</button>
-            <button class="btn btn-outline" id="madonnaPassBtn" type="button" hidden>放弃圣母</button>
-            <button class="btn btn-outline" id="flyingBladeBtn" type="button" hidden>飞刃</button>
             <button class="btn btn-outline" id="curvatureBtn" type="button" hidden>曲率判定</button>
             <button class="btn btn-outline" id="gravityAcceptBtn" type="button" hidden>引力覆盖</button>
             <button class="btn btn-outline" id="gravityPassBtn" type="button" hidden>放弃引力</button>
@@ -92,7 +88,7 @@
             let selectedIds = new Set();
             let discardCostId = null; // 古筝等：额外弃置的手牌
             let selectedTarget = null;
-            let targetingMode = null; // null | 'card' | 'benevolence' | 'ultimate_law' | 'choice_target'
+            let targetingMode = null; // null | 'card' | 'ultimate_law' | 'choice_target'
             let pendingChoiceId = null; // choice 选项需选目标时暂存
             let uiMode = 'play'; // play | discard | tech_discard
             let turnDeadlineMs = null;
@@ -248,7 +244,6 @@
                 const players = snap.players || [];
                 const others = players.filter((p) => p.alive && p.username !== username);
                 const allAlive = players.filter((p) => p.alive);
-                if (mode === 'benevolence') return allAlive.map((p) => p.username);
                 if (mode === 'ultimate_law') return others.map((p) => p.username);
                 if (mode === 'choice_target') return allAlive.map((p) => p.username);
                 if (!card) return [];
@@ -267,13 +262,8 @@
                 const hand = snap.you?.hand || [];
                 const card = hand.find((c) => c.instance_id === selectedId);
                 const prompt = snap.prompt;
-                const isBenevolence = snap.phase === 'prompt' && prompt?.type === 'benevolence_heal' && prompt.to === username;
                 const inPlay = snap.current_player === username && snap.phase === 'turn' && snap.turn_phase === 'play';
 
-                if (isBenevolence) {
-                    targetingMode = 'benevolence';
-                    return;
-                }
                 if (targetingMode === 'choice_target' && pendingChoiceId && prompt?.type === 'choice' && prompt.to === username) {
                     return;
                 }
@@ -351,7 +341,6 @@
                 const positions = seatPositions(rotated.length);
                 const playersByName = Object.fromEntries((snap.players || []).map((p) => [p.username, p]));
                 const legal = (() => {
-                    if (ctx.myBenevolence) return legalTargets(snap, 'benevolence', null);
                     if (targetingMode === 'ultimate_law') return legalTargets(snap, 'ultimate_law', null);
                     if (targetingMode === 'choice_target') return legalTargets(snap, 'choice_target', null);
                     if (targetingMode === 'card') {
@@ -432,10 +421,6 @@
                 const myTurn = snap.current_player === username && snap.phase === 'turn';
                 const isWander = isPrompt && prompt.type === 'wander_draw';
                 const myWander = isWander && prompt.to === username;
-                const isBenevolence = isPrompt && prompt.type === 'benevolence_heal';
-                const myBenevolence = isBenevolence && prompt.to === username;
-                const isMadonna = isPrompt && prompt.type === 'madonna_save';
-                const myMadonna = isMadonna && prompt.to === username;
                 const isGravity = isPrompt && prompt.type === 'gravity_override';
                 const myGravity = isGravity && prompt.to === username;
                 const isChoice = isPrompt && prompt.type === 'choice';
@@ -450,7 +435,7 @@
                 const inDiscard = myTurn && snap.turn_phase === 'discard';
                 const need = discardNeed(snap);
 
-                const ctx = { isPrompt, isDying, dying, prompt, myBenevolence };
+                const ctx = { isPrompt, isDying, dying, prompt };
                 document.body.classList.toggle('table-ended', snap.phase === 'ended');
                 renderStage(snap);
                 renderSeats(snap, ctx);
@@ -464,12 +449,6 @@
                         : '手牌已达上限，可点击「完成弃牌」';
                 } else if (myWander) {
                     hint.textContent = '【流浪】：是否失去 1 点体力并摸两张牌？';
-                } else if (myBenevolence) {
-                    hint.textContent = selectedTarget
-                        ? `【仁心】目标 ${selectedTarget} · 点击「仁心治疗」`
-                        : '【仁心】：点击座位选择治疗目标';
-                } else if (myMadonna) {
-                    hint.textContent = `【圣母】：是否救治濒死的 ${prompt.victim}？`;
                 } else if (myGravity) {
                     hint.textContent = '万有引力号：先选两张手牌，再点「引力覆盖」';
                 } else if (isDying) {
@@ -512,23 +491,17 @@
 
                 const roleBox = document.getElementById('roleBox');
                 const canPickSelfChoice = targetingMode === 'choice_target' && !!pendingChoiceId;
-                roleBox.classList.toggle('selected-target', selectedTarget === username && (!!myBenevolence || canPickSelfChoice));
-                roleBox.style.cursor = (myBenevolence || canPickSelfChoice) ? 'pointer' : '';
-                roleBox.onclick = (myBenevolence || canPickSelfChoice) ? () => {
-                    if (canPickSelfChoice) {
-                        sock.send('game_action', {
-                            action: 'choose',
-                            choice: pendingChoiceId,
-                            target: username,
-                        }, roomId);
-                        pendingChoiceId = null;
-                        targetingMode = null;
-                        selectedTarget = null;
-                        return;
-                    }
-                    selectedTarget = username;
-                    setStatus('目标：自己');
-                    render(state);
+                roleBox.classList.toggle('selected-target', selectedTarget === username && canPickSelfChoice);
+                roleBox.style.cursor = canPickSelfChoice ? 'pointer' : '';
+                roleBox.onclick = canPickSelfChoice ? () => {
+                    sock.send('game_action', {
+                        action: 'choose',
+                        choice: pendingChoiceId,
+                        target: username,
+                    }, roomId);
+                    pendingChoiceId = null;
+                    targetingMode = null;
+                    selectedTarget = null;
                 } : null;
 
                 document.getElementById('selfEquipBody').innerHTML =
@@ -718,17 +691,6 @@
                 document.getElementById('wanderAcceptBtn').disabled = !myWander;
                 document.getElementById('wanderPassBtn').disabled = !myWander;
 
-                setHidden(document.getElementById('benevolenceBtn'), !isBenevolence);
-                document.getElementById('benevolenceBtn').disabled = !myBenevolence || !selectedTarget;
-
-                setHidden(document.getElementById('madonnaAcceptBtn'), !isMadonna);
-                setHidden(document.getElementById('madonnaPassBtn'), !isMadonna);
-                document.getElementById('madonnaAcceptBtn').disabled = !myMadonna;
-                document.getElementById('madonnaPassBtn').disabled = !myMadonna;
-
-                setHidden(document.getElementById('flyingBladeBtn'), !(inPlay && you.flying_blade_ready));
-                document.getElementById('flyingBladeBtn').disabled = !(inPlay && you.flying_blade_ready);
-
                 setHidden(document.getElementById('curvatureBtn'), !(isDodgePrompt && myPrompt && prompt.curvature));
                 document.getElementById('curvatureBtn').disabled = !(isDodgePrompt && myPrompt && prompt.curvature);
 
@@ -756,7 +718,7 @@
                 discardCostId = null;
                 selectedTarget = null;
                 pendingChoiceId = null;
-                if (targetingMode !== 'benevolence') targetingMode = null;
+                targetingMode = null;
                 if (state) render(state);
             }
 
@@ -864,21 +826,6 @@
             });
             document.getElementById('wanderPassBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'wander_pass' }, roomId);
-            });
-            document.getElementById('benevolenceBtn').addEventListener('click', () => {
-                if (!selectedTarget) { setStatus('请点击座位选择仁心目标', 'error'); return; }
-                sock.send('game_action', { action: 'benevolence_heal', target: selectedTarget }, roomId);
-                selectedTarget = null;
-                targetingMode = null;
-            });
-            document.getElementById('madonnaAcceptBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'madonna_accept' }, roomId);
-            });
-            document.getElementById('madonnaPassBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'madonna_pass' }, roomId);
-            });
-            document.getElementById('flyingBladeBtn').addEventListener('click', () => {
-                sock.send('game_action', { action: 'flying_blade' }, roomId);
             });
             document.getElementById('curvatureBtn').addEventListener('click', () => {
                 sock.send('game_action', { action: 'curvature_judge' }, roomId);

@@ -1,0 +1,103 @@
+## guzheng_plan
+OLD type=trick text=弃一张手牌，然后三选一：摸两张 / 回复2点 / 科技+1。
+NEW type=trick text=至少有一张手牌时才能使用。弃置一张手牌，然后三选一：摸2张牌 / 选择一名角色弃置其2张手牌 / 回复2点血量。
+
+## cosmic_safety
+OLD type=trick text=清除所有场地与控制类状态。
+NEW type=trick text=清除任意名角色的场地效果或控制效果。若清除成功，摸两张牌。
+
+## curtain
+OLD type=trick text=清除你的所有负面状态，并摸两张牌。
+NEW type=trick text=清除你的所有负面状态，然后摸1张牌。
+
+## soap
+OLD type=trick text=选择一名其他角色，你与其各回复等同于你科技等级的体力。
+NEW type=trick text=不可在濒死时使用。询问「令哪一名角色+1血」，循环x次（x为你的科技等级），每次独立选人。
+
+## hibernation
+OLD type=trick text=你进入冬眠：不可被选为目标，直到你的下个回合开始。
+NEW type=trick text=可重铸。使用后体力上限-2，获得状态[冬眠]：无法被其他人的牌选中，持续到自己的下个回合开始。
+
+## killer_52
+OLD type=trick text=指定任意名其他角色各受到1点基础伤害，然后你摸一张牌。
+NEW type=trick text=指定一名其他角色为「猎物」。除你与猎物外按座位取至多3名存活角色各摸1张牌：若摸到杀则立即对猎物结算该杀（可被闪响应）；否则加入手牌。然后你摸1张牌。
+
+## broadcast
+OLD type=trick text=对一名视野未暴露的其他角色造成1点基础伤害并暴露其视野至其回合结束。
+NEW type=trick text=对自己外所有未暴露视野的人各造成2点基础伤害，然后暴露其余所有人的视野至其回合结束。
+
+## toxic_water
+OLD type=trick text=对一名其他角色使用。其可用杀或思想钢印响应，否则受到2点基础伤害。
+NEW type=trick text=对所有除自身以外的角色造成2点基础伤害，只能被杀、思想钢印响应。
+
+## deterrence
+OLD type=trick text=你的下一张杀额外结算一次。
+NEW type=trick text=本回合内，你的下一张基本牌指定目标+1。
+
+## zeroing
+OLD type=trick text=对每名其他角色：若体力大于1则造成1点基础伤害，否则科技-1。
+NEW type=trick text=所有其他角色选择一项：受到x/2点伤害（向上取整，x为其科技等级） / 降低1级科技等级并弃置1张牌。
+
+## star_ring_city
+OLD type=trick text=从你开始，每名存活角色二选一：摸一张或弃一张。
+NEW type=trick text=对所有人使用，各选一项：给予你两张牌 / 受到1点基础伤害并使你回复等量血量。
+
+## plan_part
+OLD type=equipment text=装备后，你接下来受到的 2 次伤害各减半（向下取整）。
+NEW type=trick text=获得正面状态[计划的一部分]：接下来2次受到的伤害减半（向下取整）；每次受伤时二选一：摸2张牌 / 对伤害来源造成1点基础伤害。2次用尽后移除状态。
+
+## black_hole
+OLD type=equipment text=你每使用 3 张基本牌，复制手牌中一张随机牌（至少保留原牌）。
+NEW type=trick text=获得正面状态[黑洞]（不可叠加）：敌方累计使用3张基本牌时，获得这3张牌的原始复制，然后移除本状态。
+
+## micro_universe
+OLD type=equipment text=装备时获得 5 点护盾；护盾优先吸收最终伤害。
+NEW type=trick text=获得正面状态[小宇宙]：获得5点护盾；护盾优先吸收最终伤害；护盾归零后移除状态。
+
+## death_immortal
+OLD type=equipment text=你即将因濒死出局时：回复 2 点体力、摸 2 张牌，并移除此装备。
+NEW type=trick text=获得正面状态[死神永生]：即将因濒死出局时，回复2点血并摸2张牌，然后移除本状态。
+
+## great_ravine
+OLD type=trick text=令一名其他角色翻面（跳过其下一回合），且其伤害加成-1。
+NEW type=trick text=选择一名角色[翻面]（跳过下次出牌阶段），且其受到伤害-1。
+
+## sophon
+OLD type=trick text=指定一名角色：其科技等级无法变化，直到其回合结束。
+NEW type=trick text=选择一名角色，使其下回合科技等级无法变化。
+
+## wallfacer_plan
+OLD type=trick text=弃置目标一张手牌；若其视野已暴露则弃两张。
+NEW type=trick text=选择一名角色，弃置其一张牌；若其暴露视野，则改为弃置两张。
+
+## thought_stamp
+OLD type=trick text=任意时刻：使正在结算的锦囊对目标无效。
+NEW type=trick text=可在任意时刻使用。使一名角色的1-3阶锦囊牌对某名角色无效。
+
+## dual_vector
+OLD type=trick text=对一名其他角色造成3点真实伤害；若其视野已暴露，改为造成等于其当前体力的真实伤害。
+NEW type=trick text=选择一名角色，对其造成3点真实伤害；若其暴露视野，改为x点（x为其当前生命值）。
+
+## four_dimension
+OLD type=trick text=弃置目标所有装备，并暴露其视野至其回合结束。
+NEW type=trick text=选择任意名角色，弃置他们的装备牌（至多弃置四张），并暴露以此法失去装备的玩家的视野直到回合结束。
+
+## curse
+OLD type=trick text=若有场地则效果翻倍；否则随机布置一个场地。
+NEW type=trick text=若当前存在场地效果则使所有场地效果翻倍；否则随机产生一个场地效果。
+
+## dark_domain
+OLD type=trick text=场地：全员受到伤害时额外减免2点。
+NEW type=trick text=场地效果：所有人获得两点伤害减免。
+
+## crisis_field
+OLD type=trick text=场地：每名角色回合结束时受到1～2点最终伤害。
+NEW type=trick text=场地效果：每名角色回合结束时，对场上一名随机角色造成(0,3)点最终伤害。
+
+## dark_forest_field
+OLD type=trick text=场地：全员造成伤害时额外加成2点。
+NEW type=trick text=场地效果：所有人获得2点伤害加成。
+
+## trisolaris_field
+OLD type=trick text=场地：随机恒纪元（回合额外摸1）或乱纪元（回合开始失去1体力）。
+NEW type=trick text=场地效果。初始恒纪元。每名角色回合开始时判定(1,4)，若为1则切换纪元。恒纪元：摸牌阶段摸牌数+1。乱纪元：出牌阶段每使用2张牌受到1点最终伤害。

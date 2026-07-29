@@ -28,7 +28,6 @@ def _blank_skills(session: GameSession, *names: str) -> None:
         p = session.players[n]
         p["skills"] = []
         p["tech_level"] = 1
-        p["countdown"] = None
         p["statuses"] = [s for s in p["statuses"] if s.get("id") != "skills_sealed"]
     if session.phase == "prompt":
         session.prompt = None
@@ -45,14 +44,6 @@ def _as_role(session: GameSession, username: str, role_id: str) -> None:
     p["max_hp"] = role["hp"]
     p["hp"] = min(p["hp"], role["hp"])
     p["tech_level"] = 4 if role_id == "guan_yifan" else 1
-    p["madonna_used"] = False
-    p["flying_blade_used"] = False
-    p["next_damage_true"] = False
-    p["countdown_done"] = False
-    if role_id == "wang_miao":
-        p["countdown"] = 12
-    else:
-        p["countdown"] = None
 
 
 KNOWN_ROLES = {
@@ -60,22 +51,16 @@ KNOWN_ROLES = {
     "friss",
     "luo_ji",
     "ye_wenjie",
-    "cheng_xin",
-    "wang_miao",
 }
 
 
 def _clear_prompt_to_turn(session: GameSession) -> None:
-    """Dismiss opening skill prompts (e.g. 仁心) so baseline tests can run."""
+    """Dismiss opening skill prompts so baseline tests can run."""
     while session.phase == "prompt" and session.prompt:
         ptype = session.prompt.get("type")
         who = str(session.prompt.get("to"))
-        if ptype == "benevolence_heal":
-            session.apply_action(who, {"action": "benevolence_pass"})
-        elif ptype == "wander_draw":
+        if ptype == "wander_draw":
             session.apply_action(who, {"action": "wander_pass"})
-        elif ptype == "madonna_save":
-            session.apply_action(who, {"action": "madonna_pass"})
         else:
             session.prompt = None
             session.phase = "turn"
@@ -466,6 +451,85 @@ def main() -> None:
     _give(fr.players["friss"], vis_c)
     ok, msg = fr.apply_action("friss", {"action": "recast", "instance_id": "vis-cohesion"})
     assert ok, msg
+    # 土著红岸：摸 2+2
+    fr.phase = "turn"
+    fr.turn_phase = "play"
+    fr.players["friss"]["red_coast_used"] = False
+    hand_before = len(fr.players["friss"]["hand"])
+    red_n = {
+        "id": "red_coast",
+        "name": "红岸计划",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "red-native",
+        "pool_entry": 19,
+    }
+    fr.players["friss"]["hand"].append(red_n)
+    ok, msg = fr.apply_action("friss", {"action": "play_card", "instance_id": "red-native"})
+    assert ok, msg
+    assert len(fr.players["friss"]["hand"]) == hand_before + 4
+    assert any("土著" in line and "红岸" in line for line in fr.log)
+    # 土著面壁：弃两次
+    fr.phase = "turn"
+    fr.turn_phase = "play"
+    _give(prey)  # 清空以免思想钢印打断
+    for i in range(4):
+        prey["hand"].append({
+            "id": "peach",
+            "name": "桃",
+            "type": "basic",
+            "subtype": "heal",
+            "instance_id": f"prey-pad-{i}",
+            "implemented": True,
+        })
+    prey_hand0 = len(prey["hand"])
+    prey["vision_exposed"] = False
+    wf_n = {
+        "id": "wallfacer_plan",
+        "name": "面壁计划",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "wf-native",
+        "pool_entry": 16,
+    }
+    _give(fr.players["friss"], wf_n)
+    ok, msg = fr.apply_action("friss", {"action": "play_card", "instance_id": "wf-native", "target": "prey"})
+    assert ok, msg
+    assert len(prey["hand"]) == prey_hand0 - 2  # 未暴露各弃 1，土著再弃 1
+    assert any("土著" in line and "面壁" in line for line in fr.log)
+    # 土著古筝：选摸牌 → 摸 2+2
+    fr.phase = "turn"
+    fr.turn_phase = "play"
+    _give(prey)  # 避免打断
+    cost = {
+        "id": "peach",
+        "name": "桃",
+        "type": "basic",
+        "subtype": "heal",
+        "instance_id": "gz-cost",
+        "implemented": True,
+    }
+    gz_n = {
+        "id": "guzheng_plan",
+        "name": "古筝计划",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "gz-native",
+        "pool_entry": 18,
+    }
+    _give(fr.players["friss"], gz_n, cost)
+    hand_before = len(fr.players["friss"]["hand"])
+    ok, msg = fr.apply_action(
+        "friss",
+        {"action": "play_card", "instance_id": "gz-native", "discard_instance_id": "gz-cost"},
+    )
+    assert ok, msg
+    assert fr.prompt and fr.prompt.get("will_native")
+    ok, msg = fr.apply_action("friss", {"action": "choose", "choice": "draw2"})
+    assert ok, msg
+    # 打出古筝+弃 cost 共 -2，摸 2+2 = +4，净 +2
+    assert len(fr.players["friss"]["hand"]) == hand_before - 2 + 4
+    assert any("土著" in line and "古筝" in line for line in fr.log)
 
     # 罗辑执剑人：视野暴露不可被杀；对暴露目标杀不可闪
     lj = GameSession.create("LUOJI", ["luo", "foe"])
@@ -526,50 +590,11 @@ def main() -> None:
     hand0 = len(yw.players["ye"]["hand"])
     ok, msg = yw.apply_action("ye", {"action": "play_card", "instance_id": "kill-ye", "target": "victim"})
     assert ok, msg
-    # 领袖直接结算，可能进入濒死/圣母询问；强制出局看红岸
-    if yw.phase == "prompt" and yw.prompt and yw.prompt.get("type") == "madonna_save":
-        yw.apply_action(str(yw.prompt["to"]), {"action": "madonna_pass"})
+    # 领袖直接结算；强制出局看红岸
     if yw.phase == "dying":
         yw.apply_action("victim", {"action": "dying_resolve"})
     assert not yw.players["victim"]["alive"]
     assert len(yw.players["ye"]["hand"]) >= hand0 + 1
-
-    # 程心仁心 + 圣母
-    cx = GameSession.create("CHENG", ["cheng", "hurt"])
-    _as_role(cx, "cheng", "cheng_xin")
-    _blank_skills(cx, "hurt")
-    cx.turn_index = cx.player_order.index("cheng")
-    cx.phase = "turn"
-    cx.turn_phase = "play"
-    cx.players["hurt"]["hp"] = 1
-    cx._open_benevolence_prompt("cheng")
-    ok, msg = cx.apply_action("cheng", {"action": "benevolence_heal", "target": "hurt"})
-    assert ok, msg
-    assert cx.players["hurt"]["hp"] == 3
-    cx.players["hurt"]["hp"] = 0
-    cx._begin_dying("hurt", source="cheng")
-    assert cx.prompt and cx.prompt.get("type") == "madonna_save"
-    ok, msg = cx.apply_action("cheng", {"action": "madonna_accept"})
-    assert ok, msg
-    assert cx.players["hurt"]["hp"] == cx.players["hurt"]["max_hp"]
-    assert cx.players["hurt"]["tech_level"] == 1
-    assert cx.players["cheng"]["madonna_used"] is True
-
-    # 汪淼倒计时 + 飞刃
-    wm = GameSession.create("WANG", ["wang", "foe"])
-    _as_role(wm, "wang", "wang_miao")
-    _blank_skills(wm, "foe")
-    assert wm.players["wang"]["countdown"] == 12
-    wm.turn_index = wm.player_order.index("wang")
-    wm.phase = "turn"
-    wm.turn_phase = "play"
-    wm.players["wang"]["countdown"] = 1
-    wm._tick_countdowns(1)
-    assert wm.players["wang"]["countdown_done"] is True
-    assert wm.players["wang"]["tech_level"] == 2
-    ok, msg = wm.apply_action("wang", {"action": "flying_blade"})
-    assert ok, msg
-    assert wm.players["wang"]["next_damage_true"] is True
 
     # 新装备/状态：小宇宙护盾 / 星环号不可被杀 / 太阳系观测
     eqn = GameSession.create("EQUIP_NEW", ["eq", "bot"])

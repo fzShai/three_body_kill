@@ -22,12 +22,8 @@ from game.equipment import (
     resolve_slot,
 )
 from game.skills import (
-    SKILL_BENEVOLENCE,
     SKILL_COHESION,
-    SKILL_COUNTDOWN,
-    SKILL_FLYING_BLADE,
     SKILL_LEADER,
-    SKILL_MADONNA,
     SKILL_NATIVE,
     SKILL_RED_SHORE,
     SKILL_STARSHIP,
@@ -37,7 +33,7 @@ from game.skills import (
     STATUS_SKILLS_SEALED,
     skill_active,
 )
-from game.stats import final_basic_damage, final_true_damage, initial_combat_fields
+from game.stats import final_basic_damage, initial_combat_fields
 from game.trick_effects import (
     HANDLERS as TRICK_HANDLERS,
     STATUS_BLACK_HOLE,
@@ -49,6 +45,7 @@ from game.trick_effects import (
     STATUS_PLAN_PART,
     STATUS_TECH_LOCK,
     TARGET_TRICKS,
+    clear_negative_statuses,
     discard_from_target,
     field_bonus_damage,
     field_bonus_reduction,
@@ -103,19 +100,12 @@ def _assign_roles(player_names: list[str], roles: list[dict[str, Any]]) -> dict[
             "kill_limit_bonus": 0,
             "vision_clear_at_turn_end": False,
             "red_coast_used": False,
-            "madonna_used": False,
-            "flying_blade_used": False,
-            "next_damage_true": False,
-            "countdown": None,
-            "countdown_done": False,
             "shield": 0,
             "cards_used_this_turn": 0,
             **initial_combat_fields(),
         }
         if skill_active(p, SKILL_STARSHIP):
             p["tech_level"] = 4
-        if skill_active(p, SKILL_COUNTDOWN):
-            p["countdown"] = 12
         assigned[name] = p
     return assigned
 
@@ -250,22 +240,6 @@ class GameSession:
                     "to": p.get("to"),
                     "text": f"{p.get('to')} 【流浪】：是否失去 1 体力并摸两张？",
                 }
-            if ptype == "benevolence_heal":
-                return {
-                    "kind": "skill",
-                    "card": None,
-                    "from": p.get("to"),
-                    "to": None,
-                    "text": f"{p.get('to')} 【仁心】：指定一名角色回复 2 点",
-                }
-            if ptype == "madonna_save":
-                return {
-                    "kind": "skill",
-                    "card": None,
-                    "from": p.get("to"),
-                    "to": p.get("victim"),
-                    "text": f"{p.get('to')} 【圣母】：是否救治 {p.get('victim')}？",
-                }
             if ptype == "gravity_override":
                 return {
                     "kind": "skill",
@@ -329,8 +303,6 @@ class GameSession:
         self.turn_phase = "play"
         p["kills_used_this_turn"] = 0
         p["red_coast_used"] = False
-        p["flying_blade_used"] = False
-        p["next_damage_true"] = False
         p["cards_used_this_turn"] = 0
         if p.get("ultimate_law_used") is not None:
             p["ultimate_law_used"] = False
@@ -352,8 +324,6 @@ class GameSession:
             p["hand"].append(kill)
             self._log(f"{name} 量子号：获得一张三阶杀")
         self._log(f"{name} 摸牌阶段摸了 {len(drawn)} 张")
-        if skill_active(p, SKILL_BENEVOLENCE) and p.get("alive"):
-            self._open_benevolence_prompt(name)
 
     def _clear_vision_if_due(self, username: str) -> None:
         p = self.players[username]
@@ -370,16 +340,6 @@ class GameSession:
             if ptype == "wander_draw":
                 self._log(f"{self.prompt.get('to')} 【流浪】超时，视为放弃")
                 self._apply_wander(str(self.prompt.get("to")), False)
-                self.seq += 1
-                return True
-            if ptype == "benevolence_heal":
-                self._log(f"{self.prompt.get('to')} 【仁心】超时，视为放弃")
-                self._apply_benevolence(str(self.prompt.get("to")), None)
-                self.seq += 1
-                return True
-            if ptype == "madonna_save":
-                self._log(f"{self.prompt.get('to')} 【圣母】超时，视为放弃")
-                self._apply_madonna(str(self.prompt.get("to")), False)
                 self.seq += 1
                 return True
             if ptype == "gravity_override":
@@ -514,118 +474,11 @@ class GameSession:
         after = int(p["tech_level"])
         if before == after:
             return False
-        if after > before:
-            self._tick_countdowns(2)
         if before < 6 <= after and not p.get("ascended"):
             self._grant_ascension(username)
         if notify:
             self._on_tech_changed(username, before, after)
         return True
-
-    def _tick_countdowns(self, amount: int) -> None:
-        for name in self.player_order:
-            p = self.players[name]
-            if not p.get("alive") or p.get("countdown_done"):
-                continue
-            if not skill_active(p, SKILL_COUNTDOWN) or p.get("countdown") is None:
-                continue
-            before = int(p["countdown"])
-            p["countdown"] = max(0, before - int(amount))
-            self._log(f"{name} 【倒计时】：{before} → {p['countdown']}")
-            if p["countdown"] == 0 and before > 0:
-                self._resolve_countdown(name)
-
-    def _resolve_countdown(self, username: str) -> None:
-        p = self.players[username]
-        p["countdown_done"] = True
-        self._raise_tech(username, 1)
-        p["max_hp"] = int(p["max_hp"]) + 1
-        self._heal(username, 2)
-        drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-        p["hand"].extend(drawn)
-        self._log(f"{username} 【倒计时】归零：科技+1，上限+1，回2，摸{len(drawn)}")
-
-    def _open_benevolence_prompt(self, username: str) -> None:
-        targets = [n for n in self.player_order if self.players[n]["alive"]]
-        self.prompt = {
-            "type": "benevolence_heal",
-            "to": username,
-            "from": username,
-            "targets": targets,
-        }
-        self.phase = "prompt"
-        self._log(f"{username} 【仁心】：指定一名角色回复 2 点体力")
-        self._start_turn_timer()
-
-    def _apply_benevolence(self, username: str, target: str | None) -> None:
-        self.prompt = None
-        if target and target in self.players and self.players[target]["alive"]:
-            self._heal(target, 2)
-            self._log(f"{username} 【仁心】：{target} 回复至 {self.players[target]['hp']}")
-        else:
-            self._log(f"{username} 【仁心】未指定有效目标")
-        if self.phase not in {"dying", "ended"}:
-            self.phase = "turn"
-            self.refresh_turn_timer()
-
-    def _madonna_holders(self) -> list[str]:
-        out = []
-        for name in self.player_order:
-            p = self.players[name]
-            if (
-                p.get("alive")
-                and skill_active(p, SKILL_MADONNA)
-                and not p.get("madonna_used")
-            ):
-                out.append(name)
-        return out
-
-    def _open_madonna_prompt(self, victim: str, holders: list[str]) -> None:
-        self.prompt = {
-            "type": "madonna_save",
-            "to": holders[0],
-            "queue": holders[1:],
-            "victim": victim,
-            "from": victim,
-        }
-        self.phase = "prompt"
-        self._log(f"{holders[0]} 【圣母】：是否救治濒死的 {victim}？")
-        self._start_turn_timer()
-
-    def _apply_madonna(self, username: str, accept: bool) -> None:
-        if not self.prompt or self.prompt.get("type") != "madonna_save":
-            return
-        victim = str(self.prompt.get("victim"))
-        queue = list(self.prompt.get("queue") or [])
-        if accept and victim in self.players:
-            p = self.players[username]
-            v = self.players[victim]
-            p["madonna_used"] = True
-            v["hp"] = int(v["max_hp"])
-            self._set_tech(victim, 1, force=True)
-            discarded = list(v["hand"])
-            v["hand"] = []
-            self.discard.extend(discarded)
-            self.prompt = None
-            self.dying = None
-            self.phase = "turn"
-            self._log(
-                f"{username} 【圣母】救治 {victim}：满血、科技降至1、弃置{len(discarded)}张手牌"
-            )
-            self.refresh_turn_timer()
-            return
-        if queue:
-            nxt = queue.pop(0)
-            self.prompt["to"] = nxt
-            self.prompt["queue"] = queue
-            self._log(f"{nxt} 【圣母】：是否救治濒死的 {victim}？")
-            self._start_turn_timer()
-            return
-        self.prompt = None
-        self.phase = "dying"
-        self.dying = {"victim": victim, "source": (self.dying or {}).get("source")}
-        self._log(f"无人发动【圣母】，{victim} 进入濒死求桃")
-        self._start_turn_timer()
 
     def _on_tech_changed(self, username: str, before: int, after: int) -> None:
         p = self.players[username]
@@ -670,8 +523,10 @@ class GameSession:
         else:
             self._log(f"{username} 放弃【流浪】")
         if native_after and native_after.get("kind") == "visitor":
-            # visitor has no tier — no-op placeholder for future
-            pass
+            who = str(native_after.get("from") or username)
+            if who in self.players and self.players[who].get("alive"):
+                fake = {"id": "visitor", "subtype": "visitor", "pool_entry": 15}
+                self._maybe_native_repeat_instant(who, fake, target=None, kind="visitor")
         if after == "conclude_turn":
             self._finish_conclude_turn(username)
             return
@@ -719,7 +574,6 @@ class GameSession:
             self._eliminate_player(username)
             if self._check_win():
                 return
-        self._tick_countdowns(1)
         if self.phase == "ended":
             return
         self._advance_turn()
@@ -881,12 +735,6 @@ class GameSession:
         from_kill: bool = False,
     ) -> str:
         t = self.players[target]
-        src_p = self.players.get(source)
-        true_dmg = bool(src_p and src_p.get("next_damage_true") and source != target)
-        if true_dmg and src_p is not None:
-            src_p["next_damage_true"] = False
-            final = final_true_damage(int(final), 0)
-            self._log(f"{source} 【飞刃】：本次伤害视为真实伤害")
 
         # 量子幽灵：8 血嘲讽替身承担伤害（伤害+1）
         ghost_hp = int(t.get("quantum_ghost_hp") or 0)
@@ -899,7 +747,7 @@ class GameSession:
                 self._log(f"{target} 量子幽灵替身消散，装备移出")
             return f"{target} 的量子幽灵替身承受了伤害"
 
-        final = self._incoming_damage(target, final, true_dmg=true_dmg)
+        final = self._incoming_damage(target, final, true_dmg=False)
         t["hp"] -= final
         msg = f"{target} 受到 {final} 点最终伤害（HP {t['hp']}）"
         src = self.players.get(source)
@@ -952,11 +800,6 @@ class GameSession:
         p["hp"] = min(p["max_hp"], p["hp"] + amount + bonus)
 
     def _begin_dying(self, victim: str, *, source: str | None = None) -> str:
-        holders = self._madonna_holders()
-        if holders:
-            self.dying = {"victim": victim, "source": source}
-            self._open_madonna_prompt(victim, holders)
-            return f"{victim} 濒死（圣母询问中）"
         self.phase = "dying"
         self.dying = {"victim": victim, "source": source}
         self.prompt = None
@@ -1100,21 +943,6 @@ class GameSession:
 
         if act == "recast":
             return self._recast(username, str(action.get("instance_id", "")).strip())
-
-        if act == "flying_blade":
-            p = self.players[username]
-            if self.turn_phase != "play":
-                return False, "现在不是出牌阶段"
-            if not skill_active(p, SKILL_FLYING_BLADE):
-                return False, "无法发动飞刃"
-            if p.get("flying_blade_used"):
-                return False, "本回合已发动飞刃"
-            p["flying_blade_used"] = True
-            p["next_damage_true"] = True
-            self._log(f"{username} 【飞刃】：下一次伤害变为真实伤害")
-            self.refresh_turn_timer()
-            self.seq += 1
-            return True, "飞刃已发动"
 
         if act == "ultimate_law":
             return self._use_ultimate_law(username, action)
@@ -1263,7 +1091,13 @@ class GameSession:
 
     @staticmethod
     def _triggers_native(card: dict[str, Any]) -> bool:
-        """土著：1阶牌，或无阶的桃/天外来客。"""
+        """土著：科技池 1 阶牌（pool_entry 1–22）；无 pool_entry 时回退 tier/桃/天外来客。"""
+        entry = card.get("pool_entry")
+        if entry is not None:
+            try:
+                return 1 <= int(entry) <= 22
+            except (TypeError, ValueError):
+                pass
         if int(card.get("tier", 0) or 0) == 1:
             return True
         subtype = card.get("subtype")
@@ -1480,6 +1314,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._maybe_native_repeat_instant(username, card, target=target, kind="ball_lightning")
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -1489,6 +1324,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._maybe_native_repeat_instant(username, card, target=None, kind="red_coast")
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -1510,6 +1346,7 @@ class GameSession:
                 hand.insert(idx, card)
                 return False, msg
             self._on_card_used(username)
+            self._after_trick_settled(username, card, target, action)
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -1581,6 +1418,7 @@ class GameSession:
         target: str | None,
         kind: str,
         heal: int = 2,
+        choice: str | None = None,
         is_repeat: bool = False,
     ) -> None:
         if is_repeat:
@@ -1601,6 +1439,61 @@ class GameSession:
                 t["vision_exposed"] = True
                 t["vision_clear_at_turn_end"] = True
                 self._log(f"{username} 【土著】：阶梯计划再结算一次，{target} 视野暴露")
+        elif kind == "red_coast":
+            p = self.players[username]
+            drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+            p["hand"].extend(drawn)
+            self._log(f"{username} 【土著】：红岸计划再结算一次，摸 {len(drawn)} 张")
+        elif kind == "ball_lightning" and target:
+            if target in self.players and self.players[target]["alive"]:
+                if not self._has_status(target, STATUS_SKILLS_SEALED):
+                    self._apply_status(target, STATUS_SKILLS_SEALED, "非锁定技失效", "negative")
+                self._log(f"{username} 【土著】：球状闪电再结算一次，{target} 非锁定技已封印")
+        elif kind == "wallfacer_plan" and target:
+            if target in self.players and self.players[target]["alive"]:
+                n = 2 if self.players[target].get("vision_exposed") else 1
+                taken = discard_from_target(self, target, n)
+                self._log(f"{username} 【土著】：面壁计划再结算一次，{target} 弃 {taken} 张")
+        elif kind == "curtain":
+            cleared = clear_negative_statuses(self, username)
+            drawn = self.draw_sys.draw_n(self.players[username]["tech_level"], 1)
+            self.players[username]["hand"].extend(drawn)
+            self._log(f"{username} 【土著】：帷幕再结算一次，清除 {cleared} 个负面，摸 {len(drawn)} 张")
+        elif kind == "guzheng_plan" and choice:
+            p = self.players[username]
+            if choice == "draw2":
+                drawn = self.draw_sys.draw_n(p["tech_level"], 2)
+                p["hand"].extend(drawn)
+                self._log(f"{username} 【土著】：古筝再结算一次，摸 {len(drawn)} 张")
+            elif choice == "heal2":
+                self._heal(username, 2)
+                self._log(f"{username} 【土著】：古筝再结算一次，回复至 {p['hp']}")
+            elif choice == "discard_target2" and target:
+                if target in self.players and self.players[target]["alive"]:
+                    n = discard_from_target(self, target, 2)
+                    self._log(f"{username} 【土著】：古筝再结算一次，弃置 {target} {n} 张")
+
+    def _after_trick_settled(
+        self,
+        username: str,
+        card: dict[str, Any],
+        target: str | None,
+        _action: dict[str, Any],
+    ) -> None:
+        """Instant tricks: native re-settle; choice tricks (古筝): stamp will_native on prompt."""
+        cid = card.get("id")
+        if cid == "guzheng_plan":
+            if (
+                self.prompt
+                and self.prompt.get("type") == "choice"
+                and self.prompt.get("card_id") == "guzheng_plan"
+                and self._triggers_native(card)
+                and skill_active(self.players[username], SKILL_NATIVE)
+            ):
+                self.prompt["will_native"] = True
+            return
+        if cid in {"wallfacer_plan", "curtain"}:
+            self._maybe_native_repeat_instant(username, card, target=target, kind=str(cid))
 
     def _play_red_coast(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
         p = self.players[username]
@@ -1706,6 +1599,7 @@ class GameSession:
                     self._log(f"结算失败：{msg}")
                 else:
                     self._log(msg)
+                    self._after_trick_settled(username, card, target, action)
             self.refresh_turn_timer()
             return
         if ptype == "respond_toxic":
@@ -1802,6 +1696,8 @@ class GameSession:
         card_id = self.prompt.get("card_id")
         if card_id == "guzheng_plan":
             p = self.players[username]
+            will_native = bool(self.prompt.get("will_native"))
+            choice_target: str | None = None
             if choice == "draw2":
                 drawn = self.draw_sys.draw_n(p["tech_level"], 2)
                 p["hand"].extend(drawn)
@@ -1810,11 +1706,20 @@ class GameSession:
                 self._heal(username, 2)
                 self._log(f"{username} 古筝：回复至 {p['hp']}")
             elif choice == "discard_target2":
-                target = str(action.get("target", "")).strip()
-                if not target or target not in self.players or not self.players[target]["alive"]:
+                choice_target = str(action.get("target", "")).strip()
+                if not choice_target or choice_target not in self.players or not self.players[choice_target]["alive"]:
                     return False, "请选择弃牌目标"
-                n = discard_from_target(self, target, 2)
-                self._log(f"{username} 古筝：弃置 {target} {n} 张")
+                n = discard_from_target(self, choice_target, 2)
+                self._log(f"{username} 古筝：弃置 {choice_target} {n} 张")
+            if will_native:
+                fake = {"id": "guzheng_plan", "pool_entry": 18}
+                self._maybe_native_repeat_instant(
+                    username,
+                    fake,
+                    target=choice_target,
+                    kind="guzheng_plan",
+                    choice=choice,
+                )
             self.prompt = None
             self.phase = "turn"
             self.refresh_turn_timer()
@@ -2194,35 +2099,6 @@ class GameSession:
                 return True, "放弃流浪"
             return False, "无效的流浪响应"
 
-        if ptype == "benevolence_heal":
-            if self.prompt.get("to") != username:
-                return False, "不是你的【仁心】"
-            if act in {"benevolence_pass", "respond_pass", "pass"}:
-                self._apply_benevolence(username, None)
-                self.seq += 1
-                return True, "放弃仁心"
-            target = str(action.get("target", "")).strip() or None
-            if act in {"benevolence_heal", "choose", "play_card"} and target:
-                if target not in (self.prompt.get("targets") or []):
-                    return False, "无效目标"
-                self._apply_benevolence(username, target)
-                self.seq += 1
-                return True, "仁心已结算"
-            return False, "请指定目标"
-
-        if ptype == "madonna_save":
-            if self.prompt.get("to") != username:
-                return False, "不是你的【圣母】"
-            if act in {"madonna_accept", "respond_accept", "wander_accept"}:
-                self._apply_madonna(username, True)
-                self.seq += 1
-                return True, "发动圣母"
-            if act in {"madonna_pass", "respond_pass", "pass", "wander_pass"}:
-                self._apply_madonna(username, False)
-                self.seq += 1
-                return True, "放弃圣母"
-            return False, "无效的圣母响应"
-
         if ptype == "gravity_override":
             if self.prompt.get("to") != username:
                 return False, "不是你的万有引力号窗口"
@@ -2401,7 +2277,6 @@ class GameSession:
             "role_name": p["role_name"] if self.phase == "ended" else None,
             "skills_sealed": self._has_status(name, STATUS_SKILLS_SEALED),
             "shield": int(p.get("shield") or 0),
-            "countdown": p.get("countdown"),
         }
 
     def snapshot_for(self, viewer: str) -> dict[str, Any]:
@@ -2449,17 +2324,9 @@ class GameSession:
                 "hand_limit": limit,
                 "kills_used_this_turn": me["kills_used_this_turn"] if me else 0,
                 "skills_sealed": self._has_status(viewer, STATUS_SKILLS_SEALED) if me else False,
-                "countdown": me.get("countdown") if me else None,
                 "shield": int(me.get("shield") or 0) if me else 0,
-                "flying_blade_ready": bool(
-                    me
-                    and skill_active(me, SKILL_FLYING_BLADE)
-                    and not me.get("flying_blade_used")
-                    and not me.get("next_damage_true")
-                ),
                 "ultimate_law_ready": bool(
                     me and has_ship(me, "ultimate_law") and not me.get("ultimate_law_used")
                 ),
-                "next_damage_true": bool(me.get("next_damage_true")) if me else False,
             },
         }

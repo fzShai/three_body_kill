@@ -1700,7 +1700,12 @@ class GameSession:
                 card = {**card, "allow_response": True}
             if cid in TRICK_HANDLERS:
                 ok, msg = TRICK_HANDLERS[cid](self, username, card, target, action)
-                self._log(msg if ok else f"结算失败：{msg}")
+                if not ok:
+                    # 结算失败（如古筝缺弃牌）：退回手牌
+                    self.players[username]["hand"].append(card)
+                    self._log(f"结算失败：{msg}")
+                else:
+                    self._log(msg)
             self.refresh_turn_timer()
             return
         if ptype == "respond_toxic":
@@ -1807,13 +1812,9 @@ class GameSession:
             elif choice == "discard_target2":
                 target = str(action.get("target", "")).strip()
                 if not target or target not in self.players or not self.players[target]["alive"]:
-                    others = self._alive_others(username)
-                    target = others[0] if others else ""
-                if not target:
-                    self._log(f"{username} 古筝：无目标可弃牌")
-                else:
-                    n = discard_from_target(self, target, 2)
-                    self._log(f"{username} 古筝：弃置 {target} {n} 张")
+                    return False, "请选择弃牌目标"
+                n = discard_from_target(self, target, 2)
+                self._log(f"{username} 古筝：弃置 {target} {n} 张")
             self.prompt = None
             self.phase = "turn"
             self.refresh_turn_timer()
@@ -2179,16 +2180,6 @@ class GameSession:
             return False, "当前无响应"
         ptype = self.prompt.get("type")
         act = str(action.get("action", "")).strip()
-        # #region agent log
-        try:
-            import json, time
-            from pathlib import Path
-            _p = Path(__file__).resolve().parent.parent / "debug-99f835.log"
-            with _p.open("a", encoding="utf-8") as _f:
-                _f.write(json.dumps({"sessionId": "99f835", "runId": "pre-fix", "hypothesisId": "B", "location": "engine.py:_apply_prompt_action", "message": "prompt action received", "data": {"username": username, "ptype": ptype, "act": act, "instance_id": action.get("instance_id"), "prompt_to": self.prompt.get("to"), "card_hint": action.get("choice")}, "timestamp": int(time.time() * 1000)}, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-        # #endregion
 
         if ptype == "wander_draw":
             if self.prompt.get("to") != username:

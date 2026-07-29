@@ -90,8 +90,10 @@
             let state = null;
             let selectedId = null;
             let selectedIds = new Set();
+            let discardCostId = null; // 古筝等：额外弃置的手牌
             let selectedTarget = null;
-            let targetingMode = null; // null | 'card' | 'benevolence' | 'ultimate_law'
+            let targetingMode = null; // null | 'card' | 'benevolence' | 'ultimate_law' | 'choice_target'
+            let pendingChoiceId = null; // choice 选项需选目标时暂存
             let uiMode = 'play'; // play | discard | tech_discard
             let turnDeadlineMs = null;
             let lastStageKey = '';
@@ -121,15 +123,19 @@
 
             function needsOtherTarget(card) {
                 const ids = new Set([
-                    'ladder_plan', 'ball_lightning', 'sophon', 'wallfacer_plan', 'broadcast',
-                    'toxic_water', 'four_dimension', 'deadline', 'dual_vector', 'soap',
-                    'great_ravine', 'killer_52', 'reckoning', 'finale',
+                    'ladder_plan', 'ball_lightning', 'sophon', 'wallfacer_plan',
+                    'deadline', 'dual_vector', 'great_ravine', 'killer_52',
+                    'dx3906', 'reckoning', 'finale',
                 ]);
                 return card && (
                     card.subtype === 'kill'
                     || card.id === 'kill_low' || card.id === 'kill_high' || card.id === 'kill_t3'
                     || ids.has(card.id)
                 );
+            }
+
+            function needsDiscardCost(card) {
+                return card && card.id === 'guzheng_plan';
             }
 
             function isPeach(card) {
@@ -244,6 +250,7 @@
                 const allAlive = players.filter((p) => p.alive);
                 if (mode === 'benevolence') return allAlive.map((p) => p.username);
                 if (mode === 'ultimate_law') return others.map((p) => p.username);
+                if (mode === 'choice_target') return allAlive.map((p) => p.username);
                 if (!card) return [];
                 if (isPeach(card) && snap.phase === 'dying' && snap.dying) {
                     return [snap.dying.victim];
@@ -267,6 +274,9 @@
                     targetingMode = 'benevolence';
                     return;
                 }
+                if (targetingMode === 'choice_target' && pendingChoiceId && prompt?.type === 'choice' && prompt.to === username) {
+                    return;
+                }
                 if (inPlay && snap.you?.ultimate_law_ready && !selectedId && targetingMode === 'ultimate_law') {
                     return;
                 }
@@ -288,6 +298,7 @@
                 }
                 if (targetingMode === 'ultimate_law' && !selectedId) return;
                 targetingMode = null;
+                pendingChoiceId = null;
                 if (!(card && isPeach(card))) {
                     // keep target only when still in card targeting
                 }
@@ -342,6 +353,7 @@
                 const legal = (() => {
                     if (ctx.myBenevolence) return legalTargets(snap, 'benevolence', null);
                     if (targetingMode === 'ultimate_law') return legalTargets(snap, 'ultimate_law', null);
+                    if (targetingMode === 'choice_target') return legalTargets(snap, 'choice_target', null);
                     if (targetingMode === 'card') {
                         const card = (snap.you?.hand || []).find((c) => c.instance_id === selectedId);
                         return legalTargets(snap, 'card', card);
@@ -384,7 +396,19 @@
 
                 ring.querySelectorAll('.seat-panel.targetable').forEach((el) => {
                     el.addEventListener('click', () => {
-                        selectedTarget = el.getAttribute('data-user');
+                        const user = el.getAttribute('data-user');
+                        if (targetingMode === 'choice_target' && pendingChoiceId) {
+                            sock.send('game_action', {
+                                action: 'choose',
+                                choice: pendingChoiceId,
+                                target: user,
+                            }, roomId);
+                            pendingChoiceId = null;
+                            targetingMode = null;
+                            selectedTarget = null;
+                            return;
+                        }
+                        selectedTarget = user;
                         setStatus(`目标：${selectedTarget}`);
                         render(state);
                     });
@@ -456,6 +480,12 @@
                     hint.textContent = selectedTarget
                         ? `终极规律目标 ${selectedTarget} · 点击「终极规律」确认`
                         : '终极规律：点击座位选择复制目标';
+                } else if (targetingMode === 'choice_target' && pendingChoiceId) {
+                    hint.textContent = '古筝：点击座位选择要弃牌的角色';
+                } else if (selectedId && needsDiscardCost((snap.you?.hand || []).find((c) => c.instance_id === selectedId))) {
+                    hint.textContent = discardCostId
+                        ? '古筝：已选弃置牌 · 点击「出牌」确认'
+                        : '古筝：再点选一张手牌作为弃置，然后点「出牌」';
                 } else if (targetingMode === 'card' && selectedId) {
                     hint.textContent = selectedTarget
                         ? `已选目标 ${selectedTarget} · 点击「出牌」确认`
@@ -481,9 +511,21 @@
                     : '—';
 
                 const roleBox = document.getElementById('roleBox');
-                roleBox.classList.toggle('selected-target', selectedTarget === username && !!myBenevolence);
-                roleBox.style.cursor = myBenevolence ? 'pointer' : '';
-                roleBox.onclick = myBenevolence ? () => {
+                const canPickSelfChoice = targetingMode === 'choice_target' && !!pendingChoiceId;
+                roleBox.classList.toggle('selected-target', selectedTarget === username && (!!myBenevolence || canPickSelfChoice));
+                roleBox.style.cursor = (myBenevolence || canPickSelfChoice) ? 'pointer' : '';
+                roleBox.onclick = (myBenevolence || canPickSelfChoice) ? () => {
+                    if (canPickSelfChoice) {
+                        sock.send('game_action', {
+                            action: 'choose',
+                            choice: pendingChoiceId,
+                            target: username,
+                        }, roomId);
+                        pendingChoiceId = null;
+                        targetingMode = null;
+                        selectedTarget = null;
+                        return;
+                    }
                     selectedTarget = username;
                     setStatus('目标：自己');
                     render(state);
@@ -498,28 +540,25 @@
                 const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || myGravity;
                 handEl.innerHTML = hand.map((c) => {
                     let dim = '';
-                    let dimBranch = 'none';
-                    if (isWander || isBenevolence || isMadonna) { dim = 'dim'; dimBranch = 'skill'; }
-                    else if (isGravity) { dim = ''; dimBranch = 'gravity'; }
-                    else if (isInterrupt) {
+                    const ptype = prompt && prompt.type;
+                    if (isWander || isBenevolence || isMadonna || isChoice || ptype === 'soap_heal') {
+                        dim = 'dim';
+                    } else if (isGravity) {
+                        dim = '';
+                    } else if (ptype === 'interrupt_trick' || ptype === 'respond_toxic') {
                         const ok = c.id === 'thought_stamp' || c.id === 'return_motion'
-                            || (prompt.type === 'respond_toxic' && (c.subtype === 'kill' || c.id === 'thought_stamp'));
+                            || (ptype === 'respond_toxic' && (c.subtype === 'kill' || c.id === 'thought_stamp'));
                         dim = ok ? '' : 'dim';
-                        dimBranch = ok ? 'interrupt_ok' : 'interrupt_dim';
-                    } else if (isPrompt) {
+                    } else if (ptype === 'respond_dodge') {
                         dim = c.subtype === 'dodge' ? '' : 'dim';
-                        dimBranch = c.subtype === 'dodge' ? 'prompt_dodge_ok' : 'prompt_dodge_only_dim';
+                    } else if (isPrompt) {
+                        dim = 'dim';
                     }
                     if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
                     if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
-                    // #region agent log
-                    if (c.id === 'thought_stamp' || c.id === 'guzheng_plan' || c.id === 'return_motion' || (isPrompt && c.subtype === 'dodge')) {
-                        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'A',location:'table.html:hand-dim',message:'card dim decision',data:{cardId:c.id,subtype:c.subtype,dim:!!dim,dimBranch,phase:snap.phase,promptType:prompt&&prompt.type,isInterrupt,isPrompt,myInterrupt,myPrompt,uiMode},timestamp:Date.now()})}).catch(()=>{});
-                    }
-                    // #endregion
                     const selected = multiSelect
                         ? selectedIds.has(c.instance_id)
-                        : selectedId === c.instance_id;
+                        : (selectedId === c.instance_id || discardCostId === c.instance_id);
                     return `<div class="card card-lift ${selected ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}" data-card-id="${c.id || ''}">
                         <div class="cname">${c.name}</div>
                         <div class="ctype">${cardTypeLabel(c)}</div>
@@ -554,12 +593,21 @@
                             render(state);
                             return;
                         }
+                        // 古筝：已选主牌后，再点其他牌作为弃置代价
+                        const mainCard = selectedId ? hand.find((c) => c.instance_id === selectedId) : null;
+                        if (mainCard && needsDiscardCost(mainCard) && id !== selectedId) {
+                            discardCostId = discardCostId === id ? null : id;
+                            render(state);
+                            return;
+                        }
                         if (selectedId === id) {
                             selectedId = null;
+                            discardCostId = null;
                             selectedTarget = null;
                             targetingMode = targetingMode === 'ultimate_law' ? 'ultimate_law' : null;
                         } else {
                             selectedId = id;
+                            discardCostId = null;
                             selectedIds.clear();
                             targetingMode = null;
                             const card = hand.find((c) => c.instance_id === id);
@@ -582,26 +630,30 @@
                 const selectedCard = hand.find((c) => c.instance_id === selectedId);
                 const needsTarget = selectedCard && needsOtherTarget(selectedCard) && !isPeach(selectedCard);
                 const hasRequiredTarget = !needsTarget || !!selectedTarget;
+                const hasDiscardCost = !needsDiscardCost(selectedCard) || !!discardCostId;
+                const isSoapPrompt = isPrompt && prompt && prompt.type === 'soap_heal';
+                const allowPromptPlay = myPrompt && !isWander && !isBenevolence && !isMadonna && !isGravity && !isChoice && !isSoapPrompt;
 
-                let canPlay = ((inPlay && uiMode === 'play') || (myPrompt && !isWander && !isBenevolence && !isMadonna && !isGravity && !isChoice) || canSaveDying) && selectedId && hasRequiredTarget;
+                let canPlay = ((inPlay && uiMode === 'play') || allowPromptPlay || canSaveDying) && selectedId && hasRequiredTarget && hasDiscardCost;
                 playBtn.disabled = !canPlay;
                 playBtn.textContent =
                     inDiscard ? '弃置所选'
                     : (uiMode === 'tech_discard' ? '—'
                     : (isDying && !myDying ? '救人'
                     : (isDying ? '自救'
-                    : (isDodgePrompt && myPrompt ? '出闪' : '出牌'))));
+                    : (isDodgePrompt && myPrompt ? '出闪'
+                    : (isInterrupt && myInterrupt ? '打出响应' : '出牌')))));
                 if (inDiscard) {
                     playBtn.disabled = selectedIds.size === 0;
                     playBtn.textContent = '弃置所选';
                     setHidden(playBtn, false);
-                } else if (uiMode === 'tech_discard' || isWander || isBenevolence || isMadonna || isChoice || myGravity) {
+                } else if (uiMode === 'tech_discard' || isWander || isBenevolence || isMadonna || isChoice || isSoapPrompt || myGravity) {
                     setHidden(playBtn, true);
                 } else {
                     setHidden(playBtn, false);
                 }
 
-                setHidden(cancelSelectBtn, !(selectedId || selectedIds.size || targetingMode === 'ultimate_law'));
+                setHidden(cancelSelectBtn, !(selectedId || selectedIds.size || discardCostId || targetingMode === 'ultimate_law'));
                 cancelSelectBtn.disabled = false;
 
                 setHidden(document.getElementById('endPlayBtn'), inDiscard || uiMode === 'tech_discard' || isWander || isPrompt || isDying);
@@ -624,7 +676,7 @@
                 document.getElementById('recastBtn').disabled = !(inPlay && uiMode === 'play' && selectedId);
 
                 const respondPassBtn = document.getElementById('respondPassBtn');
-                const hidePassTypes = isWander || isChoice || isBenevolence || isMadonna || isGravity;
+                const hidePassTypes = isWander || isChoice || isBenevolence || isMadonna || isGravity || isSoapPrompt;
                 setHidden(respondPassBtn, !(isPrompt && !hidePassTypes));
                 respondPassBtn.disabled = !(myPrompt || myInterrupt) || hidePassTypes;
                 respondPassBtn.textContent = isInterrupt ? '不响应/不打断' : '不响应';
@@ -633,16 +685,32 @@
                 if (isChoice && myChoice) {
                     setHidden(choiceBtns, false);
                     choiceBtns.innerHTML = (prompt.options || []).map((o) =>
-                        `<button class="btn" type="button" data-choice="${o.id}">${o.label}</button>`
+                        `<button class="btn${pendingChoiceId === o.id ? ' selected' : ''}" type="button" data-choice="${o.id}" data-needs-target="${o.needs_target ? '1' : '0'}">${o.label}</button>`
                     ).join('');
                     choiceBtns.querySelectorAll('button').forEach((btn) => {
                         btn.addEventListener('click', () => {
-                            sock.send('game_action', { action: 'choose', choice: btn.getAttribute('data-choice') }, roomId);
+                            const choice = btn.getAttribute('data-choice');
+                            const needsTarget = btn.getAttribute('data-needs-target') === '1';
+                            if (needsTarget) {
+                                pendingChoiceId = choice;
+                                targetingMode = 'choice_target';
+                                selectedTarget = null;
+                                setStatus('请点击座位选择目标');
+                                render(state);
+                                return;
+                            }
+                            pendingChoiceId = null;
+                            targetingMode = null;
+                            sock.send('game_action', { action: 'choose', choice }, roomId);
                         });
                     });
                 } else {
                     setHidden(choiceBtns, true);
                     choiceBtns.innerHTML = '';
+                    if (!isChoice) {
+                        pendingChoiceId = null;
+                        if (targetingMode === 'choice_target') targetingMode = null;
+                    }
                 }
 
                 setHidden(document.getElementById('wanderAcceptBtn'), !isWander);
@@ -685,7 +753,9 @@
             function clearSelection() {
                 selectedId = null;
                 selectedIds.clear();
+                discardCostId = null;
                 selectedTarget = null;
+                pendingChoiceId = null;
                 if (targetingMode !== 'benevolence') targetingMode = null;
                 if (state) render(state);
             }
@@ -703,16 +773,21 @@
                 }
                 if (!selectedId) return;
                 const card = (state.you?.hand || []).find((c) => c.instance_id === selectedId);
+                const ptype = state.prompt && state.prompt.type;
                 if (state.phase === 'prompt') {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'B',location:'table.html:tryConfirmPlay',message:'prompt play sending respond_dodge',data:{cardId:card&&card.id,subtype:card&&card.subtype,promptType:state.prompt&&state.prompt.type,promptTo:state.prompt&&state.prompt.to,actionSent:'respond_dodge'},timestamp:Date.now()})}).catch(()=>{});
-                    // #endregion
-                    sock.send('game_action', { action: 'respond_dodge', instance_id: selectedId }, roomId);
+                    let actionName = 'play_card';
+                    if (ptype === 'respond_dodge') actionName = 'respond_dodge';
+                    else if (ptype === 'interrupt_trick' || ptype === 'respond_toxic') actionName = 'play_card';
+                    sock.send('game_action', { action: actionName, instance_id: selectedId }, roomId);
                 } else if (state.phase === 'dying') {
                     sock.send('game_action', { action: 'play_card', instance_id: selectedId }, roomId);
                 } else {
                     if (needsOtherTarget(card) && !isPeach(card) && !selectedTarget) {
                         setStatus('请点击座位选择目标', 'error');
+                        return;
+                    }
+                    if (needsDiscardCost(card) && !discardCostId) {
+                        setStatus('古筝需要再弃置一张手牌', 'error');
                         return;
                     }
                     const payload = { action: 'play_card', instance_id: selectedId };
@@ -721,14 +796,11 @@
                     } else if (selectedTarget) {
                         payload.target = selectedTarget;
                     }
-                    // #region agent log
-                    if (card && (card.id === 'guzheng_plan' || card.id === 'thought_stamp')) {
-                        fetch('http://127.0.0.1:7458/ingest/e5a47139-64a7-4168-8d28-2940c0a64ab2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'99f835'},body:JSON.stringify({sessionId:'99f835',runId:'pre-fix',hypothesisId:'C',location:'table.html:tryConfirmPlay',message:'play_card payload',data:{cardId:card.id,payload,handIds:(state.you.hand||[]).map(c=>({id:c.id,iid:c.instance_id})),hasDiscardField:!!payload.discard_instance_id},timestamp:Date.now()})}).catch(()=>{});
-                    }
-                    // #endregion
+                    if (discardCostId) payload.discard_instance_id = discardCostId;
                     sock.send('game_action', payload, roomId);
                 }
                 selectedId = null;
+                discardCostId = null;
                 selectedTarget = null;
                 targetingMode = null;
             }

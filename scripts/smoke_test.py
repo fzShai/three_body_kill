@@ -788,14 +788,36 @@ def main() -> None:
     ok, msg = tg.apply_action("t1", {"action": "choose", "choice": "draw2"})
     assert ok, msg
 
+    # guzheng discard_target2 requires explicit target
+    tg.players["t1"]["hand"] = [
+        {"id": "guzheng_plan", "name": "古筝", "type": "trick", "implemented": True, "instance_id": "gz2"},
+        {"id": "peach", "name": "桃", "instance_id": "gzp2"},
+    ]
+    tg.players["t2"]["hand"] = [
+        {"id": "dodge_low", "name": "闪", "instance_id": "d1"},
+        {"id": "dodge_low", "name": "闪", "instance_id": "d2"},
+        {"id": "peach", "name": "桃", "instance_id": "d3"},
+    ]
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "gz2", "discard_instance_id": "gzp2"})
+    assert ok, msg
+    ok, msg = tg.apply_action("t1", {"action": "choose", "choice": "discard_target2"})
+    assert not ok, msg
+    ok, msg = tg.apply_action("t1", {"action": "choose", "choice": "discard_target2", "target": "t2"})
+    assert ok, msg
+    assert len(tg.players["t2"]["hand"]) == 1
+
     ok, msg = _trick(tg, "t1", {"id": "dark_domain", "name": "黑域", "type": "trick", "implemented": True, "instance_id": "dd1"})
     assert ok and any(f["id"] == "dark_domain" for f in tg.fields), msg
 
     ok, msg = _trick(tg, "t1", {"id": "dark_forest_field", "name": "黑暗森林", "type": "trick", "implemented": True, "instance_id": "df1"})
     assert ok and any(f["id"] == "dark_forest_field" for f in tg.fields), msg
 
+    hand_before_cs = len(tg.players["t1"]["hand"])
     ok, msg = _trick(tg, "t1", {"id": "cosmic_safety", "name": "宇宙安全声明", "type": "trick", "implemented": True, "instance_id": "cs1"})
     assert ok and tg.fields == [], msg
+    assert len(tg.players["t1"]["hand"]) == hand_before_cs + 2, "宇宙安全声明清除成功后应摸2张"
 
     # interrupt: give t2 thought_stamp, play curtain from t1
     tg.phase = "turn"

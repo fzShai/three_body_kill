@@ -107,6 +107,7 @@ def clear_control_effects(session: Any, username: str) -> int:
         cleared += 1
     if p.pop("ravine_damage_penalty", None):
         cleared += 1
+        p["damage_reduction"] = max(0, int(p.get("damage_reduction", 0)) - 1)
     return cleared
 
 
@@ -366,20 +367,8 @@ def play_soap(session: Any, username: str, card: dict[str, Any], _target: str | 
 def play_guzheng_start(session: Any, username: str, card: dict[str, Any], _target: str | None, action: dict) -> tuple[bool, str]:
     discard_id = str(action.get("discard_instance_id") or action.get("extra_instance_id") or "").strip()
     hand = session.players[username]["hand"]
-    # #region agent log
-    try:
-        import json, time
-        from pathlib import Path
-        _p = Path(__file__).resolve().parent.parent / "debug-99f835.log"
-        with _p.open("a", encoding="utf-8") as _f:
-            _f.write(json.dumps({"sessionId": "99f835", "runId": "pre-fix", "hypothesisId": "C", "location": "trick_effects.py:play_guzheng_start", "message": "guzheng discard resolve", "data": {"username": username, "discard_id_from_action": discard_id or None, "auto_pick": not bool(discard_id), "hand": [{"id": c.get("id"), "name": c.get("name"), "iid": c.get("instance_id")} for c in hand], "action_keys": list(action.keys())}, "timestamp": int(time.time() * 1000)}, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-    # #endregion
     if not discard_id:
-        if not hand:
-            return False, "古筝计划需要再弃一张手牌"
-        discard_id = hand[0]["instance_id"]
+        return False, "古筝计划需要再弃一张手牌"
     idx = next((i for i, c in enumerate(hand) if c["instance_id"] == discard_id), None)
     if idx is None:
         return False, "弃牌不在手牌中"
@@ -393,7 +382,7 @@ def play_guzheng_start(session: Any, username: str, card: dict[str, Any], _targe
         "card_id": "guzheng_plan",
         "options": [
             {"id": "draw2", "label": "摸两张牌"},
-            {"id": "discard_target2", "label": "弃置一名角色两张手牌"},
+            {"id": "discard_target2", "label": "弃置一名角色两张手牌", "needs_target": True},
             {"id": "heal2", "label": "回复2点"},
         ],
     }
@@ -514,6 +503,7 @@ def play_cosmic_safety(session: Any, username: str, card: dict[str, Any], target
     names = action.get("targets") or ([] if not target else [target])
     if isinstance(names, str):
         names = [names]
+    names = [n for n in names if isinstance(n, str) and n.strip()]
     if not names:
         names = [n for n in session.player_order if session.players[n]["alive"]]
     cleared = 0
@@ -523,13 +513,14 @@ def play_cosmic_safety(session: Any, username: str, card: dict[str, Any], target
         if name not in session.players or not session.players[name]["alive"]:
             continue
         cleared += clear_control_effects(session, name)
-    if cleared > 0:
-        drawn = session.draw_sys.draw_n(session.players[username]["tech_level"], 2)
-        session.players[username]["hand"].extend(drawn)
-        session._log(f"{username} 使用宇宙安全声明：清除成功，摸 {len(drawn)} 张")
-        return True, f"清除成功，摸 {len(drawn)} 张"
-    session._log(f"{username} 使用宇宙安全声明：无效果可清")
-    return True, "无效果可清"
+    if cleared <= 0:
+        session._log(f"{username} 使用宇宙安全声明：无效果可清")
+        return True, "无效果可清"
+    me = session.players[username]
+    drawn = session.draw_sys.draw_n(int(me.get("tech_level") or 1), 2)
+    me["hand"].extend(drawn)
+    session._log(f"{username} 使用宇宙安全声明：清除 {cleared} 项，摸 {len(drawn)} 张")
+    return True, f"清除成功，摸 {len(drawn)} 张"
 
 
 def play_curse(session: Any, username: str, card: dict[str, Any], _target: str | None, _action: dict) -> tuple[bool, str]:
@@ -553,16 +544,6 @@ def play_curse(session: Any, username: str, card: dict[str, Any], _target: str |
 
 
 def play_thought_stamp(session: Any, username: str, card: dict[str, Any], target: str | None, _action: dict) -> tuple[bool, str]:
-    # #region agent log
-    try:
-        import json, time
-        from pathlib import Path
-        _p = Path(__file__).resolve().parent.parent / "debug-99f835.log"
-        with _p.open("a", encoding="utf-8") as _f:
-            _f.write(json.dumps({"sessionId": "99f835", "runId": "pre-fix", "hypothesisId": "D", "location": "trick_effects.py:play_thought_stamp", "message": "thought_stamp attempt", "data": {"username": username, "phase": session.phase, "ptype": (session.prompt or {}).get("type"), "prompt_to": (session.prompt or {}).get("to")}, "timestamp": int(time.time() * 1000)}, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-    # #endregion
     if session.phase != "prompt" or not session.prompt:
         return False, "思想钢印只能在响应时使用"
     ptype = session.prompt.get("type")

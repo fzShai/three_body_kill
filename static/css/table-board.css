@@ -440,13 +440,18 @@ body.shell-page.table-page::before { opacity: 0.28; }
 .seat-panel .seat-st .neg,
 .self-role .seat-st .neg { color: #c87878; }
 
-/* —— Inspect popover (hover details) —— */
+/* —— Inspect popover (hover details) ——
+ * shell.css `body.shell-page > * { position: relative; z-index: 1 }` beats
+ * bare `.inspect-panel { position: fixed }`, parking the panel below the fold.
+ */
+body.shell-page.table-page > .inspect-panel {
+    position: fixed !important;
+    z-index: 80;
+}
 .inspect-hot {
     cursor: help;
 }
 .inspect-panel {
-    position: fixed;
-    z-index: 80;
     width: min(300px, calc(100vw - 16px));
     max-height: 50vh;
     overflow-y: auto;

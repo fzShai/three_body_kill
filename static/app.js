@@ -126,5 +126,41 @@
     return q ? q.toUpperCase() : '';
   }
 
-  global.TBK = { getCookie, currentUsername, requireLogin, api, GameSocket, roomIdFromPathOrQuery };
+  function portraitUrl(roleId) {
+    if (!roleId) return '';
+    return `/static/portraits/${encodeURIComponent(roleId)}.webp`;
+  }
+
+  /** Markup for a portrait slot; missing assets fall back via onerror → empty frame.
+   *  Table seats/self use holo-signal for holographic phone look; codex stays static. */
+  function portraitHtml(roleId, roleName, className) {
+    const holo = /\b(seat-art|self-art)\b/.test(className || '');
+    const cls = ['portrait', className, holo ? 'holo-signal' : ''].filter(Boolean).join(' ');
+    const mark = (roleName || roleId || '·').slice(0, 1);
+    const esc = (s) => String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    if (!roleId) {
+      return `<div class="${cls} portrait--empty" aria-hidden="true"><span class="portrait-mark">${esc(mark)}</span></div>`;
+    }
+    const src = portraitUrl(roleId);
+    return `<div class="${cls}" data-role="${esc(roleId)}">`
+      + `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" `
+      + `onerror="this.closest('.portrait').classList.add('portrait--empty');this.remove();" />`
+      + `<span class="portrait-mark">${esc(mark)}</span>`
+      + `</div>`;
+  }
+
+  global.TBK = {
+    getCookie,
+    currentUsername,
+    requireLogin,
+    api,
+    GameSocket,
+    roomIdFromPathOrQuery,
+    portraitUrl,
+    portraitHtml,
+  };
 })(window);

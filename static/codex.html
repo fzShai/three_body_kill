@@ -106,12 +106,15 @@
                             `<div class="text-body">${s.locked ? '【锁定技】' : '【技能】'}${escapeHtml(s.name)}：${escapeHtml(s.text || '')}</div>`
                         ).join('');
                         return `
-                        <div class="item">
-                            <div class="name">${escapeHtml(r.name)}</div>
-                            <div class="meta-line">
-                                <span>HP：${escapeHtml(r.hp)}</span>
+                        <div class="item item-role">
+                            ${TBK.portraitHtml(r.id, r.name, 'codex-art')}
+                            <div class="item-role-body">
+                                <div class="name">${escapeHtml(r.name)}</div>
+                                <div class="meta-line">
+                                    <span>HP：${escapeHtml(r.hp)}</span>
+                                </div>
+                                ${skills || '<div class="text-body">暂无技能说明</div>'}
                             </div>
-                            ${skills || '<div class="text-body">暂无技能说明</div>'}
                         </div>`;
                     }).join('');
                 } catch (e) {

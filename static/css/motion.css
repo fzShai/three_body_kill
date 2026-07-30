@@ -140,6 +140,112 @@ body.table-ended .ended-banner {
     50% { opacity: 0.42; }
 }
 
+/* —— Holographic phone signal (table portraits only) —— */
+@keyframes holo-idle {
+    0%, 100% { transform: translate(0, 0) skewX(0deg); }
+    28% { transform: translate(0.6px, -0.9px) skewX(0.12deg); }
+    52% { transform: translate(-0.7px, 0.5px) skewX(-0.1deg); }
+    76% { transform: translate(0.4px, 0.7px) skewX(0.06deg); }
+}
+
+@keyframes holo-scan-sweep {
+    0% { background-position: 0 0, 0 -40%; }
+    100% { background-position: 0 0, 0 140%; }
+}
+
+@keyframes holo-snow {
+    0%, 100% { opacity: 0.03; transform: translate(0, 0); }
+    40% { opacity: 0.055; transform: translate(-1%, 1%); }
+    70% { opacity: 0.025; transform: translate(1%, -1%); }
+}
+
+@keyframes holo-snow-bad {
+    0%, 100% { opacity: 0.12; transform: translate(0, 0); }
+    25% { opacity: 0.22; transform: translate(-2%, 1%); }
+    50% { opacity: 0.1; transform: translate(2%, -2%); }
+    75% { opacity: 0.2; transform: translate(-1%, 2%); }
+}
+
+.portrait.holo-signal img {
+    will-change: transform;
+    animation: holo-idle 5.2s ease-in-out infinite;
+}
+
+/* Scanlines + slow laser sweep */
+.portrait.holo-signal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background-image:
+        repeating-linear-gradient(
+            0deg,
+            transparent 0,
+            transparent 2px,
+            rgba(8, 14, 22, 0.28) 2px,
+            rgba(8, 14, 22, 0.28) 3px
+        ),
+        linear-gradient(
+            180deg,
+            transparent 0%,
+            rgba(122, 158, 176, 0.1) 48%,
+            transparent 100%
+        );
+    background-size: auto, 100% 28%;
+    background-repeat: repeat, no-repeat;
+    animation: holo-scan-sweep 7s linear infinite;
+    mix-blend-mode: soft-light;
+}
+
+/* Quiet signal snow (almost invisible in normal play) */
+.portrait.holo-signal::after {
+    content: '';
+    position: absolute;
+    inset: -12%;
+    z-index: 3;
+    pointer-events: none;
+    background-image:
+        radial-gradient(circle at 18% 22%, rgba(210, 225, 240, 0.55) 0 0.6px, transparent 1px),
+        radial-gradient(circle at 62% 48%, rgba(180, 200, 220, 0.45) 0 0.5px, transparent 1px),
+        radial-gradient(circle at 84% 16%, rgba(200, 220, 235, 0.4) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 36% 78%, rgba(160, 185, 210, 0.5) 0 0.5px, transparent 1px),
+        radial-gradient(circle at 8% 64%, rgba(190, 210, 230, 0.35) 0 0.45px, transparent 1px),
+        radial-gradient(circle at 74% 88%, rgba(170, 195, 215, 0.4) 0 0.55px, transparent 1px);
+    background-size: 38px 42px, 52px 36px, 44px 48px, 60px 40px, 34px 50px, 48px 44px;
+    animation: holo-snow 3.4s steps(3) infinite;
+    mix-blend-mode: screen;
+}
+
+.seat-panel.offline .portrait.holo-signal::before,
+.seat-panel.dying-victim .portrait.holo-signal::before {
+    background-image:
+        repeating-linear-gradient(
+            0deg,
+            transparent 0,
+            transparent 1px,
+            rgba(8, 14, 22, 0.4) 1px,
+            rgba(8, 14, 22, 0.4) 2px
+        ),
+        linear-gradient(
+            180deg,
+            transparent 0%,
+            rgba(184, 74, 74, 0.14) 50%,
+            transparent 100%
+        );
+    animation-duration: 3.2s;
+}
+
+.seat-panel.offline .portrait.holo-signal::after,
+.seat-panel.dying-victim .portrait.holo-signal::after {
+    animation: holo-snow-bad 0.85s steps(2) infinite;
+}
+
+.seat-panel.offline .portrait.holo-signal img {
+    animation-duration: 2.4s;
+    filter: saturate(0.55) brightness(0.85);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .motion-enter,
     .panel.radar-once,
@@ -148,8 +254,16 @@ body.table-ended .ended-banner {
     .ended-banner,
     .stage-card.stage-enter,
     .table-felt.urgency-pulse::after,
-    body.shell-page::before {
+    body.shell-page::before,
+    .portrait.holo-signal img,
+    .portrait.holo-signal::before,
+    .portrait.holo-signal::after,
+    .seat-panel.offline .portrait.holo-signal::after,
+    .seat-panel.dying-victim .portrait.holo-signal::after {
         animation: none !important;
+    }
+    .portrait.holo-signal::after {
+        opacity: 0;
     }
     .card-lift:hover,
     .card-lift.selected,

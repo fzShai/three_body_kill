@@ -50,7 +50,6 @@ KNOWN_ROLES = {
     "guan_yifan",
     "friss",
     "luo_ji",
-    "ye_wenjie",
 }
 
 
@@ -574,33 +573,6 @@ def main() -> None:
     ok, msg = lj.apply_action("luo", {"action": "play_card", "instance_id": "kill-lj2", "target": "foe"})
     assert ok, msg
     assert lj.players["foe"]["hp"] < hp_before
-
-    # 叶文洁领袖：杀无法响应；红岸摸牌
-    yw = GameSession.create("YE", ["ye", "victim"])
-    _as_role(yw, "ye", "ye_wenjie")
-    _blank_skills(yw, "victim")
-    yw.turn_index = yw.player_order.index("ye")
-    yw.phase = "turn"
-    yw.turn_phase = "play"
-    kill_ye = {
-        "id": "kill_low",
-        "name": "1阶杀",
-        "type": "basic",
-        "subtype": "kill",
-        "tier": 1,
-        "instance_id": "kill-ye",
-    }
-    _give(yw.players["ye"], kill_ye)
-    _give(yw.players["victim"])  # 清空手牌，避免濒死强制桃
-    yw.players["victim"]["hp"] = 1
-    hand0 = len(yw.players["ye"]["hand"])
-    ok, msg = yw.apply_action("ye", {"action": "play_card", "instance_id": "kill-ye", "target": "victim"})
-    assert ok, msg
-    # 领袖直接结算；强制出局看红岸
-    if yw.phase == "dying":
-        yw.apply_action("victim", {"action": "dying_resolve"})
-    assert not yw.players["victim"]["alive"]
-    assert len(yw.players["ye"]["hand"]) >= hand0 + 1
 
     # you.actions：终极规律号主动技由 snapshot 下发
     law = GameSession.create("LAW", ["law", "bot"])

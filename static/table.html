@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260729x" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260729x" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730h" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730h" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -538,14 +538,18 @@
                     if (p.ascension) flags.push(ASCENSION_LABEL[p.ascension] || p.ascension);
                     if (!p.alive) flags.push('出局');
                     const roleLabel = p.role_name ? `<div class="seat-role">${p.role_name}</div>` : '';
+                    const art = TBK.portraitHtml(p.role_id, p.role_name, 'seat-art');
                     return `<div class="${cls}" data-user="${p.username}" style="left:${pos.left};top:${pos.top}">
-                        <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                        ${roleLabel}
-                        <div class="seat-stats">科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${p.shield ? ` · 盾${p.shield}` : ''}</div>
-                        <div class="hp-row">${hpPips(p.hp, p.max_hp)}</div>
-                        <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
-                        ${statusLines(p.statuses)}
-                        ${flags.length ? `<div class="seat-flags">${flags.join(' · ')}</div>` : ''}
+                        ${art}
+                        <div class="seat-overlay">
+                            <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
+                            ${roleLabel}
+                            <div class="seat-stats">科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${p.shield ? ` · 盾${p.shield}` : ''}</div>
+                            <div class="hp-row">${hpPips(p.hp, p.max_hp)}</div>
+                            <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
+                            ${statusLines(p.statuses)}
+                            ${flags.length ? `<div class="seat-flags">${flags.join(' · ')}</div>` : ''}
+                        </div>
                     </div>`;
                 }).join('');
 
@@ -676,11 +680,14 @@
                 ).join(' · ');
                 const sealedYou = you.skills_sealed ? ' · 非锁定技失效' : '';
                 document.getElementById('roleBox').innerHTML = role
-                    ? `<div class="role-name">${role.role_name}</div>
+                    ? `${TBK.portraitHtml(role.role_id, role.role_name, 'self-art')}
+                        <div class="self-role-body">
+                        <div class="role-name">${role.role_name}</div>
                         HP ${you.hp}/${mePublic.max_hp ?? you.hp} · 科技${you.tech_level ?? 1} · 上限${you.hand_limit ?? '—'}${sealedYou}
                         <div class="hp-row">${hpPips(you.hp, mePublic.max_hp || you.hp)}</div>
                         ${skillText ? `<div class="role-skills">${skillText}</div>` : ''}
-                        ${statusLines(mePublic.statuses)}`
+                        ${statusLines(mePublic.statuses)}
+                        </div>`
                     : '—';
 
                 const roleBox = document.getElementById('roleBox');

@@ -337,6 +337,49 @@ td strong {
     border-bottom: 1px solid var(--line);
 }
 .item:last-child { border-bottom: none; }
+.item.item-role {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+    align-items: start;
+    padding: 16px 0;
+}
+.item-role .portrait.codex-art {
+    width: 96px;
+    height: 144px;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px var(--line);
+}
+.item-role .portrait.codex-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+}
+.item-role .portrait {
+    position: relative;
+    background:
+        radial-gradient(ellipse 70% 55% at 50% 35%, rgba(122, 158, 176, 0.1) 0%, transparent 65%),
+        var(--bg-void-mid);
+}
+.item-role .portrait .portrait-mark {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 28px;
+    letter-spacing: 0.08em;
+    color: var(--accent-ice-dim);
+}
+.item-role .portrait.portrait--empty .portrait-mark {
+    display: flex;
+}
+.item-role-body { min-width: 0; }
 .item .name {
     font-size: 16px;
     font-weight: 700;

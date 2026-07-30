@@ -261,7 +261,8 @@ body.table-ended .ended-banner {
     .portrait.holo-signal::before,
     .portrait.holo-signal::after,
     .seat-panel.offline .portrait.holo-signal::after,
-    .seat-panel.dying-victim .portrait.holo-signal::after {
+    .seat-panel.dying-victim .portrait.holo-signal::after,
+    .hp-row.hp-low .hp-pip:not(.empty) {
         animation: none !important;
     }
     .portrait.holo-signal::after {

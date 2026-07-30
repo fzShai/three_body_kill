@@ -39,17 +39,33 @@ body.shell-page.table-page::before { opacity: 0.28; }
 
 /* —— Top bar —— */
 .board-top {
+    position: relative;
+    z-index: 6;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px 16px;
-    padding: 6px 4px 10px;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 12px 12px;
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--ink-muted);
     letter-spacing: 0.06em;
     flex-shrink: 0;
+    text-align: center;
+    background: linear-gradient(
+        180deg,
+        rgba(5, 8, 15, 0.88) 0%,
+        rgba(5, 8, 15, 0.55) 70%,
+        transparent 100%
+    );
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+}
+.board-top .brand-mini,
+.board-top .meta {
+    pointer-events: auto;
 }
 .board-top .brand-mini {
     color: var(--accent-ice-bright);
@@ -58,8 +74,12 @@ body.shell-page.table-page::before { opacity: 0.28; }
     letter-spacing: 0.1em;
     font-size: 13px;
 }
+.board-top .meta {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
 .board-top .meta span { color: var(--accent-ice-bright); }
-.board-top .meta-actions { display: flex; gap: 8px; align-items: center; }
+.board-top .meta-actions { display: flex; gap: 8px; align-items: center; justify-content: center; }
 
 /* —— Arena (seat ring + stage) —— */
 .board-arena {
@@ -139,13 +159,13 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 .seat-panel.seat-corner--tl {
     left: 1%;
-    top: 1%;
+    top: 52px;
     bottom: auto;
     right: auto;
 }
 .seat-panel.seat-corner--tr {
     right: 1%;
-    top: 1%;
+    top: 52px;
     left: auto;
     bottom: auto;
 }
@@ -173,7 +193,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
     transform: scale(1.7);
     transform-origin: top center;
     display: block;
-    filter: contrast(1.08) saturate(0.92);
+    filter: contrast(1.08) saturate(0.92) brightness(1.08);
 }
 .seat-panel .seat-overlay {
     position: relative;
@@ -249,22 +269,38 @@ body.shell-page.table-page::before { opacity: 0.28; }
     margin-top: 4px;
     line-height: 1.35;
 }
-.seat-panel .hp-row {
+.seat-panel .hp-row,
+.hp-row {
     display: flex;
-    gap: 2px;
+    gap: 4px;
     margin-top: 6px;
     flex-wrap: wrap;
+    align-items: center;
 }
-.seat-panel .hp-pip {
-    width: 8px;
-    height: 8px;
+/* Dark Forest stellar ticks (diamond) */
+.seat-panel .hp-pip,
+.hp-pip {
+    width: 9px;
+    height: 9px;
     background: var(--danger-cold);
-    opacity: 0.85;
+    opacity: 0.92;
+    border: none;
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    box-shadow: 0 0 0 1px rgba(155, 184, 200, 0.25);
+    flex-shrink: 0;
 }
-.seat-panel .hp-pip.empty {
-    background: transparent;
-    border: 1px solid rgba(184, 74, 74, 0.35);
-    opacity: 0.5;
+.seat-panel .hp-pip.empty,
+.hp-pip.empty {
+    background: rgba(122, 158, 176, 0.14);
+    opacity: 0.7;
+    box-shadow: 0 0 0 1px rgba(122, 158, 176, 0.5);
+}
+@keyframes hp-stellar-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.35); }
+}
+.hp-row.hp-low .hp-pip:not(.empty) {
+    animation: hp-stellar-pulse 1.8s ease-in-out infinite;
 }
 .seat-panel .seat-eq {
     margin-top: 6px;

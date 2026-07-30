@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730j" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730j" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730k" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730k" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -433,7 +433,7 @@
                         <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}${isSelf ? '<span class="badge-self">我</span>' : ''}</div>
                         ${roleLabel}
                         <div class="seat-stats">科技${tech} · ${handBit}${p.shield ? ` · 盾${p.shield}` : ''}${sealedYou}</div>
-                        <div class="hp-row">${hpPips(hp, maxHp)}</div>
+                        <div class="hp-row${(hp > 0 && hp <= 2) ? ' hp-low' : ''}">${hpPips(hp, maxHp)}</div>
                         <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
                         ${skillText ? `<div class="seat-skills">${skillText}</div>` : ''}
                         ${statusLines(p.statuses)}

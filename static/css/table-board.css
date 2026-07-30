@@ -14,7 +14,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
 
 .table-shell {
     display: grid;
-    grid-template-columns: 1fr min(280px, 28vw);
+    grid-template-columns: 1fr min(220px, 22vw);
     height: 100vh;
     max-height: 100dvh;
     width: 100%;
@@ -372,10 +372,10 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 .stage.idle .stage-text { color: var(--ink-muted); }
 
-/* —— Self zone (hand / equip / role text — portrait lives in BL corner) —— */
+/* —— Self zone (equip left, hand expands; portrait in BL corner) —— */
 .board-self {
     display: grid;
-    grid-template-columns: minmax(100px, 140px) 1fr 120px;
+    grid-template-columns: 120px 1fr;
     gap: 10px;
     align-items: end;
     padding: 8px 4px 4px;
@@ -385,10 +385,29 @@ body.shell-page.table-page::before { opacity: 0.28; }
     min-height: 0;
     position: relative;
     z-index: 3;
-    /* Keep hand clear of BL / BR corner portraits */
-    margin-left: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
-    margin-right: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
+    /* Keep hand clear of BL / BR corner portraits (slightly under full portrait width) */
+    margin-left: calc(min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3)) * 0.85);
+    margin-right: calc(min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3)) * 0.85);
 }
+.field-bar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    max-width: min(420px, 70%);
+    padding: 4px 12px;
+    border: 1px solid var(--line);
+    background: rgba(8, 12, 20, 0.82);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--accent-ice-bright);
+    text-align: center;
+    pointer-events: none;
+}
+.field-bar[hidden] { display: none !important; }
+.field-bar .field-muted { color: var(--ink-muted); }
 .self-meta {
     padding: 8px 10px;
     border: 1px solid var(--line);
@@ -537,8 +556,8 @@ body.shell-page.table-page::before { opacity: 0.28; }
     background: rgba(6, 10, 16, 0.9);
     flex-shrink: 0;
     min-height: 52px;
-    margin-left: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
-    margin-right: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
+    margin-left: calc(min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3)) * 0.85);
+    margin-right: calc(min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3)) * 0.85);
 }
 .action-bar .status {
     flex: 1 1 100%;

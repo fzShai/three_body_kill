@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730k" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730k" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730m" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730m" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -26,6 +26,7 @@
 
         <div class="board-arena">
             <div class="table-felt" aria-hidden="true"></div>
+            <div class="field-bar" id="fieldBar" hidden>场地：无</div>
             <div class="stage idle" id="stage">
                 <div id="stageCardSlot"></div>
                 <div class="stage-text" id="stageText">等待对局</div>
@@ -34,14 +35,13 @@
         </div>
 
         <section class="board-self">
-            <div class="self-meta" id="roleBox">—</div>
-            <div class="self-hand-wrap">
-                <div class="mode-hint" id="modeHint"></div>
-                <div class="hand" id="hand"></div>
-            </div>
             <div class="self-equip" id="selfEquip">
                 <h3>装备</h3>
                 <div id="selfEquipBody">—</div>
+            </div>
+            <div class="self-hand-wrap">
+                <div class="mode-hint" id="modeHint"></div>
+                <div class="hand" id="hand"></div>
             </div>
         </section>
 
@@ -122,7 +122,7 @@
                 const ids = new Set([
                     'ladder_plan', 'ball_lightning', 'sophon', 'wallfacer_plan',
                     'deadline', 'dual_vector', 'great_ravine', 'killer_52',
-                    'dx3906', 'reckoning', 'finale',
+                    'dx3906', 'reckoning', 'finale', 'four_dimension',
                 ]);
                 return card && (
                     card.subtype === 'kill'
@@ -471,6 +471,10 @@
                 if (card.id === 'ladder_plan') {
                     return others.filter((p) => !p.vision_exposed).map((p) => p.username);
                 }
+                // 四维：任意名角色（含自己）；UI 先支持单选一名
+                if (card.id === 'four_dimension') {
+                    return allAlive.map((p) => p.username);
+                }
                 if (needsOtherTarget(card)) return others.map((p) => p.username);
                 return [];
             }
@@ -718,24 +722,18 @@
                     hint.textContent = '';
                 }
 
-                const role = snap.you?.role;
                 const you = snap.you || {};
                 const mePublic = (snap.players || []).find((p) => p.username === username) || {};
-                const skillText = (role?.skills || []).map((s) =>
-                    `${s.locked ? '【锁定】' : ''}${s.name}`
-                ).join(' · ');
-                const sealedYou = you.skills_sealed ? ' · 非锁定技失效' : '';
-                document.getElementById('roleBox').innerHTML = role
-                    ? `<div class="role-name">${role.role_name}</div>
-                        <div class="role-line">HP ${you.hp}/${mePublic.max_hp ?? you.hp} · 科技${you.tech_level ?? 1} · 上限${you.hand_limit ?? '—'}${sealedYou}</div>
-                        ${skillText ? `<div class="role-skills">${skillText}</div>` : ''}
-                        ${statusLines(mePublic.statuses)}`
-                    : '—';
 
-                const roleBox = document.getElementById('roleBox');
                 const selfCorner = document.querySelector('.seat-panel.seat-self');
+                const cardForSelf = (snap.you?.hand || []).find((c) => c.instance_id === selectedId);
+                const canPickSelfCard = targetingMode === 'card'
+                    && cardForSelf
+                    && cardForSelf.id === 'four_dimension'
+                    && legalTargets(snap, 'card', cardForSelf).includes(username);
                 const canPickSelfChoice = (targetingMode === 'choice_target' && !!pendingChoiceId)
-                    || targetingMode === 'soap_heal';
+                    || targetingMode === 'soap_heal'
+                    || canPickSelfCard;
                 if (selfCorner) {
                     selfCorner.classList.toggle('selected-target', selectedTarget === username && canPickSelfChoice);
                     selfCorner.style.cursor = canPickSelfChoice ? 'pointer' : '';
@@ -743,6 +741,12 @@
                         ev.stopPropagation();
                         if (targetingMode === 'soap_heal') {
                             sock.send('game_action', { action: 'choose', target: username }, roomId);
+                            return;
+                        }
+                        if (canPickSelfCard) {
+                            selectedTarget = username;
+                            setStatus(`目标：${selectedTarget}`);
+                            render(state);
                             return;
                         }
                         sock.send('game_action', {
@@ -760,11 +764,29 @@
                     equipLine(mePublic.equipment || you.equipment, 'ship')
                     + equipLine(mePublic.equipment || you.equipment, 'armor');
 
-                bindInspect(roleBox, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
                 if (selfCorner) {
                     bindInspect(selfCorner, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
                 }
                 bindInspect(document.getElementById('selfEquip'), () => (state?.players || []).find((p) => p.username === username) || mePublic, 'equip');
+
+                const fieldBar = document.getElementById('fieldBar');
+                if (fieldBar) {
+                    const fields = snap.fields || [];
+                    const bits = fields.map((f) => f.name || f.id).filter(Boolean);
+                    if (snap.field_multiplier && snap.field_multiplier !== 1) {
+                        bits.push(`倍率×${snap.field_multiplier}`);
+                    }
+                    if (snap.trisolaris_era) {
+                        bits.push(`三体·${snap.trisolaris_era === 'stable' ? '恒纪元' : snap.trisolaris_era}`);
+                    }
+                    if (bits.length) {
+                        fieldBar.hidden = false;
+                        fieldBar.innerHTML = `场地：${bits.map((b) => escHtml(b)).join(' · ')}`;
+                    } else {
+                        fieldBar.hidden = false;
+                        fieldBar.innerHTML = '<span class="field-muted">场地：无</span>';
+                    }
+                }
 
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');

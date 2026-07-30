@@ -174,6 +174,8 @@ def main() -> None:
     vg.turn_index = vg.player_order.index("nora")
     vg.phase = "turn"
     vg.turn_phase = "play"
+    nora["hand"] = []
+    owen["hand"] = []
     ladder = {
         "id": "ladder_plan",
         "name": "阶梯计划",
@@ -246,6 +248,8 @@ def main() -> None:
     lg.turn_index = lg.player_order.index("uma")
     lg.phase = "turn"
     lg.turn_phase = "play"
+    uma["hand"] = []
+    vic["hand"] = []
     ladder_a = {
         "id": "ladder_plan",
         "name": "阶梯计划",
@@ -459,7 +463,12 @@ def main() -> None:
     # 土著红岸：摸 2+2
     fr.phase = "turn"
     fr.turn_phase = "play"
+    fr.prompt = None
+    fr._pending_trick = None
     fr.players["friss"]["red_coast_used"] = False
+    for n in fr.player_order:
+        if n != "friss":
+            fr.players[n]["hand"] = []
     hand_before = len(fr.players["friss"]["hand"])
     red_n = {
         "id": "red_coast",
@@ -683,6 +692,8 @@ def main() -> None:
     bl.turn_index = bl.player_order.index("seer")
     bl.phase = "turn"
     bl.turn_phase = "play"
+    bl.players["seer"]["hand"] = []
+    bl.players["target"]["hand"] = []
     ball = {
         "id": "ball_lightning",
         "name": "球状闪电",
@@ -840,6 +851,22 @@ def main() -> None:
     ok, msg = _trick(tg, "t1", {"id": "dark_domain", "name": "黑域", "type": "trick", "implemented": True, "instance_id": "dd1"})
     assert ok and any(f["id"] == "dark_domain" for f in tg.fields), msg
 
+    # 同名场地：不可再打出，可重铸
+    ok, msg = _trick(tg, "t1", {"id": "dark_domain", "name": "黑域", "type": "trick", "implemented": True, "instance_id": "dd2"})
+    assert not ok, msg
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    tg.prompt = None
+    tg._pending_trick = None
+    for n in tg.player_order:
+        tg.players[n]["hand"] = []
+    tg.players["t1"]["hand"] = [
+        {"id": "dark_domain", "name": "黑域", "type": "trick", "implemented": True, "instance_id": "dd-recast"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "recast", "instance_id": "dd-recast"})
+    assert ok, msg
+    assert any(f["id"] == "dark_domain" for f in tg.fields)
+
     ok, msg = _trick(tg, "t1", {"id": "dark_forest_field", "name": "黑暗森林", "type": "trick", "implemented": True, "instance_id": "df1"})
     assert ok and any(f["id"] == "dark_forest_field" for f in tg.fields), msg
 
@@ -860,6 +887,103 @@ def main() -> None:
     assert ok, msg
     # curtain nullified — t1 should not have drawn from it
     assert tg.phase == "turn"
+
+    # 红岸可被思想钢印响应
+    tg.players["t1"]["red_coast_used"] = False
+    tg.players["t1"]["hand"] = [
+        {"id": "red_coast", "name": "红岸计划", "type": "trick", "implemented": True, "instance_id": "rc1"}
+    ]
+    tg.players["t2"]["hand"] = [
+        {"id": "thought_stamp", "name": "思想钢印", "type": "trick", "implemented": True, "instance_id": "ts-rc"}
+    ]
+    hand_before_rc = len(tg.players["t1"]["hand"])
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "rc1"})
+    assert ok and tg.prompt and tg.prompt.get("type") == "interrupt_trick", msg
+    ok, msg = tg.apply_action("t2", {"action": "play_card", "instance_id": "ts-rc"})
+    assert ok, msg
+    assert not tg.players["t1"].get("red_coast_used"), "钢印无效后不应记已用红岸"
+    assert len(tg.players["t1"]["hand"]) == hand_before_rc - 1
+
+    # 阶梯 / 球状闪电也可进打断窗
+    tg.players["t1"]["hand"] = [
+        {"id": "ladder_plan", "name": "阶梯计划", "type": "trick", "implemented": True, "instance_id": "lp1"}
+    ]
+    tg.players["t2"]["hand"] = [
+        {"id": "thought_stamp", "name": "思想钢印", "type": "trick", "implemented": True, "instance_id": "ts-lp"}
+    ]
+    tg.players["t2"]["vision_exposed"] = False
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "lp1", "target": "t2"})
+    assert ok and tg.prompt and tg.prompt.get("type") == "interrupt_trick", msg
+    ok, msg = tg.apply_action("t2", {"action": "respond_pass"})
+    assert ok, msg
+    assert tg.players["t2"].get("vision_exposed")
+
+    tg.players["t1"]["hand"] = [
+        {
+            "id": "nano_center",
+            "name": "纳米工程中心",
+            "type": "equipment",
+            "slot": "temp_ascend",
+            "implemented": True,
+            "instance_id": "nano1",
+        }
+    ]
+    tg.players["t2"]["hand"] = [
+        {"id": "thought_stamp", "name": "思想钢印", "type": "trick", "implemented": True, "instance_id": "ts-nano"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "nano1"})
+    assert ok and tg.prompt and tg.prompt.get("type") == "interrupt_trick", msg
+    ok, msg = tg.apply_action("t2", {"action": "play_card", "instance_id": "ts-nano"})
+    assert ok, msg
+    assert not any(s["id"] == "nano_center" for s in tg.players["t1"]["statuses"])
+
+    # 四维：拆装备 → 暴露 → 面壁弃 2；无装备 → 不暴露 → 面壁弃 1
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    tg.prompt = None
+    tg._pending_trick = None
+    for n in tg.player_order:
+        tg.players[n]["hand"] = []
+    tg.players["t2"]["equipment"] = {
+        "ship": {"id": "blue_space", "name": "蓝色空间", "type": "equipment", "slot": "ship", "implemented": True}
+    }
+    tg.players["t2"]["vision_exposed"] = False
+    tg.players["t2"]["hand"] = [
+        {"id": "peach", "name": "桃", "instance_id": "fd-p1"},
+        {"id": "peach", "name": "桃", "instance_id": "fd-p2"},
+    ]
+    tg.players["t1"]["hand"] = [
+        {"id": "four_dimension", "name": "四维空间", "type": "trick", "implemented": True, "instance_id": "fd1"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "fd1", "target": "t2"})
+    assert ok, msg
+    assert not tg.players["t2"]["equipment"].get("ship")
+    assert tg.players["t2"].get("vision_exposed")
+    tg.players["t1"]["hand"] = [
+        {"id": "wallfacer_plan", "name": "面壁", "type": "trick", "implemented": True, "instance_id": "wf-fd"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "wf-fd", "target": "t2"})
+    assert ok, msg
+    assert len(tg.players["t2"]["hand"]) == 0
+
+    tg.players["t2"]["equipment"] = {}
+    tg.players["t2"]["vision_exposed"] = False
+    tg.players["t2"]["hand"] = [
+        {"id": "peach", "name": "桃", "instance_id": "fd-q1"},
+        {"id": "peach", "name": "桃", "instance_id": "fd-q2"},
+    ]
+    tg.players["t1"]["hand"] = [
+        {"id": "four_dimension", "name": "四维空间", "type": "trick", "implemented": True, "instance_id": "fd2"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "fd2", "target": "t2"})
+    assert ok, msg
+    assert not tg.players["t2"].get("vision_exposed")
+    tg.players["t1"]["hand"] = [
+        {"id": "wallfacer_plan", "name": "面壁", "type": "trick", "implemented": True, "instance_id": "wf-fd2"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "play_card", "instance_id": "wf-fd2", "target": "t2"})
+    assert ok, msg
+    assert len(tg.players["t2"]["hand"]) == 1
 
     ok, msg = _trick(
         tg,

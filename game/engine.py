@@ -1148,7 +1148,7 @@ class GameSession:
                 return False
             if cid == "ladder_plan":
                 return bool(self._unexposed_others(username))
-            return True
+            return not bool(self.players[username].get("red_coast_used"))
         if cid in TRICK_HANDLERS:
             return trick_legal_play(self, username, card)
         if is_temp_ascend_card(card):
@@ -1319,31 +1319,33 @@ class GameSession:
             return True, f"科技等级 {self.players[username]['tech_level']}"
 
         if cid == "ladder_plan":
+            if self._needs_trick_interrupt(username, card):
+                self._open_trick_interrupt(username, card, target, action)
+                self.refresh_turn_timer()
+                self.seq += 1
+                return True, "等待打断响应"
             ok, msg = self._play_ladder_plan(username, card, target)
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._on_card_used(username)
             self._maybe_native_repeat_instant(username, card, target=target, kind="ladder")
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
 
         if cid == "ball_lightning":
+            if self._needs_trick_interrupt(username, card):
+                self._open_trick_interrupt(username, card, target, action)
+                self.refresh_turn_timer()
+                self.seq += 1
+                return True, "等待打断响应"
             ok, msg = self._play_ball_lightning(username, card, target)
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._on_card_used(username)
             self._maybe_native_repeat_instant(username, card, target=target, kind="ball_lightning")
-            self.refresh_turn_timer()
-            self.seq += 1
-            return True, msg
-
-        if cid == "red_coast":
-            ok, msg = self._play_red_coast(username, card)
-            if not ok:
-                hand.insert(idx, card)
-                return False, msg
-            self._maybe_native_repeat_instant(username, card, target=None, kind="red_coast")
             self.refresh_turn_timer()
             self.seq += 1
             return True, msg
@@ -1371,6 +1373,12 @@ class GameSession:
             return True, msg
 
         if is_temp_ascend_card(card):
+            # 纳米等：卡面「可被思想钢印响应」
+            if self._needs_trick_interrupt(username, card):
+                self._open_trick_interrupt(username, card, target, action)
+                self.refresh_turn_timer()
+                self.seq += 1
+                return True, "等待打断响应"
             ok, msg = self._apply_temp_ascend(username, card)
             if not ok:
                 hand.insert(idx, card)
@@ -1511,19 +1519,8 @@ class GameSession:
             ):
                 self.prompt["will_native"] = True
             return
-        if cid in {"wallfacer_plan", "curtain"}:
+        if cid in {"wallfacer_plan", "curtain", "red_coast"}:
             self._maybe_native_repeat_instant(username, card, target=target, kind=str(cid))
-
-    def _play_red_coast(self, username: str, card: dict[str, Any]) -> tuple[bool, str]:
-        p = self.players[username]
-        if p.get("red_coast_used"):
-            return False, "红岸计划每回合限一次"
-        drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-        p["hand"].extend(drawn)
-        p["red_coast_used"] = True
-        self.discard.append(card)
-        self._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
-        return True, f"摸了 {len(drawn)} 张"
 
     def _compute_kill_damage_full(self, tier: int, src: str, tgt: str) -> int:
         s, t = self.players[src], self.players[tgt]
@@ -1610,7 +1607,33 @@ class GameSession:
             cid = card.get("id")
             if cid == "toxic_water":
                 card = {**card, "allow_response": True}
-            if cid in TRICK_HANDLERS:
+            if cid == "ladder_plan":
+                ok, msg = self._play_ladder_plan(username, card, target)
+                if not ok:
+                    self.players[username]["hand"].append(card)
+                    self._log(f"结算失败：{msg}")
+                else:
+                    self._log(msg)
+                    self._on_card_used(username)
+                    self._maybe_native_repeat_instant(username, card, target=target, kind="ladder")
+            elif cid == "ball_lightning":
+                ok, msg = self._play_ball_lightning(username, card, target)
+                if not ok:
+                    self.players[username]["hand"].append(card)
+                    self._log(f"结算失败：{msg}")
+                else:
+                    self._log(msg)
+                    self._on_card_used(username)
+                    self._maybe_native_repeat_instant(username, card, target=target, kind="ball_lightning")
+            elif is_temp_ascend_card(card):
+                ok, msg = self._apply_temp_ascend(username, card)
+                if not ok:
+                    self.players[username]["hand"].append(card)
+                    self._log(f"结算失败：{msg}")
+                else:
+                    self._log(msg)
+                    self._on_card_used(username)
+            elif cid in TRICK_HANDLERS:
                 ok, msg = TRICK_HANDLERS[cid](self, username, card, target, action)
                 if not ok:
                     # 结算失败（如古筝缺弃牌）：退回手牌
@@ -1618,6 +1641,7 @@ class GameSession:
                     self._log(f"结算失败：{msg}")
                 else:
                     self._log(msg)
+                    self._on_card_used(username)
                     self._after_trick_settled(username, card, target, action)
             self.refresh_turn_timer()
             return

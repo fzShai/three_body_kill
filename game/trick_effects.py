@@ -140,8 +140,21 @@ def play_wallfacer(session: Any, username: str, card: dict[str, Any], target: st
     n = 2 if session.players[target].get("vision_exposed") else 1
     session.discard.append(card)
     taken = discard_from_target(session, target, n)
-    session._log(f"{username} 对 {target} 使用面壁计划：弃 {taken} 张")
+    exposed = "已" if session.players[target].get("vision_exposed") else "未"
+    session._log(f"{username} 对 {target} 使用面壁计划：弃 {taken} 张（目标{exposed}暴露视野）")
     return True, f"{target} 弃置 {taken} 张"
+
+
+def play_red_coast(session: Any, username: str, card: dict[str, Any], _target: str | None, _action: dict) -> tuple[bool, str]:
+    p = session.players[username]
+    if p.get("red_coast_used"):
+        return False, "红岸计划每回合限一次"
+    drawn = session.draw_sys.draw_n(p["tech_level"], 2)
+    p["hand"].extend(drawn)
+    p["red_coast_used"] = True
+    session.discard.append(card)
+    session._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
+    return True, f"摸了 {len(drawn)} 张"
 
 
 def play_broadcast(session: Any, username: str, card: dict[str, Any], _target: str | None, _action: dict) -> tuple[bool, str]:
@@ -490,6 +503,8 @@ def play_field_card(session: Any, username: str, card: dict[str, Any], _target: 
         "crisis_field": "危机",
         "trisolaris_field": "三体",
     }
+    if has_field(session, str(cid)):
+        return False, "场上已有同名场地，可将本牌重铸"
     session.discard.append(card)
     add_field(session, str(cid), names.get(str(cid), str(cid)), username)
     if cid == "trisolaris_field":
@@ -683,6 +698,7 @@ HANDLERS: dict[str, Callable[..., tuple[bool, str]]] = {
     "sophon": play_sophon,
     "curtain": play_curtain,
     "wallfacer_plan": play_wallfacer,
+    "red_coast": play_red_coast,
     "broadcast": play_broadcast,
     "toxic_water": play_toxic_water,
     "four_dimension": play_four_dimension,
@@ -750,6 +766,7 @@ SELF_OK = {
     "cosmic_safety",
     "curse",
     "soap",
+    "four_dimension",
 }
 
 
@@ -769,6 +786,10 @@ def legal_play(session: Any, username: str, card: dict[str, Any]) -> bool:
         return len(session.players[username]["hand"]) >= 2
     if cid in {"thought_stamp", "return_motion"}:
         return False
+    if cid == "red_coast":
+        return not bool(session.players[username].get("red_coast_used"))
     if cid in STATUS_TRICK_IDS:
         return not session._has_status(username, str(cid))
+    if cid in FIELD_IDS:
+        return not has_field(session, str(cid))
     return True

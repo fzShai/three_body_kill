@@ -160,11 +160,18 @@ body.shell-page.table-page::before { opacity: 0.28; }
     inset: 0;
     z-index: 0;
 }
-.seat-panel .portrait.seat-art img {
+.seat-panel .portrait-crop {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+.seat-panel .portrait-crop img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center top;
+    object-position: center 10%;
+    transform: scale(1.7);
+    transform-origin: top center;
     display: block;
     filter: contrast(1.08) saturate(0.92);
 }
@@ -180,7 +187,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
     );
     min-height: 0;
 }
-.seat-panel.dead .portrait.seat-art img {
+.seat-panel.dead .portrait-crop img {
     filter: grayscale(0.85) brightness(0.7) contrast(1.05);
 }
 .seat-panel .seat-skills {

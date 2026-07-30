@@ -166,7 +166,7 @@ body.table-ended .ended-banner {
     75% { opacity: 0.24; transform: translate(-1%, 2%); }
 }
 
-.portrait.holo-signal img {
+.portrait.holo-signal .portrait-crop {
     will-change: transform;
     animation: holo-idle 4s ease-in-out infinite;
 }
@@ -241,9 +241,11 @@ body.table-ended .ended-banner {
     animation: holo-snow-bad 0.85s steps(2) infinite;
 }
 
-.seat-panel.offline .portrait.holo-signal img {
+.seat-panel.offline .portrait.holo-signal .portrait-crop {
     animation-duration: 2.4s;
-    filter: saturate(0.55) brightness(0.85);
+}
+.seat-panel.offline .portrait-crop img {
+    filter: saturate(0.55) brightness(0.85) contrast(1.05);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -255,7 +257,7 @@ body.table-ended .ended-banner {
     .stage-card.stage-enter,
     .table-felt.urgency-pulse::after,
     body.shell-page::before,
-    .portrait.holo-signal img,
+    .portrait.holo-signal .portrait-crop,
     .portrait.holo-signal::before,
     .portrait.holo-signal::after,
     .seat-panel.offline .portrait.holo-signal::after,

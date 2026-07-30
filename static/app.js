@@ -132,7 +132,7 @@
   }
 
   /** Markup for a portrait slot; missing assets fall back via onerror → empty frame.
-   *  Table seats/self use holo-signal for holographic phone look; codex stays static. */
+   *  Table seats/self use holo-signal + bust crop; codex/inspect stay full-body. */
   function portraitHtml(roleId, roleName, className) {
     const holo = /\b(seat-art|self-art)\b/.test(className || '');
     const cls = ['portrait', className, holo ? 'holo-signal' : ''].filter(Boolean).join(' ');
@@ -146,11 +146,10 @@
       return `<div class="${cls} portrait--empty" aria-hidden="true"><span class="portrait-mark">${esc(mark)}</span></div>`;
     }
     const src = portraitUrl(roleId);
-    return `<div class="${cls}" data-role="${esc(roleId)}">`
-      + `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" `
-      + `onerror="this.closest('.portrait').classList.add('portrait--empty');this.remove();" />`
-      + `<span class="portrait-mark">${esc(mark)}</span>`
-      + `</div>`;
+    const img = `<img src="${esc(src)}" alt="" loading="lazy" decoding="async" `
+      + `onerror="this.closest('.portrait').classList.add('portrait--empty');this.remove();" />`;
+    const body = holo ? `<div class="portrait-crop">${img}</div>` : img;
+    return `<div class="${cls}" data-role="${esc(roleId)}">${body}<span class="portrait-mark">${esc(mark)}</span></div>`;
   }
 
   global.TBK = {

@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730h" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730h" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730c" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730c" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -22,9 +22,10 @@
             </div>
         </header>
 
+        <div class="seat-ring" id="seatRing"></div>
+
         <div class="board-arena">
             <div class="table-felt" aria-hidden="true"></div>
-            <div class="seat-ring" id="seatRing"></div>
             <div class="stage idle" id="stage">
                 <div id="stageCardSlot"></div>
                 <div class="stage-text" id="stageText">等待对局</div>
@@ -33,7 +34,7 @@
         </div>
 
         <section class="board-self">
-            <div class="self-role" id="roleBox">—</div>
+            <div class="self-meta" id="roleBox">—</div>
             <div class="self-hand-wrap">
                 <div class="mode-hint" id="modeHint"></div>
                 <div class="hand" id="hand"></div>
@@ -237,6 +238,9 @@
                 if (!player) return '<div class="inspect-muted">无数据</div>';
                 const bits = [];
                 if (mode === 'role' || mode === 'seat') {
+                    if (player.role_id || player.role_name) {
+                        bits.push(`<div class="inspect-portrait">${TBK.portraitHtml(player.role_id, player.role_name, 'inspect-art')}</div>`);
+                    }
                     bits.push(`<div class="inspect-title">${escHtml(player.role_name || '未知角色')} · ${escHtml(player.username)}</div>`);
                     bits.push(`<div class="inspect-meta">HP ${player.hp}/${player.max_hp} · 科技${player.tech_level ?? 1} · 手牌 ${player.hand_count ?? 0}`
                         + (player.shield ? ` · 盾${player.shield}` : '')
@@ -348,28 +352,91 @@
                 return Math.max(0, handCount - limit);
             }
 
-            /** Relative seat positions: self at bottom (index 0 of rotated order). */
+            /** Corner seats relative to self (rotated[0] = self at BL). */
+            function seatCornerSlots(count) {
+                // Returns array of { corner, isSelf } aligned with rotated order indices.
+                // Corners: bl | tl | tr | br
+                if (count <= 0) return [];
+                if (count === 1) return [{ corner: 'bl', isSelf: true }];
+                if (count === 2) {
+                    return [
+                        { corner: 'bl', isSelf: true },
+                        { corner: 'tr', isSelf: false },
+                    ];
+                }
+                if (count === 3) {
+                    return [
+                        { corner: 'bl', isSelf: true },
+                        { corner: 'tl', isSelf: false },
+                        { corner: 'tr', isSelf: false },
+                    ];
+                }
+                // 4+
+                return [
+                    { corner: 'bl', isSelf: true },
+                    { corner: 'tl', isSelf: false },
+                    { corner: 'tr', isSelf: false },
+                    { corner: 'br', isSelf: false },
+                ].slice(0, count);
+            }
+
+            function buildSeatPanelHtml(p, snap, ctx, legal, canPickSeat, corner, isSelf) {
+                const isVictim = ctx.isDying && p.username === ctx.dying.victim;
+                const isLegal = legal.includes(p.username);
+                const cls = [
+                    'seat-panel',
+                    'seat-corner',
+                    `seat-corner--${corner}`,
+                    isSelf ? 'seat-self' : '',
+                    (!ctx.isPrompt && !ctx.isDying && p.username === snap.current_player) ? 'turn' : '',
+                    isVictim ? 'dying-victim deterrence-pulse' : '',
+                    (ctx.isPrompt && p.username === ctx.prompt.to) ? 'prompt-active' : '',
+                    p.alive ? '' : 'dead',
+                    p.online === false ? 'offline' : '',
+                    selectedTarget === p.username ? 'selected-target' : '',
+                    canPickSeat && isLegal ? 'targetable' : '',
+                    canPickSeat && !isLegal ? 'dim-target' : '',
+                ].filter(Boolean).join(' ');
+                const flags = [];
+                if (p.vision_exposed) flags.push('视野暴露');
+                if (p.skills_sealed) flags.push('技封');
+                if (p.ascension) flags.push(ASCENSION_LABEL[p.ascension] || p.ascension);
+                if (!p.alive) flags.push('出局');
+                const roleLabel = p.role_name ? `<div class="seat-role">${p.role_name}</div>` : '';
+                const artClass = isSelf ? 'seat-art self-art' : 'seat-art';
+                const art = TBK.portraitHtml(p.role_id, p.role_name, artClass);
+                const you = snap.you || {};
+                const skillText = isSelf
+                    ? (you.role?.skills || p.skills || []).map((s) =>
+                        `${s.locked ? '【锁定】' : ''}${s.name}`
+                    ).join(' · ')
+                    : '';
+                const sealedYou = isSelf && you.skills_sealed ? ' · 非锁定技失效' : '';
+                const handBit = isSelf
+                    ? `上限${you.hand_limit ?? '—'}`
+                    : `手牌 ${p.hand_count}`;
+                const hp = isSelf ? (you.hp ?? p.hp) : p.hp;
+                const maxHp = p.max_hp ?? hp;
+                const tech = isSelf ? (you.tech_level ?? p.tech_level ?? 1) : (p.tech_level ?? 1);
+                return `<div class="${cls}" data-user="${p.username}" data-corner="${corner}">
+                    ${art}
+                    <div class="seat-overlay">
+                        <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}${isSelf ? '<span class="badge-self">我</span>' : ''}</div>
+                        ${roleLabel}
+                        <div class="seat-stats">科技${tech} · ${handBit}${p.shield ? ` · 盾${p.shield}` : ''}${sealedYou}</div>
+                        <div class="hp-row">${hpPips(hp, maxHp)}</div>
+                        <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
+                        ${skillText ? `<div class="seat-skills">${skillText}</div>` : ''}
+                        ${statusLines(p.statuses)}
+                        ${flags.length ? `<div class="seat-flags">${flags.join(' · ')}</div>` : ''}
+                    </div>
+                </div>`;
+            }
+
+            /** Relative seat positions: self at bottom-left corner. */
             function seatPositions(count) {
-                // Angles for others only; self is in bottom zone.
-                // Positions around ellipse: angle 0 = bottom, clockwise.
-                if (count <= 1) return [];
-                const others = count - 1;
-                const positions = [];
-                for (let i = 0; i < others; i++) {
-                    // Spread from ~200° to ~340° via top (avoid bottom self zone)
-                    const t = others === 1 ? 0.5 : i / (others - 1);
-                    const angle = Math.PI + t * Math.PI; // π … 2π (left → top → right)
-                    // Convert: 0 at right, CCW in math; we use cos/sin with top-up
-                    // angle: π left, 1.5π top, 2π right
-                    const x = 50 + 42 * Math.cos(angle);
-                    const y = 48 + 38 * Math.sin(angle);
-                    positions.push({ left: x + '%', top: y + '%' });
-                }
-                // For 2 players: single opponent at top
-                if (others === 1) {
-                    return [{ left: '50%', top: '14%' }];
-                }
-                return positions;
+                // Kept for compatibility; corners handled via seatCornerSlots.
+                return seatCornerSlots(count).filter((s) => !s.isSelf).map((s) => ({ corner: s.corner }));
             }
 
             function hpPips(hp, maxHp) {
@@ -498,9 +565,7 @@
                 const rotated = myIdx >= 0
                     ? [...order.slice(myIdx), ...order.slice(0, myIdx)]
                     : order.slice();
-                // rotated[0] is self; others follow
-                const others = rotated.slice(1);
-                const positions = seatPositions(rotated.length);
+                const slots = seatCornerSlots(rotated.length);
                 const playersByName = Object.fromEntries((snap.players || []).map((p) => [p.username, p]));
                 const legal = (() => {
                     if (targetingMode === 'action') return legalTargets(snap, 'action', null);
@@ -515,45 +580,15 @@
                 const canPickSeat = legal.length > 0;
 
                 const ring = document.getElementById('seatRing');
-                ring.innerHTML = others.map((name, i) => {
+                ring.innerHTML = rotated.map((name, i) => {
                     const p = playersByName[name];
-                    if (!p) return '';
-                    const pos = positions[i] || { left: '50%', top: '20%' };
-                    const isVictim = ctx.isDying && p.username === ctx.dying.victim;
-                    const isLegal = legal.includes(p.username);
-                    const cls = [
-                        'seat-panel',
-                        (!ctx.isPrompt && !ctx.isDying && p.username === snap.current_player) ? 'turn' : '',
-                        isVictim ? 'dying-victim deterrence-pulse' : '',
-                        (ctx.isPrompt && p.username === ctx.prompt.to) ? 'prompt-active' : '',
-                        p.alive ? '' : 'dead',
-                        p.online === false ? 'offline' : '',
-                        selectedTarget === p.username ? 'selected-target' : '',
-                        canPickSeat && isLegal ? 'targetable' : '',
-                        canPickSeat && !isLegal ? 'dim-target' : '',
-                    ].filter(Boolean).join(' ');
-                    const flags = [];
-                    if (p.vision_exposed) flags.push('视野暴露');
-                    if (p.skills_sealed) flags.push('技封');
-                    if (p.ascension) flags.push(ASCENSION_LABEL[p.ascension] || p.ascension);
-                    if (!p.alive) flags.push('出局');
-                    const roleLabel = p.role_name ? `<div class="seat-role">${p.role_name}</div>` : '';
-                    const art = TBK.portraitHtml(p.role_id, p.role_name, 'seat-art');
-                    return `<div class="${cls}" data-user="${p.username}" style="left:${pos.left};top:${pos.top}">
-                        ${art}
-                        <div class="seat-overlay">
-                            <div class="seat-name">${p.username}${p.online === false ? '<span class="badge-off">离线</span>' : ''}</div>
-                            ${roleLabel}
-                            <div class="seat-stats">科技${p.tech_level ?? 1} · 手牌 ${p.hand_count}${p.shield ? ` · 盾${p.shield}` : ''}</div>
-                            <div class="hp-row">${hpPips(p.hp, p.max_hp)}</div>
-                            <div class="seat-eq">${equipLine(p.equipment, 'ship')}${equipLine(p.equipment, 'armor')}</div>
-                            ${statusLines(p.statuses)}
-                            ${flags.length ? `<div class="seat-flags">${flags.join(' · ')}</div>` : ''}
-                        </div>
-                    </div>`;
+                    const slot = slots[i];
+                    if (!p || !slot) return '';
+                    return buildSeatPanelHtml(p, snap, ctx, legal, canPickSeat, slot.corner, !!slot.isSelf);
                 }).join('');
 
                 ring.querySelectorAll('.seat-panel.targetable').forEach((el) => {
+                    if (el.classList.contains('seat-self')) return;
                     el.addEventListener('click', () => {
                         const user = el.getAttribute('data-user');
                         if (targetingMode === 'choice_target' && pendingChoiceId) {
@@ -588,9 +623,17 @@
                         render(state);
                     });
                 });
+                // Touch: tap toggles full-body when not targeting
                 ring.querySelectorAll('.seat-panel').forEach((el) => {
                     const uname = el.getAttribute('data-user');
-                    bindInspect(el, () => (state?.players || []).find((p) => p.username === uname), 'seat');
+                    if (!el.classList.contains('seat-self')) {
+                        bindInspect(el, () => (state?.players || []).find((p) => p.username === uname), 'seat');
+                    }
+                    el.addEventListener('pointerdown', (ev) => {
+                        if (ev.pointerType === 'touch' && !el.classList.contains('targetable')) {
+                            el.classList.toggle('seat-show-full');
+                        }
+                    });
                 });
                 if (inspectSourceEl && !document.body.contains(inspectSourceEl)) {
                     hideInspect();
@@ -680,41 +723,44 @@
                 ).join(' · ');
                 const sealedYou = you.skills_sealed ? ' · 非锁定技失效' : '';
                 document.getElementById('roleBox').innerHTML = role
-                    ? `${TBK.portraitHtml(role.role_id, role.role_name, 'self-art')}
-                        <div class="self-role-body">
-                        <div class="role-name">${role.role_name}</div>
-                        HP ${you.hp}/${mePublic.max_hp ?? you.hp} · 科技${you.tech_level ?? 1} · 上限${you.hand_limit ?? '—'}${sealedYou}
-                        <div class="hp-row">${hpPips(you.hp, mePublic.max_hp || you.hp)}</div>
+                    ? `<div class="role-name">${role.role_name}</div>
+                        <div class="role-line">HP ${you.hp}/${mePublic.max_hp ?? you.hp} · 科技${you.tech_level ?? 1} · 上限${you.hand_limit ?? '—'}${sealedYou}</div>
                         ${skillText ? `<div class="role-skills">${skillText}</div>` : ''}
-                        ${statusLines(mePublic.statuses)}
-                        </div>`
+                        ${statusLines(mePublic.statuses)}`
                     : '—';
 
                 const roleBox = document.getElementById('roleBox');
+                const selfCorner = document.querySelector('.seat-panel.seat-self');
                 const canPickSelfChoice = (targetingMode === 'choice_target' && !!pendingChoiceId)
                     || targetingMode === 'soap_heal';
-                roleBox.classList.toggle('selected-target', selectedTarget === username && canPickSelfChoice);
-                roleBox.style.cursor = canPickSelfChoice ? 'pointer' : '';
-                roleBox.onclick = canPickSelfChoice ? () => {
-                    if (targetingMode === 'soap_heal') {
-                        sock.send('game_action', { action: 'choose', target: username }, roomId);
-                        return;
-                    }
-                    sock.send('game_action', {
-                        action: 'choose',
-                        choice: pendingChoiceId,
-                        target: username,
-                    }, roomId);
-                    pendingChoiceId = null;
-                    targetingMode = null;
-                    selectedTarget = null;
-                } : null;
+                if (selfCorner) {
+                    selfCorner.classList.toggle('selected-target', selectedTarget === username && canPickSelfChoice);
+                    selfCorner.style.cursor = canPickSelfChoice ? 'pointer' : '';
+                    selfCorner.onclick = canPickSelfChoice ? (ev) => {
+                        ev.stopPropagation();
+                        if (targetingMode === 'soap_heal') {
+                            sock.send('game_action', { action: 'choose', target: username }, roomId);
+                            return;
+                        }
+                        sock.send('game_action', {
+                            action: 'choose',
+                            choice: pendingChoiceId,
+                            target: username,
+                        }, roomId);
+                        pendingChoiceId = null;
+                        targetingMode = null;
+                        selectedTarget = null;
+                    } : null;
+                }
 
                 document.getElementById('selfEquipBody').innerHTML =
                     equipLine(mePublic.equipment || you.equipment, 'ship')
                     + equipLine(mePublic.equipment || you.equipment, 'armor');
 
                 bindInspect(roleBox, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
+                if (selfCorner) {
+                    bindInspect(selfCorner, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
+                }
                 bindInspect(document.getElementById('selfEquip'), () => (state?.players || []).find((p) => p.username === username) || mePublic, 'equip');
 
                 const hand = you.hand || [];

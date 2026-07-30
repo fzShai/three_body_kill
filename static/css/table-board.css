@@ -23,6 +23,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 
 .board {
+    position: relative;
     display: grid;
     grid-template-rows: auto 1fr auto auto;
     min-width: 0;
@@ -32,6 +33,8 @@ body.shell-page.table-page::before { opacity: 0.28; }
     width: 100%;
     padding: 8px 12px 0;
     gap: 0;
+    --portrait-h: calc(min(100vw, 100vh) * 3 / 7);
+    --portrait-w: calc(var(--portrait-h) * 2 / 3);
 }
 
 /* —— Top bar —— */
@@ -100,25 +103,57 @@ body.shell-page.table-page::before { opacity: 0.28; }
     position: absolute;
     inset: 0;
     pointer-events: none;
+    z-index: 2;
+}
+.seat-ring .seat-panel {
+    pointer-events: auto;
 }
 
 .seat-panel {
     position: absolute;
-    width: 140px;
-    height: 180px;
+    width: var(--portrait-w);
+    height: var(--portrait-h);
+    max-height: min(var(--portrait-h), 42vh);
+    max-width: calc(min(var(--portrait-h), 42vh) * 2 / 3);
     padding: 0;
     border: 1px solid var(--line);
     background: var(--bg-panel);
     backdrop-filter: blur(6px);
     pointer-events: auto;
     cursor: default;
-    transform: translate(-50%, -50%);
     transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
     z-index: 2;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
+}
+.seat-panel.seat-corner {
+    transform: none;
+}
+.seat-panel.seat-corner--bl {
+    left: 1%;
+    bottom: 1%;
+    top: auto;
+    right: auto;
+}
+.seat-panel.seat-corner--tl {
+    left: 1%;
+    top: 1%;
+    bottom: auto;
+    right: auto;
+}
+.seat-panel.seat-corner--tr {
+    right: 1%;
+    top: 1%;
+    left: auto;
+    bottom: auto;
+}
+.seat-panel.seat-corner--br {
+    right: 1%;
+    bottom: 1%;
+    left: auto;
+    top: auto;
 }
 .seat-panel .portrait.seat-art {
     position: absolute;
@@ -127,28 +162,52 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 .seat-panel .portrait.seat-art img {
     width: 100%;
-    height: 100%;
+    height: 145%;
     object-fit: cover;
-    object-position: top center;
+    object-position: center 6%;
     display: block;
+    transition: height 0.22s ease, object-position 0.22s ease, object-fit 0.22s ease;
+}
+/* Hover / touch: reveal full body */
+.seat-panel:hover .portrait.seat-art img,
+.seat-panel.seat-show-full .portrait.seat-art img,
+.seat-panel:focus-within .portrait.seat-art img {
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+}
+.seat-panel:hover .portrait.holo-signal::before,
+.seat-panel.seat-show-full .portrait.holo-signal::before {
+    opacity: 0.55;
 }
 .seat-panel .seat-overlay {
     position: relative;
     z-index: 1;
-    padding: 28px 8px 8px;
+    padding: 36px 10px 10px;
     background: linear-gradient(
         180deg,
         transparent 0%,
-        rgba(5, 8, 15, 0.55) 28%,
-        rgba(5, 8, 15, 0.94) 100%
+        rgba(5, 8, 15, 0.45) 22%,
+        rgba(5, 8, 15, 0.92) 100%
     );
     min-height: 0;
 }
 .seat-panel.dead .portrait.seat-art img {
     filter: grayscale(0.85) brightness(0.7);
 }
+.seat-panel .seat-skills {
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--accent-ice-bright);
+    line-height: 1.35;
+}
+.badge-self {
+    font-size: 10px;
+    color: var(--accent-ice-bright);
+    margin-left: 6px;
+    letter-spacing: 0.08em;
+}
 .seat-panel.self-anchor {
-    /* self is rendered in bottom zone; ring only shows others */
     display: none;
 }
 .seat-panel.targetable {
@@ -282,10 +341,10 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 .stage.idle .stage-text { color: var(--ink-muted); }
 
-/* —— Self zone —— */
+/* —— Self zone (hand / equip / role text — portrait lives in BL corner) —— */
 .board-self {
     display: grid;
-    grid-template-columns: 200px 1fr 120px;
+    grid-template-columns: minmax(100px, 140px) 1fr 120px;
     gap: 10px;
     align-items: end;
     padding: 8px 4px 4px;
@@ -293,46 +352,40 @@ body.shell-page.table-page::before { opacity: 0.28; }
     border-top: 1px solid var(--line);
     background: linear-gradient(180deg, transparent 0%, rgba(4, 8, 14, 0.55) 40%);
     min-height: 0;
+    position: relative;
+    z-index: 3;
+    /* Keep hand clear of BL / BR corner portraits */
+    margin-left: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
+    margin-right: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
 }
-.self-role {
-    padding: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--accent-ice-glow);
+.self-meta {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    background: var(--bg-inset);
     font-size: 12px;
     line-height: 1.4;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    display: grid;
-    grid-template-columns: 72px 1fr;
-    min-height: 118px;
-    overflow: hidden;
-}
-.self-role.selected-target {
-    border-color: var(--accent-ice-bright);
-    box-shadow: 0 0 0 2px var(--accent-ice-dim);
-}
-.self-role .portrait.self-art {
-    position: relative;
-    min-height: 118px;
-    border-right: 1px solid var(--line);
-}
-.self-role .portrait.self-art img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: top center;
-    display: block;
-}
-.self-role-body {
-    padding: 10px 12px;
     min-width: 0;
 }
-.self-role .role-name {
+.self-meta .role-name {
     font-weight: 700;
     font-size: 14px;
     color: var(--accent-ice-bright);
     margin-bottom: 4px;
 }
-.self-role .hp-row { margin-top: 6px; }
+.self-meta .role-line {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+}
+.self-meta .role-skills {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ink-muted);
+}
+.self-role-body {
+    padding: 10px 12px;
+    min-width: 0;
+}
 
 /* Shared portrait empty frame */
 .portrait {
@@ -453,6 +506,8 @@ body.shell-page.table-page::before { opacity: 0.28; }
     background: rgba(6, 10, 16, 0.9);
     flex-shrink: 0;
     min-height: 52px;
+    margin-left: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
+    margin-right: min(var(--portrait-w), calc(min(var(--portrait-h), 42vh) * 2 / 3));
 }
 .action-bar .status {
     flex: 1 1 100%;
@@ -510,16 +565,16 @@ body.shell-page.table-page::before { opacity: 0.28; }
     margin-top: 2px;
 }
 .seat-panel .seat-st,
-.self-role .seat-st {
+.self-meta .seat-st {
     margin-top: 4px;
     font-size: 10px;
     line-height: 1.35;
     color: var(--ink-muted);
 }
 .seat-panel .seat-st .pos,
-.self-role .seat-st .pos { color: var(--ok); }
+.self-meta .seat-st .pos { color: var(--ok); }
 .seat-panel .seat-st .neg,
-.self-role .seat-st .neg { color: #c87878; }
+.self-meta .seat-st .neg { color: #c87878; }
 
 /* —— Inspect popover (hover details) ——
  * shell.css `body.shell-page > * { position: relative; z-index: 1 }` beats
@@ -581,7 +636,26 @@ body.shell-page.table-page > .inspect-panel {
     color: var(--ink-dim);
     font-size: 11px;
 }
-.inspect-muted { color: var(--ink-muted); }
+.inspect-portrait {
+    margin: 0 0 10px;
+    width: 100%;
+    max-width: 160px;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--bg-void-mid);
+}
+.inspect-portrait .portrait {
+    width: 100%;
+    height: 100%;
+}
+.inspect-portrait .portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+    display: block;
+}
 
 /* —— Mobile —— */
 @media (max-width: 800px) {
@@ -595,9 +669,10 @@ body.shell-page.table-page > .inspect-panel {
     .board {
         grid-template-rows: auto auto 1fr auto auto;
         height: auto;
-        min-height: 0;
+        min-height: 70vh;
         overflow: visible;
         padding-bottom: 0;
+        --portrait-h: calc(min(100vw, 100vh) * 2.4 / 7);
     }
     body.shell-page.table-page {
         height: auto;
@@ -609,7 +684,6 @@ body.shell-page.table-page > .inspect-panel {
         border-top: 1px solid var(--line-strong);
         order: 2;
     }
-    /* Keep soft halo on mobile; hide hard desk border */
     .table-felt {
         display: block;
         inset: 12% 4% 18%;
@@ -622,31 +696,24 @@ body.shell-page.table-page > .inspect-panel {
         flex-direction: column;
         gap: 10px;
         padding: 4px 0 8px;
-        min-height: auto;
+        min-height: 180px;
     }
     .seat-ring {
-        position: relative;
-        inset: auto;
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 4px 2px 8px;
-        pointer-events: auto;
+        position: absolute;
+        inset: 0;
+        display: block;
+        overflow: visible;
+        pointer-events: none;
     }
     .seat-panel {
-        position: relative;
-        transform: none;
-        left: auto !important;
-        top: auto !important;
-        flex-shrink: 0;
-        width: 124px;
-        height: 168px;
+        max-height: 36vh;
+        max-width: calc(min(36vh, var(--portrait-h)) * 2 / 3);
     }
     .stage {
         width: 100%;
         min-height: 100px;
         align-self: center;
+        z-index: 3;
     }
     .board-self {
         grid-template-columns: 1fr;
@@ -657,7 +724,9 @@ body.shell-page.table-page > .inspect-panel {
 }
 
 @media (min-width: 801px) and (max-height: 720px) {
-    .seat-panel { width: 124px; height: 156px; }
+    .board {
+        --portrait-h: calc(min(100vw, 100vh) * 2.6 / 7);
+    }
     .hand .card { width: 92px; min-height: 110px; margin-left: -32px; }
     .stage { min-height: 110px; }
 }

@@ -178,6 +178,8 @@ body.table-ended .ended-banner {
     inset: 0;
     z-index: 2;
     pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.22s ease;
     background-image:
         repeating-linear-gradient(
             0deg,

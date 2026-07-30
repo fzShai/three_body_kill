@@ -10,7 +10,7 @@ from typing import Any
 
 from game.engine import GameSession
 
-MAX_PLAYERS = 6
+MAX_PLAYERS = 4
 MIN_PLAYERS_TO_START = 2
 HOST_TRANSFER_SECONDS = 15
 

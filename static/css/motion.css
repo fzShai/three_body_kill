@@ -143,9 +143,9 @@ body.table-ended .ended-banner {
 /* —— Holographic phone signal (table portraits only) —— */
 @keyframes holo-idle {
     0%, 100% { transform: translate(0, 0) skewX(0deg); }
-    28% { transform: translate(0.6px, -0.9px) skewX(0.12deg); }
-    52% { transform: translate(-0.7px, 0.5px) skewX(-0.1deg); }
-    76% { transform: translate(0.4px, 0.7px) skewX(0.06deg); }
+    28% { transform: translate(2px, -2.5px) skewX(0.35deg); }
+    52% { transform: translate(-2.5px, 1.5px) skewX(-0.3deg); }
+    76% { transform: translate(1.5px, 2px) skewX(0.2deg); }
 }
 
 @keyframes holo-scan-sweep {
@@ -154,21 +154,21 @@ body.table-ended .ended-banner {
 }
 
 @keyframes holo-snow {
-    0%, 100% { opacity: 0.03; transform: translate(0, 0); }
-    40% { opacity: 0.055; transform: translate(-1%, 1%); }
-    70% { opacity: 0.025; transform: translate(1%, -1%); }
+    0%, 100% { opacity: 0.09; transform: translate(0, 0); }
+    40% { opacity: 0.14; transform: translate(-1.5%, 1%); }
+    70% { opacity: 0.07; transform: translate(1.5%, -1%); }
 }
 
 @keyframes holo-snow-bad {
-    0%, 100% { opacity: 0.12; transform: translate(0, 0); }
-    25% { opacity: 0.22; transform: translate(-2%, 1%); }
-    50% { opacity: 0.1; transform: translate(2%, -2%); }
-    75% { opacity: 0.2; transform: translate(-1%, 2%); }
+    0%, 100% { opacity: 0.16; transform: translate(0, 0); }
+    25% { opacity: 0.28; transform: translate(-2%, 1%); }
+    50% { opacity: 0.12; transform: translate(2%, -2%); }
+    75% { opacity: 0.24; transform: translate(-1%, 2%); }
 }
 
 .portrait.holo-signal img {
     will-change: transform;
-    animation: holo-idle 5.2s ease-in-out infinite;
+    animation: holo-idle 4s ease-in-out infinite;
 }
 
 /* Scanlines + slow laser sweep */
@@ -179,28 +179,26 @@ body.table-ended .ended-banner {
     z-index: 2;
     pointer-events: none;
     opacity: 1;
-    transition: opacity 0.22s ease;
     background-image:
         repeating-linear-gradient(
             0deg,
             transparent 0,
             transparent 2px,
-            rgba(8, 14, 22, 0.28) 2px,
-            rgba(8, 14, 22, 0.28) 3px
+            rgba(5, 10, 16, 0.45) 2px,
+            rgba(5, 10, 16, 0.45) 3px
         ),
         linear-gradient(
             180deg,
             transparent 0%,
-            rgba(122, 158, 176, 0.1) 48%,
+            rgba(155, 184, 200, 0.22) 48%,
             transparent 100%
         );
-    background-size: auto, 100% 28%;
+    background-size: auto, 100% 32%;
     background-repeat: repeat, no-repeat;
-    animation: holo-scan-sweep 7s linear infinite;
-    mix-blend-mode: soft-light;
+    animation: holo-scan-sweep 5.5s linear infinite;
 }
 
-/* Quiet signal snow (almost invisible in normal play) */
+/* Signal snow — visible but quiet */
 .portrait.holo-signal::after {
     content: '';
     position: absolute;
@@ -208,14 +206,14 @@ body.table-ended .ended-banner {
     z-index: 3;
     pointer-events: none;
     background-image:
-        radial-gradient(circle at 18% 22%, rgba(210, 225, 240, 0.55) 0 0.6px, transparent 1px),
-        radial-gradient(circle at 62% 48%, rgba(180, 200, 220, 0.45) 0 0.5px, transparent 1px),
-        radial-gradient(circle at 84% 16%, rgba(200, 220, 235, 0.4) 0 0.55px, transparent 1px),
-        radial-gradient(circle at 36% 78%, rgba(160, 185, 210, 0.5) 0 0.5px, transparent 1px),
-        radial-gradient(circle at 8% 64%, rgba(190, 210, 230, 0.35) 0 0.45px, transparent 1px),
-        radial-gradient(circle at 74% 88%, rgba(170, 195, 215, 0.4) 0 0.55px, transparent 1px);
-    background-size: 38px 42px, 52px 36px, 44px 48px, 60px 40px, 34px 50px, 48px 44px;
-    animation: holo-snow 3.4s steps(3) infinite;
+        radial-gradient(circle at 18% 22%, rgba(210, 225, 240, 0.7) 0 0.7px, transparent 1.2px),
+        radial-gradient(circle at 62% 48%, rgba(180, 200, 220, 0.55) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 84% 16%, rgba(200, 220, 235, 0.5) 0 0.65px, transparent 1.1px),
+        radial-gradient(circle at 36% 78%, rgba(160, 185, 210, 0.6) 0 0.6px, transparent 1.1px),
+        radial-gradient(circle at 8% 64%, rgba(190, 210, 230, 0.45) 0 0.55px, transparent 1px),
+        radial-gradient(circle at 74% 88%, rgba(170, 195, 215, 0.5) 0 0.65px, transparent 1.1px);
+    background-size: 34px 38px, 48px 32px, 40px 44px, 56px 36px, 30px 46px, 44px 40px;
+    animation: holo-snow 2.8s steps(3) infinite;
     mix-blend-mode: screen;
 }
 

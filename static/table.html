@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730c" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730c" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730i" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730i" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -188,7 +188,19 @@
                 inspectHideTimer = setTimeout(() => {
                     inspectHideTimer = null;
                     hideInspect();
-                }, 60);
+                }, 220);
+            }
+
+            function cancelHideInspect() {
+                if (inspectHideTimer) {
+                    clearTimeout(inspectHideTimer);
+                    inspectHideTimer = null;
+                }
+            }
+
+            if (inspectPanel) {
+                inspectPanel.onmouseenter = () => cancelHideInspect();
+                inspectPanel.onmouseleave = () => scheduleHideInspect();
             }
 
             function escHtml(s) {
@@ -277,10 +289,7 @@
             }
 
             function showInspect(anchorEl, player, mode) {
-                if (inspectHideTimer) {
-                    clearTimeout(inspectHideTimer);
-                    inspectHideTimer = null;
-                }
+                cancelHideInspect();
                 inspectSourceEl = anchorEl;
                 inspectPanel.innerHTML = buildInspectHtml(player, mode);
                 positionInspect(anchorEl);
@@ -623,17 +632,11 @@
                         render(state);
                     });
                 });
-                // Touch: tap toggles full-body when not targeting
                 ring.querySelectorAll('.seat-panel').forEach((el) => {
                     const uname = el.getAttribute('data-user');
                     if (!el.classList.contains('seat-self')) {
                         bindInspect(el, () => (state?.players || []).find((p) => p.username === uname), 'seat');
                     }
-                    el.addEventListener('pointerdown', (ev) => {
-                        if (ev.pointerType === 'touch' && !el.classList.contains('targetable')) {
-                            el.classList.toggle('seat-show-full');
-                        }
-                    });
                 });
                 if (inspectSourceEl && !document.body.contains(inspectSourceEl)) {
                     hideInspect();

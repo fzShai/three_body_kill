@@ -162,38 +162,26 @@ body.shell-page.table-page::before { opacity: 0.28; }
 }
 .seat-panel .portrait.seat-art img {
     width: 100%;
-    height: 145%;
-    object-fit: cover;
-    object-position: center 6%;
-    display: block;
-    transition: height 0.22s ease, object-position 0.22s ease, object-fit 0.22s ease;
-}
-/* Hover / touch: reveal full body */
-.seat-panel:hover .portrait.seat-art img,
-.seat-panel.seat-show-full .portrait.seat-art img,
-.seat-panel:focus-within .portrait.seat-art img {
     height: 100%;
-    object-fit: contain;
-    object-position: center bottom;
-}
-.seat-panel:hover .portrait.holo-signal::before,
-.seat-panel.seat-show-full .portrait.holo-signal::before {
-    opacity: 0.55;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+    filter: contrast(1.08) saturate(0.92);
 }
 .seat-panel .seat-overlay {
     position: relative;
     z-index: 1;
-    padding: 36px 10px 10px;
+    padding: 28px 10px 10px;
     background: linear-gradient(
         180deg,
         transparent 0%,
-        rgba(5, 8, 15, 0.45) 22%,
+        rgba(5, 8, 15, 0.35) 18%,
         rgba(5, 8, 15, 0.92) 100%
     );
     min-height: 0;
 }
 .seat-panel.dead .portrait.seat-art img {
-    filter: grayscale(0.85) brightness(0.7);
+    filter: grayscale(0.85) brightness(0.7) contrast(1.05);
 }
 .seat-panel .seat-skills {
     margin-top: 4px;
@@ -588,8 +576,8 @@ body.shell-page.table-page > .inspect-panel {
     cursor: help;
 }
 .inspect-panel {
-    width: min(300px, calc(100vw - 16px));
-    max-height: 50vh;
+    width: min(320px, calc(100vw - 16px));
+    max-height: 70vh;
     overflow-y: auto;
     padding: 12px 14px;
     border: 1px solid var(--line-strong);
@@ -597,7 +585,7 @@ body.shell-page.table-page > .inspect-panel {
     color: var(--ink);
     font-size: 12px;
     line-height: 1.45;
-    pointer-events: none;
+    pointer-events: auto;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 .inspect-panel[hidden] { display: none !important; }
@@ -637,10 +625,10 @@ body.shell-page.table-page > .inspect-panel {
     font-size: 11px;
 }
 .inspect-portrait {
-    margin: 0 0 10px;
+    margin: 0 0 12px;
     width: 100%;
-    max-width: 160px;
-    aspect-ratio: 2 / 3;
+    max-width: 220px;
+    height: 300px;
     overflow: hidden;
     border: 1px solid var(--line);
     background: var(--bg-void-mid);

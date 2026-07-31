@@ -541,15 +541,20 @@ body.shell-page.table-page::before { opacity: 0.28; }
     overflow: hidden;
     transform: translateY(var(--fan-lift, 0px)) rotate(var(--fan-rot, 0deg));
     transform-origin: bottom center;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-}
-.card.card-face {
-    position: relative;
+    box-shadow:
+        inset 3px 0 0 var(--rank-color, transparent),
+        0 6px 16px rgba(0, 0, 0, 0.35);
 }
 .hand .card:first-child { margin-left: 0; }
 .hand .card:hover,
 .hand .card.selected { z-index: 5; }
 .hand .card.dim { opacity: 0.35; cursor: not-allowed; z-index: 0; filter: grayscale(0.35); }
+.card.card-face {
+    position: relative;
+    box-shadow:
+        inset 3px 0 0 var(--rank-color, transparent),
+        0 6px 16px rgba(0, 0, 0, 0.35);
+}
 
 .card-face .card-top {
     display: flex;
@@ -561,13 +566,13 @@ body.shell-page.table-page::before { opacity: 0.28; }
     background: transparent;
 }
 .card-face .card-rank-pip {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     flex-shrink: 0;
     border-radius: 0;
     background: var(--rank-color, var(--ink-muted));
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-    opacity: 0.92;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+    opacity: 1;
 }
 .card-face .card-meta {
     font-family: var(--font-mono);
@@ -649,7 +654,10 @@ body.shell-page.table-page::before { opacity: 0.28; }
         ),
         linear-gradient(180deg, rgba(16, 20, 26, 0.98) 0%, rgba(8, 10, 14, 0.98) 100%) !important;
     border-color: rgba(120, 130, 140, 0.38) !important;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 6px 14px rgba(0, 0, 0, 0.4);
+    box-shadow:
+        inset 3px 0 0 var(--rank-color, transparent),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+        0 6px 14px rgba(0, 0, 0, 0.4);
 }
 .card-band-low .card-art {
     border-color: rgba(130, 140, 150, 0.28);
@@ -670,6 +678,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
         linear-gradient(180deg, rgba(14, 24, 38, 0.98) 0%, rgba(6, 12, 22, 0.98) 100%) !important;
     border-color: rgba(122, 168, 210, 0.32) !important;
     box-shadow:
+        inset 3px 0 0 var(--rank-color, transparent),
         inset 0 1px 0 rgba(180, 220, 255, 0.12),
         0 8px 18px rgba(0, 0, 0, 0.38);
 }
@@ -701,6 +710,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
         linear-gradient(180deg, rgba(12, 16, 24, 0.96) 0%, rgba(5, 8, 14, 0.99) 100%) !important;
     border-color: rgba(210, 220, 235, 0.22) !important;
     box-shadow:
+        inset 3px 0 0 var(--rank-color, transparent),
         inset 0 0 0 1px rgba(255, 255, 255, 0.04),
         0 10px 22px rgba(0, 0, 0, 0.42);
 }

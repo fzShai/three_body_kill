@@ -45,17 +45,37 @@
     return c.type || 'unknown';
   }
 
+  /** Mirror of pools.json tech_pool_max — client fallback from pool_entry. */
+  const TECH_POOL_MAX = { 1: 22, 2: 30, 3: 43, 4: 53, 5: 74, 6: 80 };
+
   function clampRank(n) {
     const v = Number(n);
     if (!Number.isFinite(v)) return 1;
     return Math.max(1, Math.min(6, Math.round(v)));
   }
 
-  /** Prefer server visual_tier; kill/dodge fall back to tier. */
+  function techForEntry(entry) {
+    const e = Number(entry);
+    if (!Number.isFinite(e) || e <= 0) return 1;
+    for (let t = 1; t <= 6; t += 1) {
+      if (e <= TECH_POOL_MAX[t]) return t;
+    }
+    return 6;
+  }
+
+  /**
+   * Kill/dodge → 阶 (visual_tier or tier).
+   * Others → visual_tier, else pool_entry→科等.
+   */
   function cardVisualTier(c) {
     if (!c) return 1;
+    const isKd = c.subtype === 'kill' || c.subtype === 'dodge';
+    if (isKd) {
+      if (c.visual_tier != null && c.visual_tier !== '') return clampRank(c.visual_tier);
+      return clampRank(c.tier || 1);
+    }
     if (c.visual_tier != null && c.visual_tier !== '') return clampRank(c.visual_tier);
-    if (c.subtype === 'kill' || c.subtype === 'dodge') return clampRank(c.tier || 1);
+    if (c.pool_entry != null && c.pool_entry !== '') return techForEntry(c.pool_entry);
     return 1;
   }
 

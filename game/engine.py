@@ -182,6 +182,7 @@ class GameSession:
             "subtype": card.get("subtype"),
             "tier": card.get("tier"),
             "visual_tier": visual,
+            "pool_entry": card.get("pool_entry"),
             "slot": card.get("slot"),
             "instance_id": card.get("instance_id"),
             "text": card.get("text"),
@@ -2560,8 +2561,13 @@ class GameSession:
         me = self.players.get(viewer)
         private_hand = deepcopy(me["hand"]) if me else []
         for c in private_hand:
-            if isinstance(c, dict) and c.get("visual_tier") is None:
+            if isinstance(c, dict):
                 self.draw_sys.stamp_visual_tier(c)
+        # Keep live hand in sync so subsequent actions see stamped tiers
+        if me:
+            for c in me["hand"]:
+                if isinstance(c, dict):
+                    self.draw_sys.stamp_visual_tier(c)
         private_role = None
         if me:
             private_role = {

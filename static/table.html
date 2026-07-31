@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730m" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730m" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260730n" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730n" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -20,6 +20,10 @@
                 · 弃牌堆 <span id="discardCount">0</span>
                 · 倒计时 <span id="turnTimer">—</span>
             </div>
+            <div class="meta-actions">
+                <button class="btn btn-outline btn-compact" id="logToggle" type="button" aria-expanded="false" aria-controls="logDrawer">战报</button>
+                <a class="btn btn-outline btn-compact" href="/lobby" id="backLobbyLink">回大厅</a>
+            </div>
         </header>
 
         <div class="seat-ring" id="seatRing"></div>
@@ -31,14 +35,11 @@
                 <div id="stageCardSlot"></div>
                 <div class="stage-text" id="stageText">等待对局</div>
                 <div class="stage-sub" id="stageSub"></div>
+                <div class="recent-log" id="recentLog" aria-live="polite"></div>
             </div>
         </div>
 
         <section class="board-self">
-            <div class="self-equip" id="selfEquip">
-                <h3>装备</h3>
-                <div id="selfEquipBody">—</div>
-            </div>
             <div class="self-hand-wrap">
                 <div class="mode-hint" id="modeHint"></div>
                 <div class="hand" id="hand"></div>
@@ -64,12 +65,12 @@
         </div>
     </div>
 
-    <aside class="log-panel">
-        <h2>战报</h2>
-        <div class="log" id="log"></div>
-        <div class="log-panel-foot">
-            <a class="btn btn-outline" href="/lobby" id="backLobbyLink">回大厅</a>
+    <aside class="log-drawer" id="logDrawer" hidden>
+        <div class="log-drawer-head">
+            <h2>战报</h2>
+            <button class="btn btn-outline btn-compact" id="logClose" type="button">收起</button>
         </div>
+        <div class="log" id="log"></div>
     </aside>
     </div>
 
@@ -579,6 +580,10 @@
                     ? [...order.slice(myIdx), ...order.slice(0, myIdx)]
                     : order.slice();
                 const slots = seatCornerSlots(rotated.length);
+                document.querySelector('.board')?.classList.toggle(
+                    'has-br',
+                    slots.some((s) => s && s.corner === 'br'),
+                );
                 const playersByName = Object.fromEntries((snap.players || []).map((p) => [p.username, p]));
                 const legal = (() => {
                     if (targetingMode === 'action') return legalTargets(snap, 'action', null);
@@ -760,14 +765,9 @@
                     } : null;
                 }
 
-                document.getElementById('selfEquipBody').innerHTML =
-                    equipLine(mePublic.equipment || you.equipment, 'ship')
-                    + equipLine(mePublic.equipment || you.equipment, 'armor');
-
                 if (selfCorner) {
                     bindInspect(selfCorner, () => (state?.players || []).find((p) => p.username === username) || mePublic, 'role');
                 }
-                bindInspect(document.getElementById('selfEquip'), () => (state?.players || []).find((p) => p.username === username) || mePublic, 'equip');
 
                 const fieldBar = document.getElementById('fieldBar');
                 if (fieldBar) {
@@ -1016,7 +1016,15 @@
                 setHidden(document.getElementById('dyingPassBtn'), !myDying);
                 document.getElementById('dyingPassBtn').disabled = !myDying;
 
-                document.getElementById('log').innerHTML = (snap.log || []).slice().reverse().map((l) => `<div>${l}</div>`).join('');
+                const logLines = snap.log || [];
+                document.getElementById('log').innerHTML = logLines.slice().reverse().map((l) => `<div>${escHtml(l)}</div>`).join('');
+                const recentEl = document.getElementById('recentLog');
+                if (recentEl) {
+                    const recent = logLines.slice(-3);
+                    recentEl.innerHTML = recent.length
+                        ? recent.map((l) => `<div class="recent-log-line">${escHtml(l)}</div>`).join('')
+                        : '';
+                }
             }
 
             function clearSelection() {
@@ -1161,6 +1169,22 @@
                 sock.send('game_action', { action: 'recast', instance_id: selectedId }, roomId);
                 selectedId = null;
                 selectedTarget = null;
+            });
+
+            const logDrawer = document.getElementById('logDrawer');
+            const logToggle = document.getElementById('logToggle');
+            function setLogOpen(open) {
+                setHidden(logDrawer, !open);
+                if (logToggle) logToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+            logToggle?.addEventListener('click', () => {
+                setLogOpen(logDrawer?.hasAttribute('hidden'));
+            });
+            document.getElementById('logClose')?.addEventListener('click', () => setLogOpen(false));
+            document.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Escape' && logDrawer && !logDrawer.hasAttribute('hidden')) {
+                    setLogOpen(false);
+                }
             });
 
             document.getElementById('backLobbyLink')?.addEventListener('click', () => {

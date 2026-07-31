@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260731a" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260731a" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260731d" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260731d" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -18,16 +18,6 @@
                 房号 <span id="roomIdDisplay"></span>
                 · 阶段 <span id="phaseLabel">—</span>
                 · 倒计时 <span id="turnTimer">—</span>
-            </div>
-            <div class="pile-row" aria-hidden="true">
-                <div class="pile deck-pile" id="deckPile" title="科技牌堆">
-                    <span>牌堆</span>
-                    <span class="pile-count" id="deckCount">∞</span>
-                </div>
-                <div class="pile discard-pile" id="discardPile" title="弃牌堆">
-                    <span>弃牌</span>
-                    <span class="pile-count" id="discardCount">0</span>
-                </div>
             </div>
             <div class="meta-actions">
                 <button class="btn btn-outline btn-compact sfx-toggle" id="sfxToggle" type="button" title="音效开关">音效</button>
@@ -41,11 +31,21 @@
         <div class="board-arena">
             <div class="table-felt" aria-hidden="true"></div>
             <div class="field-bar" id="fieldBar" hidden>场地：无</div>
-            <div class="stage idle" id="stage">
-                <div id="stageCardSlot"></div>
-                <div class="stage-text" id="stageText">等待对局</div>
-                <div class="stage-sub" id="stageSub"></div>
-                <div class="recent-log" id="recentLog" aria-live="polite"></div>
+            <div class="stage-row">
+                <div class="pile deck-pile" id="deckPile" title="科技牌堆" aria-hidden="true">
+                    <span>牌堆</span>
+                    <span class="pile-count" id="deckCount">∞</span>
+                </div>
+                <div class="stage idle" id="stage">
+                    <div id="stageCardSlot"></div>
+                    <div class="stage-text" id="stageText">等待对局</div>
+                    <div class="stage-sub" id="stageSub"></div>
+                    <div class="recent-log" id="recentLog" aria-live="polite"></div>
+                </div>
+                <div class="pile discard-pile" id="discardPile" title="弃牌堆" aria-hidden="true">
+                    <span>弃牌</span>
+                    <span class="pile-count" id="discardCount">0</span>
+                </div>
             </div>
         </div>
 

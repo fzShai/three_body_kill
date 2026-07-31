@@ -66,10 +66,9 @@ body.shell-page.table-page::before { opacity: 0.28; }
         rgba(5, 8, 15, 0.55) 70%,
         transparent 100%
     );
-    backdrop-filter: blur(6px);
+    /* no backdrop-filter: seat-ring is absolute under this header; blur frosts opponent faces */
     pointer-events: none;
 }
-.board-top .pile-row,
 .board-top .meta-actions {
     pointer-events: auto;
 }
@@ -651,14 +650,24 @@ body.shell-page.table-page::before { opacity: 0.28; }
 .card-compact .card-art { display: none; }
 .card-compact .ctext { display: none; }
 
-/* Pile anchors */
-.pile-row {
+/* Stage row: piles flank the center stage; field-bar stays free above */
+.stage-row {
+    position: relative;
+    z-index: 3;
     display: flex;
-    gap: 10px;
+    align-items: center;
     justify-content: center;
-    align-items: flex-end;
-    margin-top: 4px;
-    pointer-events: auto;
+    gap: 14px;
+    width: 100%;
+    max-width: min(560px, 92%);
+    margin: 0 auto;
+    padding-top: 28px; /* clear field-bar */
+}
+.stage-row .stage {
+    flex: 0 1 auto;
+}
+.stage-row .pile {
+    flex-shrink: 0;
 }
 .pile {
     width: 56px;

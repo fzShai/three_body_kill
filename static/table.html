@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260730n" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260730n" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260731a" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260731a" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -17,10 +17,20 @@
             <div class="meta">
                 房号 <span id="roomIdDisplay"></span>
                 · 阶段 <span id="phaseLabel">—</span>
-                · 弃牌堆 <span id="discardCount">0</span>
                 · 倒计时 <span id="turnTimer">—</span>
             </div>
+            <div class="pile-row" aria-hidden="true">
+                <div class="pile deck-pile" id="deckPile" title="科技牌堆">
+                    <span>牌堆</span>
+                    <span class="pile-count" id="deckCount">∞</span>
+                </div>
+                <div class="pile discard-pile" id="discardPile" title="弃牌堆">
+                    <span>弃牌</span>
+                    <span class="pile-count" id="discardCount">0</span>
+                </div>
+            </div>
             <div class="meta-actions">
+                <button class="btn btn-outline btn-compact sfx-toggle" id="sfxToggle" type="button" title="音效开关">音效</button>
                 <button class="btn btn-outline btn-compact" id="logToggle" type="button" aria-expanded="false" aria-controls="logDrawer">战报</button>
                 <a class="btn btn-outline btn-compact" href="/lobby" id="backLobbyLink">回大厅</a>
             </div>
@@ -75,8 +85,18 @@
     </div>
 
     <div class="inspect-panel" id="inspectPanel" hidden></div>
+    <div class="card-tip" id="cardTip" hidden></div>
+    <div class="guide-banner" id="guideBanner" hidden>
+        <p><strong>操作提示</strong>：点选手牌 → 需要时再点座位选目标 → 点「出牌」。弃牌阶段可多选后弃置。规则见 <a href="/codex" style="color:var(--accent-ice-bright)">图鉴</a>。</p>
+        <div class="guide-actions">
+            <button class="btn btn-outline btn-compact" id="guideDismiss" type="button">知道了</button>
+        </div>
+    </div>
 
     <script src="/static/app.js?v=20260730j"></script>
+    <script src="/static/js/card-markup.js?v=20260731a"></script>
+    <script src="/static/js/fx-audio.js?v=20260731a"></script>
+    <script src="/static/js/fx-queue.js?v=20260731a"></script>
     <script>
         const username = TBK.requireLogin();
         const roomId = TBK.roomIdFromPathOrQuery();
@@ -95,8 +115,80 @@
             let uiMode = 'play'; // play | discard | tech_discard
             let turnDeadlineMs = null;
             let lastStageKey = '';
+            let knownHandIds = new Set();
+            let handBootstrapped = false;
             const statusMsg = document.getElementById('statusMsg');
             const turnTimerEl = document.getElementById('turnTimer');
+            const cardTip = document.getElementById('cardTip');
+            const fxQueue = new TBK.FxQueue({
+                username,
+                getCardMarkup: (c, opts) => TBK.cardMarkup(c, opts),
+            });
+
+            function syncSfxToggle() {
+                const btn = document.getElementById('sfxToggle');
+                if (!btn || !TBK.sfx) return;
+                const on = TBK.sfx.isEnabled();
+                btn.textContent = on ? '音效开' : '音效关';
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            }
+            syncSfxToggle();
+            document.getElementById('sfxToggle')?.addEventListener('click', () => {
+                if (!TBK.sfx) return;
+                TBK.sfx.setEnabled(!TBK.sfx.isEnabled());
+                syncSfxToggle();
+                if (TBK.sfx.isEnabled()) TBK.sfx.play('play');
+            });
+
+            function maybeShowGuide() {
+                try {
+                    if (localStorage.getItem('tbk_guide_v1') === '1') return;
+                } catch (e) { return; }
+                const banner = document.getElementById('guideBanner');
+                if (banner) banner.hidden = false;
+            }
+            document.getElementById('guideDismiss')?.addEventListener('click', () => {
+                const banner = document.getElementById('guideBanner');
+                if (banner) banner.hidden = true;
+                try { localStorage.setItem('tbk_guide_v1', '1'); } catch (e) { /* ignore */ }
+            });
+            maybeShowGuide();
+
+            function showCardTip(el, card) {
+                if (!cardTip || !card) return;
+                cardTip.innerHTML = `<div class="tip-name">${escHtml(card.name || '')}</div>
+                    <div class="tip-type">${escHtml(TBK.cardTypeLabel(card))}</div>
+                    <div class="tip-text">${escHtml(card.text || '无额外说明')}</div>`;
+                cardTip.hidden = false;
+                const r = el.getBoundingClientRect();
+                const tipW = 240;
+                let left = r.left + r.width / 2 - tipW / 2;
+                left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+                let top = r.top - 12;
+                cardTip.style.left = `${left}px`;
+                cardTip.style.width = `${tipW}px`;
+                // place above if space, else below
+                requestAnimationFrame(() => {
+                    const h = cardTip.offsetHeight || 80;
+                    const y = r.top - h - 10;
+                    cardTip.style.top = `${y < 8 ? r.bottom + 8 : y}px`;
+                });
+            }
+            function hideCardTip() {
+                if (cardTip) cardTip.hidden = true;
+            }
+
+            function captureHandRects(instanceIds) {
+                const out = {};
+                (instanceIds || []).forEach((id) => {
+                    if (!id) return;
+                    const el = document.querySelector(`#hand .card[data-id="${CSS.escape(id)}"]`);
+                    if (!el) return;
+                    const r = el.getBoundingClientRect();
+                    out[id] = { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+                });
+                return out;
+            }
 
             function setStatus(text, kind) {
                 statusMsg.textContent = text || '';
@@ -109,15 +201,8 @@
                 else el.removeAttribute('hidden');
             }
 
-            const SLOT_LABEL = {
-                stellar_track: '恒星航迹',
-                stability_system: '维稳系统',
-                ship: '船',
-                armor: '甲',
-                temp_ascend: '临时飞升',
-            };
-
-            const TEMP_ASCEND_IDS = new Set(['nano_center', 'chip_workshop', 'stars_plan']);
+            const SLOT_LABEL = TBK.SLOT_LABEL;
+            const TEMP_ASCEND_IDS = TBK.TEMP_ASCEND_IDS;
 
             function needsOtherTarget(card) {
                 const ids = new Set([
@@ -316,14 +401,7 @@
             }
 
             function cardTypeLabel(c) {
-                if (!c) return '';
-                if (c.subtype === 'kill') return `${c.tier || '?'}阶杀`;
-                if (c.subtype === 'dodge') return `${c.tier || '?'}阶闪`;
-                if (c.subtype === 'heal') return `桃 · 回复${c.heal || 2}`;
-                if (c.subtype === 'visitor') return '基本 · 天外来客';
-                if (TEMP_ASCEND_IDS.has(c.id) || c.slot === 'temp_ascend') return '临时飞升';
-                if (c.type === 'equipment') return `装备 · ${SLOT_LABEL[c.slot] || c.slot || ''}`;
-                return c.type || '牌';
+                return TBK.cardTypeLabel(c);
             }
 
             function syncUiMode(snap) {
@@ -560,8 +638,8 @@
                 else if (!st.kind || st.kind === 'idle') stageEl.classList.add('idle');
 
                 if (st.card && st.card.name) {
-                    const enter = key !== lastStageKey ? ' stage-enter' : '';
-                    stageCardSlot.innerHTML = `<div class="stage-card${enter}"><div class="cname">${st.card.name}</div><div class="ctype">${cardTypeLabel(st.card)}</div></div>`;
+                    const enter = key !== lastStageKey ? ' stage-enter stage-card' : ' stage-card';
+                    stageCardSlot.innerHTML = TBK.cardMarkup(st.card, { compact: true, extraClass: enter });
                 } else {
                     stageCardSlot.innerHTML = '';
                 }
@@ -658,6 +736,10 @@
                 syncUiMode(snap);
                 syncTargetingFromSelection(snap);
                 document.getElementById('discardCount').textContent = snap.discard_count ?? 0;
+                const deckCountEl = document.getElementById('deckCount');
+                if (deckCountEl) {
+                    deckCountEl.textContent = snap.deck_count == null ? '∞' : String(snap.deck_count);
+                }
                 const phaseMap = { turn: '回合', prompt: '响应', dying: '濒死', ended: '结束' };
                 const tp = snap.turn_phase ? ({ draw: '摸牌', play: '出牌', discard: '弃牌' }[snap.turn_phase] || snap.turn_phase) : '';
                 document.getElementById('phaseLabel').textContent = (phaseMap[snap.phase] || snap.phase) + (tp ? '/' + tp : '');
@@ -791,34 +873,45 @@
                 const hand = you.hand || [];
                 const handEl = document.getElementById('hand');
                 const multiSelect = uiMode === 'discard' || uiMode === 'tech_discard' || needsConfirmCards;
-                handEl.innerHTML = hand.map((c) => {
-                    let dim = '';
+                const fanTotal = hand.length;
+                handEl.innerHTML = hand.map((c, i) => {
+                    let dim = false;
                     const ptype = prompt && prompt.type;
                     if (myConfirm || isChoice || isSoapPrompt) {
-                        dim = needsConfirmCards ? '' : 'dim';
+                        dim = !needsConfirmCards;
                     } else if (ptype === 'interrupt_trick' || ptype === 'respond_toxic') {
                         const ok = c.id === 'thought_stamp' || c.id === 'return_motion'
                             || (ptype === 'respond_toxic' && (c.subtype === 'kill' || c.id === 'thought_stamp'));
-                        dim = ok ? '' : 'dim';
+                        dim = !ok;
                     } else if (ptype === 'respond_dodge') {
-                        dim = c.subtype === 'dodge' ? '' : 'dim';
+                        dim = c.subtype !== 'dodge';
                     } else if (isPrompt) {
-                        dim = 'dim';
+                        dim = true;
                     }
-                    if (isDying) dim = (c.subtype === 'heal' || c.id === 'peach') ? '' : 'dim';
-                    if (uiMode === 'tech_discard' && !isBasic(c)) dim = 'dim';
+                    if (isDying) dim = !(c.subtype === 'heal' || c.id === 'peach');
+                    if (uiMode === 'tech_discard' && !isBasic(c)) dim = true;
                     const selected = multiSelect
                         ? selectedIds.has(c.instance_id)
                         : (selectedId === c.instance_id || discardCostId === c.instance_id);
-                    return `<div class="card card-lift ${selected ? 'selected' : ''} ${dim}" data-id="${c.instance_id}" data-subtype="${c.subtype || ''}" data-card-id="${c.id || ''}">
-                        <div class="cname">${c.name}</div>
-                        <div class="ctype">${cardTypeLabel(c)}</div>
-                        <div class="ctext">${c.text || ''}</div>
-                    </div>`;
+                    const isNew = handBootstrapped && !knownHandIds.has(c.instance_id);
+                    return TBK.cardMarkup(c, {
+                        selected,
+                        dim,
+                        fanIndex: i,
+                        fanTotal,
+                        extraClass: isNew ? 'card-enter' : '',
+                    });
                 }).join('') || '<div style="color:rgba(255,255,255,0.25);font-size:13px;padding:20px;">无手牌</div>';
+                knownHandIds = new Set(hand.map((c) => c.instance_id));
+                handBootstrapped = true;
 
                 handEl.querySelectorAll('.card').forEach((el) => {
+                    const id = el.getAttribute('data-id');
+                    const card = hand.find((c) => c.instance_id === id);
+                    el.addEventListener('mouseenter', () => showCardTip(el, card));
+                    el.addEventListener('mouseleave', hideCardTip);
                     el.addEventListener('click', () => {
+                        hideCardTip();
                         if (el.classList.contains('dim')) return;
                         const id = el.getAttribute('data-id');
                         if (uiMode === 'discard') {
@@ -1088,14 +1181,22 @@
             sock.on('game_state', (msg) => {
                 if (msg.room_id && msg.room_id !== roomId) return;
                 setStatus('');
-                const handIds = new Set((msg.payload?.you?.hand || []).map((c) => c.instance_id));
+                const payload = msg.payload || {};
+                const events = payload.events || [];
+                const fromRects = captureHandRects(
+                    events
+                        .filter((e) => (e.type === 'play' || e.type === 'discard') && e.instance_id)
+                        .map((e) => e.instance_id),
+                );
+                const handIds = new Set((payload.you?.hand || []).map((c) => c.instance_id));
                 if (selectedId && !handIds.has(selectedId)) selectedId = null;
                 selectedIds = new Set([...selectedIds].filter((id) => handIds.has(id)));
-                const names = new Set((msg.payload?.players || []).map((p) => p.username));
+                const names = new Set((payload.players || []).map((p) => p.username));
                 if (selectedTarget && !names.has(selectedTarget) && selectedTarget !== username) {
                     selectedTarget = null;
                 }
-                render(msg.payload);
+                render(payload);
+                if (events.length) fxQueue.enqueue(events, { fromRects });
             });
             sock.on('game_started', () => sock.send('get_game_state', {}, roomId));
             sock.on('_open', () => sock.send('get_game_state', {}, roomId));

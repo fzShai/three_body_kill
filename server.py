@@ -253,8 +253,10 @@ async def _broadcast_game_state(room) -> None:
     if room is None or room.game is None:
         return
     for p in room.players:
-        snap = room.game.snapshot_for(p.username)
+        snap = room.game.snapshot_for(p.username, with_events=True)
         await ws_hub.send_to(p.username, make_message("game_state", snap, room_id=room.room_id, seq=snap["seq"]))
+    if hasattr(room.game, "flush_events"):
+        room.game.flush_events()
 
 
 @app.get("/")
@@ -557,7 +559,7 @@ async def _handle_ws_message(username: str, data: dict[str, Any]) -> None:
         if not room or not room.game:
             await ws_hub.send_to(username, make_message("error", {"message": "对局不存在"}))
             return
-        snap = room.game.snapshot_for(username)
+        snap = room.game.snapshot_for(username, with_events=False)
         await ws_hub.send_to(username, make_message("game_state", snap, room_id=room.room_id, seq=snap["seq"]))
         return
 

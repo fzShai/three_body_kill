@@ -64,6 +64,8 @@ def discard_from_target(session: Any, target: str, n: int) -> int:
             break
         card = hand.pop(random.randrange(len(hand)))
         session.discard.append(card)
+        if hasattr(session, "_emit_discard"):
+            session._emit_discard(target, card)
         session._log(f"{target} 被弃置 {card.get('name')}")
         taken += 1
     return taken
@@ -133,7 +135,10 @@ def play_curtain(session: Any, username: str, card: dict[str, Any], _target: str
     session.discard.append(card)
     cleared = clear_negative_statuses(session, username)
     drawn = session.draw_sys.draw_n(session.players[username]["tech_level"], 1)
-    session.players[username]["hand"].extend(drawn)
+    if hasattr(session, "_give_drawn"):
+        session._give_drawn(username, drawn)
+    else:
+        session.players[username]["hand"].extend(drawn)
     session._log(f"{username} 使用帷幕：清除 {cleared} 个负面，摸 {len(drawn)} 张")
     return True, f"清除负面并摸 {len(drawn)} 张"
 
@@ -156,7 +161,10 @@ def play_red_coast(session: Any, username: str, card: dict[str, Any], _target: s
     if p.get("red_coast_used"):
         return False, "红岸计划每回合限一次"
     drawn = session.draw_sys.draw_n(p["tech_level"], 2)
-    p["hand"].extend(drawn)
+    if hasattr(session, "_give_drawn"):
+        session._give_drawn(username, drawn)
+    else:
+        p["hand"].extend(drawn)
     p["red_coast_used"] = True
     session.discard.append(card)
     session._log(f"{username} 使用红岸计划，摸 {len(drawn)} 张")
@@ -350,6 +358,8 @@ def play_dual_vector(session: Any, username: str, card: dict[str, Any], target: 
     else:
         dmg = final_true_damage(3, int(src.get("damage_bonus", 0)) + field_bonus_damage(session))
     t["hp"] -= dmg
+    if dmg > 0 and hasattr(session, "_emit"):
+        session._emit("damage", source=username, target=target, value=dmg, reason="true")
     msg = f"{target} 受到 {dmg} 点真实伤害（HP {t['hp']}）"
     if t["hp"] <= 0:
         msg += "，" + session._begin_dying(target)
@@ -445,9 +455,20 @@ def play_killer_52(session: Any, username: str, card: dict[str, Any], target: st
             session._log(f"{helper} 摸到杀，将对 {target} 立即结算")
         else:
             session.players[helper]["hand"].append(drawn)
+            if hasattr(session, "_emit"):
+                session._emit(
+                    "draw",
+                    source=helper,
+                    count=1,
+                    cards=[session._card_pub(drawn)] if hasattr(session, "_card_pub") else None,
+                    instance_ids=[drawn.get("instance_id")],
+                )
             session._log(f"{helper} 摸到 {drawn.get('name')}，加入手牌")
     self_draw = session.draw_sys.draw_one(session.players[username]["tech_level"])
-    session.players[username]["hand"].append(self_draw)
+    if hasattr(session, "_give_drawn"):
+        session._give_drawn(username, self_draw)
+    else:
+        session.players[username]["hand"].append(self_draw)
     session._log(f"{username} Killer.5.2：自己摸到 {self_draw.get('name')}")
     if pending_kills:
         session.killer_queue = pending_kills
@@ -480,16 +501,25 @@ def play_dx3906(session: Any, username: str, card: dict[str, Any], target: str |
     session.discard.append(card)
     taken = thand.pop(random.randrange(len(thand)))
     me = session.players[username]
-    me["hand"].append(taken)
+    if hasattr(session, "_give_drawn"):
+        session._give_drawn(username, taken)
+    else:
+        me["hand"].append(taken)
     bits = [f"获得 {taken.get('name')}"]
     if session._is_basic_card(taken):
         drawn = session.draw_sys.draw_one(me["tech_level"])
-        me["hand"].append(drawn)
+        if hasattr(session, "_give_drawn"):
+            session._give_drawn(username, drawn)
+        else:
+            me["hand"].append(drawn)
         bits.append(f"基本牌：再摸 {drawn.get('name')}")
     elif taken.get("type") == "equipment" or taken.get("slot") in {"ship", "armor", "temp_ascend"}:
         dumped = list(me["hand"])
         me["hand"] = []
         session.discard.extend(dumped)
+        for c in dumped:
+            if hasattr(session, "_emit_discard"):
+                session._emit_discard(username, c)
         bits.append(f"装备：弃光手牌（{len(dumped)}）")
     else:
         # trick / field

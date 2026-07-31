@@ -150,12 +150,15 @@ class GameSession:
         self.field_multiplier: int = 1
         self.trisolaris_era: str | None = None
         self._pending_trick: dict[str, Any] | None = None
+        self._events: list[dict[str, Any]] = []
         self._deal_initial()
         self.phase = "turn"
         self.turn_phase = "draw"
         self._run_draw_phase()
         self._start_turn_timer()
         self._log(f"对局开始，先手：{self.current_player()}")
+        # Opening deal/draw should not animate on first connect
+        self._events.clear()
 
     @classmethod
     def create(cls, room_id: str, player_names: list[str]) -> GameSession:
@@ -165,6 +168,81 @@ class GameSession:
         self.log.append(text)
         if len(self.log) > 100:
             self.log = self.log[-100:]
+
+    def _card_pub(self, card: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not card:
+            return None
+        return {
+            "id": card.get("id"),
+            "name": card.get("name"),
+            "type": card.get("type"),
+            "subtype": card.get("subtype"),
+            "tier": card.get("tier"),
+            "slot": card.get("slot"),
+            "instance_id": card.get("instance_id"),
+            "text": card.get("text"),
+            "heal": card.get("heal"),
+        }
+
+    def _emit(self, type_: str, **kwargs: Any) -> None:
+        ev: dict[str, Any] = {"type": type_, "seq": self.seq}
+        for key, val in kwargs.items():
+            if val is not None:
+                ev[key] = val
+        self._events.append(ev)
+
+    def _events_for_viewer(self, viewer: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for raw in self._events:
+            ev = dict(raw)
+            if ev.get("type") == "draw" and ev.get("source") != viewer:
+                ev["cards"] = None
+                ev["hidden"] = True
+            out.append(ev)
+        return out
+
+    def flush_events(self) -> None:
+        self._events.clear()
+
+    def _give_drawn(
+        self,
+        username: str,
+        cards: list[dict[str, Any]] | dict[str, Any],
+        *,
+        emit: bool = True,
+    ) -> list[dict[str, Any]]:
+        if isinstance(cards, dict):
+            cards = [cards]
+        cards = list(cards)
+        if not cards:
+            return []
+        self.players[username]["hand"].extend(cards)
+        if emit:
+            self._emit(
+                "draw",
+                source=username,
+                count=len(cards),
+                cards=[self._card_pub(c) for c in cards],
+                instance_ids=[c.get("instance_id") for c in cards],
+            )
+        return cards
+
+    def _emit_play(self, username: str, card: dict[str, Any], target: str | None = None) -> None:
+        self._emit(
+            "play",
+            source=username,
+            target=target,
+            card=self._card_pub(card),
+            instance_id=card.get("instance_id"),
+        )
+
+    def _emit_discard(self, username: str, card: dict[str, Any]) -> None:
+        self._emit(
+            "discard",
+            source=username,
+            card=self._card_pub(card),
+            instance_id=card.get("instance_id"),
+        )
 
     def _set_stage(
         self,
@@ -298,7 +376,7 @@ class GameSession:
         for name in self.player_order:
             tech = self.players[name]["tech_level"]
             cards = self.draw_sys.draw_n(tech, 6)
-            self.players[name]["hand"].extend(cards)
+            self._give_drawn(name, cards, emit=False)
             self._log(f"{name} 开局摸 6 张")
 
     def _run_draw_phase(self) -> None:
@@ -311,7 +389,7 @@ class GameSession:
             n += 1
         n += int(p.get("extra_draw", 0))
         drawn = self.draw_sys.draw_n(p["tech_level"], n)
-        p["hand"].extend(drawn)
+        self._give_drawn(name, drawn)
         self.turn_phase = "play"
         p["kills_used_this_turn"] = 0
         p["red_coast_used"] = False
@@ -333,7 +411,7 @@ class GameSession:
                 "implemented": True,
                 "text": "量子号补给：三阶杀。",
             }
-            p["hand"].append(kill)
+            self._give_drawn(name, kill)
             self._log(f"{name} 量子号：获得一张三阶杀")
         self._log(f"{name} 摸牌阶段摸了 {len(drawn)} 张")
 
@@ -453,6 +531,7 @@ class GameSession:
         while len(p["hand"]) > limit:
             card = p["hand"].pop()
             self.discard.append(card)
+            self._emit_discard(username, card)
             self._log(f"{username} 弃置 {card.get('name')}")
 
     # --- status helpers (kept for compatibility) ---
@@ -463,6 +542,7 @@ class GameSession:
         if kind not in STATUS_KINDS or self._has_status(username, status_id):
             return False
         self.players[username]["statuses"].append({"id": status_id, "name": name, "kind": kind})
+        self._emit("status", target=username, status_id=status_id, name=name, kind=kind)
         return True
 
     def _remove_status(self, username: str, status_id: str) -> bool:
@@ -531,8 +611,9 @@ class GameSession:
         if accept and self.players[username]["alive"]:
             p = self.players[username]
             p["hp"] -= 1
+            self._emit("damage", source=username, target=username, value=1, reason="wander")
             drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-            p["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 发动【流浪】：失去 1 体力，摸 {len(drawn)} 张（HP {p['hp']}）")
             if p["hp"] <= 0:
                 if after == "conclude_turn":
@@ -665,7 +746,7 @@ class GameSession:
             self._run_draw_phase()
             if self.trisolaris_era == "stable":
                 extra = self.draw_sys.draw_n(self.players[nxt]["tech_level"], 1)
-                self.players[nxt]["hand"].extend(extra)
+                self._give_drawn(nxt, extra)
                 self._log(f"恒纪元：{nxt} 额外摸 1 张")
             self._start_turn_timer()
             self._log(f"轮到 {nxt}")
@@ -684,6 +765,13 @@ class GameSession:
             p["damage_bonus"] += 1
         elif choice == "cyber":
             p["damage_reduction"] += 1
+        self._emit(
+            "ascension",
+            target=username,
+            ascension=choice,
+            name=labels[choice],
+            permanent=True,
+        )
         self._log(f"{username} 科技达到 6，获得{labels[choice]}")
 
     def _clear_temp_ascend_statuses(self, username: str) -> None:
@@ -709,6 +797,7 @@ class GameSession:
                 self._unequip_slot(username, slot, to_discard=True)
         self._clear_temp_ascend_statuses(username)
         t["statuses"] = []
+        self._emit("die", target=username, source=killer)
         self._trigger_red_shore(username, killer)
 
     def _trigger_red_shore(self, victim: str, killer: str | None) -> None:
@@ -717,12 +806,12 @@ class GameSession:
             if not p.get("alive") or not skill_active(p, SKILL_RED_SHORE):
                 continue
             drawn = self.draw_sys.draw_n(p["tech_level"], 1)
-            p["hand"].extend(drawn)
+            self._give_drawn(name, drawn)
             self._heal(name, 1)
             self._log(f"{name} 【红岸】：因 {victim} 死亡摸1回1")
             if killer and killer == name and killer != victim:
                 drawn2 = self.draw_sys.draw_n(p["tech_level"], 1)
-                p["hand"].extend(drawn2)
+                self._give_drawn(name, drawn2)
                 self._heal(name, 1)
                 self._log(f"{name} 【红岸】击杀加成：再摸1回1")
 
@@ -780,6 +869,7 @@ class GameSession:
         if ghost_hp > 0 and final > 0 and source != target:
             ghost_dmg = int(final) + 1
             t["quantum_ghost_hp"] = max(0, ghost_hp - ghost_dmg)
+            self._emit("damage", source=source, target=target, value=ghost_dmg, reason="quantum_ghost")
             self._log(f"{target} 量子幽灵替身承受 {ghost_dmg}（剩余 {t['quantum_ghost_hp']}）")
             if t["quantum_ghost_hp"] <= 0:
                 self._unequip_slot(target, "armor", to_discard=True)
@@ -788,6 +878,8 @@ class GameSession:
 
         final = self._incoming_damage(target, final, true_dmg=False)
         t["hp"] -= final
+        if final > 0:
+            self._emit("damage", source=source, target=target, value=final)
         msg = f"{target} 受到 {final} 点最终伤害（HP {t['hp']}）"
         src = self.players.get(source)
         if src and src.get("swordholder_ready") and final > 0 and source != target:
@@ -805,6 +897,8 @@ class GameSession:
             self._remove_status(target, STATUS_CRADLE)
             s = self.players[source]
             s["hp"] -= reflect
+            if reflect > 0:
+                self._emit("damage", source=target, target=source, value=reflect, reason="cradle")
             self._log(f"{target} 摇篮反弹 {reflect} 点给 {source}（HP {s['hp']}）")
             if s["hp"] <= 0:
                 self._begin_dying(source, source=target)
@@ -819,6 +913,7 @@ class GameSession:
             and src.get("alive")
         ):
             src["hp"] -= 1
+            self._emit("damage", source=target, target=source, value=1, reason="wallfacer")
             self._log(f"{target} 【面壁者】：{source} 扣 1 点体力（HP {src['hp']}）")
             if src["hp"] <= 0:
                 self._begin_dying(source, source=target)
@@ -835,8 +930,12 @@ class GameSession:
 
     def _heal(self, username: str, amount: int) -> None:
         p = self.players[username]
+        before = int(p["hp"])
         bonus = 1 if p.get("deep_sea") and not p.get("vision_exposed") else 0
         p["hp"] = min(p["max_hp"], p["hp"] + amount + bonus)
+        gained = int(p["hp"]) - before
+        if gained > 0:
+            self._emit("heal", target=username, value=gained)
 
     def _begin_dying(self, victim: str, *, source: str | None = None) -> str:
         self.phase = "dying"
@@ -849,6 +948,7 @@ class GameSession:
             to_name=victim,
             text=f"{victim} 濒死 · 求桃",
         )
+        self._emit("dying", target=victim, source=source)
         self._log(f"{victim} 进入濒死")
         self._start_turn_timer()
         return f"{victim} 濒死"
@@ -859,8 +959,13 @@ class GameSession:
         if peach_idx is not None:
             card = p["hand"].pop(peach_idx)
             heal = int(card.get("heal", 2))
+            before = int(p["hp"])
             p["hp"] = min(p["max_hp"], max(1, p["hp"] + heal))
+            gained = int(p["hp"]) - before
             self.discard.append(card)
+            self._emit_play(victim, card, victim)
+            if gained > 0:
+                self._emit("heal", target=victim, value=gained)
             self._log(f"{victim} 濒死强制使用 {card.get('name')}，HP {p['hp']}")
             self.dying = None
             self.phase = "turn"
@@ -876,9 +981,13 @@ class GameSession:
         if p.get("death_immortal") or self._has_status(victim, STATUS_DEATH_IMMORTAL):
             self._remove_status(victim, STATUS_DEATH_IMMORTAL)
             p["death_immortal"] = False
+            before = int(p["hp"])
             p["hp"] = min(p["max_hp"], max(1, p["hp"] + 2))
+            gained = int(p["hp"]) - before
+            if gained > 0:
+                self._emit("heal", target=victim, value=gained)
             drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-            p["hand"].extend(drawn)
+            self._give_drawn(victim, drawn)
             self.dying = None
             self.phase = "turn"
             self._log(f"{victim} 死神永生：回2摸{len(drawn)}并移除状态（HP {p['hp']}）")
@@ -959,6 +1068,7 @@ class GameSession:
                 return False, "手牌中没有这张牌"
             card = hand.pop(idx)
             self.discard.append(card)
+            self._emit_discard(username, card)
             self._log(f"{username} 弃置 {card.get('name')}")
             self.refresh_turn_timer()
             self.seq += 1
@@ -1014,8 +1124,13 @@ class GameSession:
             hand.pop(idx)
             heal = int(card.get("heal", 2))
             v = self.players[victim]
+            before = int(v["hp"])
             v["hp"] = min(v["max_hp"], max(1, v["hp"] + heal))
+            gained = int(v["hp"]) - before
             self.discard.append(card)
+            self._emit_play(username, card, victim)
+            if gained > 0:
+                self._emit("heal", target=victim, value=gained)
             self.dying = None
             self.phase = "turn"
             if username == victim:
@@ -1071,6 +1186,8 @@ class GameSession:
         remove_ids = set(ids)
         self.players[username]["hand"] = [c for c in hand if c["instance_id"] not in remove_ids]
         self.discard.extend(cards)
+        for card in cards:
+            self._emit_discard(username, card)
         self._raise_tech(username, 1)
         names = "、".join(c.get("name", "?") for c in cards)
         self._log(f"{username} 弃置 4 张基本牌（{names}）升科技至 {self.players[username]['tech_level']}")
@@ -1090,6 +1207,14 @@ class GameSession:
         notes = apply_equip_bonuses(self.players[username], card, equipping=True)
         self.discard.append(card)
         note = f"（{', '.join(notes)}）" if notes else ""
+        self._emit(
+            "ascension",
+            target=username,
+            ascension=cid,
+            name=name,
+            permanent=False,
+            card=self._card_pub(card),
+        )
         self._log(f"{username} 获得临时飞升：{name}{note}")
         return True, f"获得临时飞升：{name}"
 
@@ -1183,7 +1308,7 @@ class GameSession:
             self.discard.append(old)
         if old.get("id") == "tang" or old.get("ship_id") == "tang":
             drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-            p["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 唐号离场：摸 {len(drawn)} 张")
         if notes:
             self._log(f"{username} 卸下 {old.get('name')}（{', '.join(notes)}）")
@@ -1201,7 +1326,7 @@ class GameSession:
         notes = apply_equip_bonuses(p, card, equipping=True)
         if card.get("id") == "tang" or card.get("ship_id") == "tang":
             drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-            p["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 唐号入场：摸 {len(drawn)} 张")
         label = SLOT_LABELS.get(slot, slot)
         note = f"（{', '.join(notes)}）" if notes else ""
@@ -1211,6 +1336,13 @@ class GameSession:
             from_name=username,
             to_name=username,
             text=f"{username} 装备 {card.get('name')}",
+        )
+        self._emit(
+            "equip",
+            source=username,
+            target=username,
+            card=self._card_pub(card),
+            slot=slot,
         )
         self._log(f"{username} 装备[{label}] {card.get('name')}{note}")
         return True, f"已装备 {card.get('name')}"
@@ -1232,8 +1364,9 @@ class GameSession:
             return False, "该牌有合法打法，不能重铸"
         hand.pop(idx)
         self.discard.append(card)
+        self._emit_discard(username, card)
         drawn = self.draw_sys.draw_one(self.players[username]["tech_level"])
-        hand.append(drawn)
+        self._give_drawn(username, drawn)
         self._log(f"{username} 重铸了 {card.get('name')}")
         self.refresh_turn_timer()
         self.seq += 1
@@ -1262,6 +1395,7 @@ class GameSession:
                 hand.insert(idx, card)
                 self._pending_deterrence_target = None
                 return False, msg
+            self._emit_play(username, card, target)
             self._on_card_used(username)
             self.refresh_turn_timer()
             self.seq += 1
@@ -1285,6 +1419,7 @@ class GameSession:
             heal = int(card.get("heal", 2))
             self._heal(username, heal)
             self.discard.append(card)
+            self._emit_play(username, card, username)
             self._set_stage(
                 "heal",
                 card=card,
@@ -1308,6 +1443,7 @@ class GameSession:
                 self.players[username]["deterrence_extra_target"] = False
                 self._log(f"{username} 威慑在天外来客上消耗（无额外目标）")
             self.discard.append(card)
+            self._emit_play(username, card)
             self._set_stage(
                 "basic",
                 card=card,
@@ -1330,6 +1466,7 @@ class GameSession:
 
         if cid == "ladder_plan":
             if self._needs_trick_interrupt(username, card):
+                self._emit_play(username, card, target)
                 self._open_trick_interrupt(username, card, target, action)
                 self.refresh_turn_timer()
                 self.seq += 1
@@ -1338,6 +1475,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._emit_play(username, card, target)
             self._on_card_used(username)
             self._maybe_native_repeat_instant(username, card, target=target, kind="ladder")
             self.refresh_turn_timer()
@@ -1346,6 +1484,7 @@ class GameSession:
 
         if cid == "ball_lightning":
             if self._needs_trick_interrupt(username, card):
+                self._emit_play(username, card, target)
                 self._open_trick_interrupt(username, card, target, action)
                 self.refresh_turn_timer()
                 self.seq += 1
@@ -1354,6 +1493,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._emit_play(username, card, target)
             self._on_card_used(username)
             self._maybe_native_repeat_instant(username, card, target=target, kind="ball_lightning")
             self.refresh_turn_timer()
@@ -1366,6 +1506,7 @@ class GameSession:
                 return False, "该牌只能在响应窗口打出"
             if self._needs_trick_interrupt(username, card):
                 # keep card out; store pending
+                self._emit_play(username, card, target)
                 self._open_trick_interrupt(username, card, target, action)
                 self.refresh_turn_timer()
                 self.seq += 1
@@ -1376,6 +1517,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._emit_play(username, card, target)
             self._on_card_used(username)
             self._after_trick_settled(username, card, target, action)
             self.refresh_turn_timer()
@@ -1385,6 +1527,7 @@ class GameSession:
         if is_temp_ascend_card(card):
             # 纳米等：卡面「可被思想钢印响应」
             if self._needs_trick_interrupt(username, card):
+                self._emit_play(username, card, target)
                 self._open_trick_interrupt(username, card, target, action)
                 self.refresh_turn_timer()
                 self.seq += 1
@@ -1393,6 +1536,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._emit_play(username, card, username)
             self._on_card_used(username)
             self.refresh_turn_timer()
             self.seq += 1
@@ -1405,6 +1549,7 @@ class GameSession:
             if not ok:
                 hand.insert(idx, card)
                 return False, msg
+            self._emit_play(username, card, username)
             if p["tech_level"] != tech_before:
                 self._on_tech_changed(username, tech_before, p["tech_level"])
             self._on_card_used(username)
@@ -1479,7 +1624,7 @@ class GameSession:
         elif kind == "red_coast":
             p = self.players[username]
             drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-            p["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 【土著】：红岸计划再结算一次，摸 {len(drawn)} 张")
         elif kind == "ball_lightning" and target:
             if target in self.players and self.players[target]["alive"]:
@@ -1494,13 +1639,13 @@ class GameSession:
         elif kind == "curtain":
             cleared = clear_negative_statuses(self, username)
             drawn = self.draw_sys.draw_n(self.players[username]["tech_level"], 1)
-            self.players[username]["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 【土著】：帷幕再结算一次，清除 {cleared} 个负面，摸 {len(drawn)} 张")
         elif kind == "guzheng_plan" and choice:
             p = self.players[username]
             if choice == "draw2":
                 drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-                p["hand"].extend(drawn)
+                self._give_drawn(username, drawn)
                 self._log(f"{username} 【土著】：古筝再结算一次，摸 {len(drawn)} 张")
             elif choice == "heal2":
                 self._heal(username, 2)
@@ -1753,7 +1898,7 @@ class GameSession:
             choice_target: str | None = None
             if choice == "draw2":
                 drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-                p["hand"].extend(drawn)
+                self._give_drawn(username, drawn)
                 self._log(f"{username} 古筝：摸 {len(drawn)} 张")
             elif choice == "heal2":
                 self._heal(username, 2)
@@ -1857,7 +2002,7 @@ class GameSession:
             p = self.players[username]
             if choice == "draw2":
                 drawn = self.draw_sys.draw_n(p["tech_level"], 2)
-                p["hand"].extend(drawn)
+                self._give_drawn(username, drawn)
                 self._log(f"{username} 计划的一部分：摸 {len(drawn)} 张")
             else:
                 src = str(self.prompt.get("from") or "")
@@ -1904,6 +2049,8 @@ class GameSession:
                 return False, "只能打出思想钢印或回归运动"
             hand.pop(idx)
             ok, msg = TRICK_HANDLERS[cid](self, username, card, None, action)
+            if ok:
+                self._emit_play(username, card)
             self.seq += 1
             return ok, msg
         return False, "无效打断行动"
@@ -1927,6 +2074,7 @@ class GameSession:
             if card.get("subtype") == "kill" or card.get("id") == "thought_stamp":
                 hand.pop(idx)
                 self.discard.append(card)
+                self._emit_play(username, card)
                 self.prompt["nullified"] = True
                 self._log(f"{username} 用{card.get('name')}响应剧毒之水")
                 self._resolve_interrupt_or_toxic()
@@ -2118,7 +2266,7 @@ class GameSession:
         p["cards_used_this_turn"] = int(p.get("cards_used_this_turn") or 0) + 1
         if p["cards_used_this_turn"] % 4 == 0:
             drawn = self.draw_sys.draw_n(p["tech_level"], 1)
-            p["hand"].extend(drawn)
+            self._give_drawn(username, drawn)
             self._log(f"{username} 太阳系观测单元：使用4张牌，摸1张")
 
     def _on_basic_played(self, username: str, card: dict[str, Any]) -> None:
@@ -2134,10 +2282,12 @@ class GameSession:
             buf = list(hp.get("black_hole_enemy_basics") or [])
             buf.append(deepcopy(card))
             if len(buf) >= 3:
+                copies = []
                 for src in buf[:3]:
                     copy = deepcopy(src)
                     copy["instance_id"] = f"blackhole-{self.seq}-{src.get('instance_id')}"
-                    hp["hand"].append(copy)
+                    copies.append(copy)
+                self._give_drawn(holder, copies)
                 hp["black_hole_enemy_basics"] = []
                 self._remove_status(holder, STATUS_BLACK_HOLE)
                 self._log(f"{holder} 黑洞：获得敌方3张基本牌复制，状态移除")
@@ -2279,6 +2429,7 @@ class GameSession:
                 return False, "闪的阶数不足以响应此杀"
             hand.pop(idx)
             self.discard.append(card)
+            self._emit_play(username, card)
             self._log(f"{username} 打出{card.get('name')}，响应成功")
             self._finish_kill_prompt(dodged=True)
             self.seq += 1
@@ -2397,7 +2548,7 @@ class GameSession:
             )
         return out
 
-    def snapshot_for(self, viewer: str) -> dict[str, Any]:
+    def snapshot_for(self, viewer: str, *, with_events: bool = True) -> dict[str, Any]:
         me = self.players.get(viewer)
         private_hand = deepcopy(me["hand"]) if me else []
         private_role = None
@@ -2421,6 +2572,7 @@ class GameSession:
             "players": [self.public_player_view(n) for n in self.player_order],
             "deck_count": None,
             "discard_count": len(self.discard),
+            "events": self._events_for_viewer(viewer) if with_events else [],
             "log": self.log[-16:],
             "winner": self.winner,
             "winner_faction": self.winner_faction,

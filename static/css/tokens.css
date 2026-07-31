@@ -34,6 +34,17 @@
     --ok: #6a9e88;
     --ok-dim: rgba(106, 158, 136, 0.18);
 
+    /* Card type accents */
+    --card-kill: #c45a5a;
+    --card-dodge: #6a9eb8;
+    --card-heal: #6a9e88;
+    --card-visitor: #b89a5a;
+    --card-trick: #8a7ab0;
+    --card-equip: #7a9a78;
+    --card-ascend: #c9a45a;
+    --card-realm: #5a8a9e;
+    --card-field: #9a7a6a;
+
     /* Type */
     --font-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

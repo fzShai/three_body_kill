@@ -553,6 +553,26 @@ class GameSession:
             self.phase = "turn"
             self.refresh_turn_timer()
 
+    def _end_play_phase(self, username: str) -> tuple[bool, str]:
+        """Leave play phase: skip discard when hand is within limit."""
+        limit = hand_limit(self.players[username]["max_hp"])
+        if len(self.players[username]["hand"]) <= limit:
+            self._log(f"{username} 无需弃牌，跳过弃牌阶段")
+            self._conclude_turn(username)
+            self._check_win()
+            self.seq += 1
+            return True, "无需弃牌，回合结束"
+        self.turn_phase = "discard"
+        self._set_stage(
+            "discard",
+            from_name=username,
+            text=f"{username} 弃牌阶段",
+        )
+        self._log(f"{username} 进入弃牌阶段")
+        self.refresh_turn_timer()
+        self.seq += 1
+        return True, "进入弃牌阶段"
+
     def _conclude_turn(self, username: str) -> None:
         """End-of-turn skills then advance. May pause for wander."""
         p = self.players[username]
@@ -913,24 +933,11 @@ class GameSession:
             return False, "你已离线"
 
         if act == "end_play":
-            self.turn_phase = "discard"
-            self._set_stage(
-                "discard",
-                from_name=username,
-                text=f"{username} 弃牌阶段",
-            )
-            self._log(f"{username} 进入弃牌阶段")
-            self.refresh_turn_timer()
-            self.seq += 1
-            return True, "进入弃牌阶段"
+            return self._end_play_phase(username)
 
         if act == "discard_done" or act == "pass":
             if self.turn_phase == "play":
-                self.turn_phase = "discard"
-                self._log(f"{username} 进入弃牌阶段")
-                self.refresh_turn_timer()
-                self.seq += 1
-                return True, "进入弃牌阶段"
+                return self._end_play_phase(username)
             if self.turn_phase != "discard":
                 return False, "现在不是弃牌阶段"
             limit = hand_limit(self.players[username]["max_hp"])
@@ -1139,8 +1146,8 @@ class GameSession:
         if subtype == "heal" or cid == "peach":
             return True
         if subtype == "visitor" or cid == "visitor":
-            # 凝聚：天外来客可重铸 —— 对「有合法打法」判定仍为 True，重铸处单独放行
-            return True
+            # 满级无合法打法 → 可重铸；未满级时凝聚仍可破例重铸
+            return int(self.players[username].get("tech_level", 1)) < 6
         if cid == "ball_lightning":
             return self._card_implemented(card) and bool(self._alive_others(username))
         if cid == "ladder_plan" or cid == "red_coast":
@@ -1294,6 +1301,9 @@ class GameSession:
             return True, f"回复至 {self.players[username]['hp']} HP"
 
         if subtype == "visitor" or cid == "visitor":
+            if int(self.players[username].get("tech_level", 1)) >= 6:
+                hand.insert(idx, card)
+                return False, "科技已满级，可将本牌重铸"
             if self.players[username].get("deterrence_extra_target"):
                 self.players[username]["deterrence_extra_target"] = False
                 self._log(f"{username} 威慑在天外来客上消耗（无额外目标）")

@@ -28,7 +28,13 @@ FIELD_IDS = {
 }
 
 STATUS_TRICK_IDS = frozenset(
-    {STATUS_PLAN_PART, STATUS_BLACK_HOLE, STATUS_MICRO_UNIVERSE, STATUS_DEATH_IMMORTAL}
+    {
+        STATUS_PLAN_PART,
+        STATUS_BLACK_HOLE,
+        STATUS_MICRO_UNIVERSE,
+        STATUS_DEATH_IMMORTAL,
+        STATUS_CRADLE,
+    }
 )
 
 
@@ -298,10 +304,9 @@ def play_zeroing(session: Any, username: str, card: dict[str, Any], _target: str
 
 
 def play_cradle(session: Any, username: str, card: dict[str, Any], _target: str | None, _action: dict) -> tuple[bool, str]:
-    session.discard.append(card)
     if session._has_status(username, STATUS_CRADLE):
-        session._log(f"{username} 使用摇篮：已有摇篮，不可叠加")
-        return True, "摇篮不可叠加（已存在）"
+        return False, "已有摇篮，可将本牌重铸"
+    session.discard.append(card)
     session._apply_status(username, STATUS_CRADLE, "摇篮", "positive")
     session._log(f"{username} 使用摇篮：获得反伤（≤3）")
     return True, "获得摇篮"

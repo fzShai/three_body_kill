@@ -114,6 +114,19 @@ def main() -> None:
     assert ok, msg
     assert g.players[cur]["tech_level"] == 2
 
+    # 科技满级：天外来客不可打出，可重铸
+    g.players[cur]["tech_level"] = 6
+    g.phase = "turn"
+    g.turn_phase = "play"
+    g.prompt = None
+    vis_full = {**visitor, "instance_id": "vis-full"}
+    _give(g.players[cur], vis_full)
+    ok, msg = g.apply_action(cur, {"action": "play_card", "instance_id": "vis-full"})
+    assert not ok and "满级" in msg, msg
+    ok, msg = g.apply_action(cur, {"action": "recast", "instance_id": "vis-full"})
+    assert ok, msg
+    g.players[cur]["tech_level"] = 2
+
     # kill -> dodge response
     kg = GameSession.create("KILL", ["cara", "dan"])
     _clear_prompt_to_turn(kg)
@@ -198,24 +211,26 @@ def main() -> None:
     assert owen["hp"] == 2
     ok, msg = vg.apply_action("nora", {"action": "end_play"})
     assert ok, msg
-    limit_n = max(0, nora["max_hp"] - 2)
-    while len(nora["hand"]) > limit_n:
-        card = nora["hand"][0]
-        ok, msg = vg.apply_action("nora", {"action": "discard_card", "instance_id": card["instance_id"]})
+    if vg.current_player() == "nora" and vg.turn_phase == "discard":
+        limit_n = max(0, nora["max_hp"] - 2)
+        while len(nora["hand"]) > limit_n:
+            card = nora["hand"][0]
+            ok, msg = vg.apply_action("nora", {"action": "discard_card", "instance_id": card["instance_id"]})
+            assert ok, msg
+        ok, msg = vg.apply_action("nora", {"action": "discard_done"})
         assert ok, msg
-    ok, msg = vg.apply_action("nora", {"action": "discard_done"})
-    assert ok, msg
     assert vg.current_player() == "owen"
     assert owen["vision_exposed"] is True
     ok, msg = vg.apply_action("owen", {"action": "end_play"})
     assert ok, msg
-    limit_o = max(0, owen["max_hp"] - 2)
-    while len(owen["hand"]) > limit_o:
-        card = owen["hand"][0]
-        ok, msg = vg.apply_action("owen", {"action": "discard_card", "instance_id": card["instance_id"]})
+    if vg.current_player() == "owen" and vg.turn_phase == "discard":
+        limit_o = max(0, owen["max_hp"] - 2)
+        while len(owen["hand"]) > limit_o:
+            card = owen["hand"][0]
+            ok, msg = vg.apply_action("owen", {"action": "discard_card", "instance_id": card["instance_id"]})
+            assert ok, msg
+        ok, msg = vg.apply_action("owen", {"action": "discard_done"})
         assert ok, msg
-    ok, msg = vg.apply_action("owen", {"action": "discard_done"})
-    assert ok, msg
     assert owen["vision_exposed"] is False
 
     # illegal recast / privacy
@@ -359,10 +374,21 @@ def main() -> None:
     eg = GameSession.create("END", ["kate", "liam"])
     _blank_skills(eg, "kate", "liam")
     cur = eg.current_player()
-    ok, msg = eg.apply_action(cur, {"action": "discard_done"})
-    assert ok and eg.turn_phase == "discard", msg
     p = eg.players[cur]
     p["max_hp"] = 4
+    p["hand"] = [
+        {
+            "id": "peach",
+            "name": "桃",
+            "type": "basic",
+            "subtype": "heal",
+            "heal": 2,
+            "instance_id": f"pad-{i}",
+        }
+        for i in range(5)
+    ]
+    ok, msg = eg.apply_action(cur, {"action": "discard_done"})
+    assert ok and eg.turn_phase == "discard", msg
     extras = [
         {
             "id": "peach",
@@ -382,6 +408,21 @@ def main() -> None:
         assert ok, msg
     ok, msg = eg.apply_action(cur, {"action": "discard_done"})
     assert ok, msg
+
+    # 无需弃牌时跳过弃牌阶段
+    skip = GameSession.create("SKIP_DISC", ["sk1", "sk2"])
+    _blank_skills(skip, "sk1", "sk2")
+    skip.turn_index = skip.player_order.index("sk1")
+    skip.phase = "turn"
+    skip.turn_phase = "play"
+    skip.players["sk1"]["max_hp"] = 5
+    skip.players["sk1"]["hand"] = [
+        {"id": "peach", "name": "桃", "type": "basic", "subtype": "heal", "instance_id": "sk-p"}
+    ]
+    ok, msg = skip.apply_action("sk1", {"action": "end_play"})
+    assert ok and "无需弃牌" in msg, msg
+    assert skip.current_player() == "sk2"
+    assert skip.turn_phase != "discard" or skip.current_player() != "sk1"
 
     tg = GameSession.create("TECH", ["mona", "neil"])
     _blank_skills(tg, "mona", "neil")
@@ -415,8 +456,9 @@ def main() -> None:
     _give(gy.players["guan"])
     ok, msg = gy.apply_action("guan", {"action": "end_play"})
     assert ok, msg
-    ok, msg = gy.apply_action("guan", {"action": "discard_done"})
-    assert ok, msg
+    if gy.turn_phase == "discard" and gy.current_player() == "guan":
+        ok, msg = gy.apply_action("guan", {"action": "discard_done"})
+        assert ok, msg
     assert gy.phase == "prompt" and gy.prompt and gy.prompt.get("type") == "wander_draw"
     conf = gy.prompt.get("confirm") or {}
     assert conf.get("accept_action") == "wander_accept"
@@ -615,6 +657,10 @@ def main() -> None:
     eqn.turn_index = eqn.player_order.index("eq")
     eqn.phase = "turn"
     eqn.turn_phase = "play"
+    eqn.prompt = None
+    eqn._pending_trick = None
+    for n in eqn.player_order:
+        eqn.players[n]["hand"] = []
     micro = {
         "id": "micro_universe",
         "name": "小宇宙",
@@ -708,8 +754,9 @@ def main() -> None:
     _give(bl.players["seer"])
     ok, msg = bl.apply_action("seer", {"action": "end_play"})
     assert ok, msg
-    ok, msg = bl.apply_action("seer", {"action": "discard_done"})
-    assert ok, msg
+    if bl.turn_phase == "discard" and bl.current_player() == "seer":
+        ok, msg = bl.apply_action("seer", {"action": "discard_done"})
+        assert ok, msg
     assert bl.current_player() == "target"
     tech_before = bl.players["target"]["tech_level"]
     _give(bl.players["target"])
@@ -717,8 +764,9 @@ def main() -> None:
     bl.turn_phase = "play"
     ok, msg = bl.apply_action("target", {"action": "end_play"})
     assert ok, msg
-    ok, msg = bl.apply_action("target", {"action": "discard_done"})
-    assert ok, msg
+    if bl.turn_phase == "discard" and bl.current_player() == "target":
+        ok, msg = bl.apply_action("target", {"action": "discard_done"})
+        assert ok, msg
     assert bl.players["target"]["tech_level"] == max(1, tech_before - 1)
     assert not (bl.prompt and bl.prompt.get("type") == "wander_draw")
     assert not any(s["id"] == "skills_sealed" for s in bl.players["target"]["statuses"])
@@ -772,6 +820,22 @@ def main() -> None:
 
     ok, msg = _trick(tg, "t1", {"id": "cradle", "name": "摇篮", "type": "trick", "implemented": True, "instance_id": "cr1"})
     assert ok and any(s["id"] == "cradle" for s in tg.players["t1"]["statuses"]), msg
+
+    # 已有摇篮：不可再打，可重铸
+    ok, msg = _trick(tg, "t1", {"id": "cradle", "name": "摇篮", "type": "trick", "implemented": True, "instance_id": "cr2"})
+    assert not ok and "重铸" in msg, msg
+    tg.phase = "turn"
+    tg.turn_phase = "play"
+    tg.prompt = None
+    tg._pending_trick = None
+    for n in tg.player_order:
+        tg.players[n]["hand"] = []
+    tg.players["t1"]["hand"] = [
+        {"id": "cradle", "name": "摇篮", "type": "trick", "implemented": True, "instance_id": "cr-recast"}
+    ]
+    ok, msg = tg.apply_action("t1", {"action": "recast", "instance_id": "cr-recast"})
+    assert ok, msg
+    assert any(s["id"] == "cradle" for s in tg.players["t1"]["statuses"])
 
     max_before = tg.players["t1"]["max_hp"]
     ok, msg = _trick(tg, "t1", {"id": "hibernation", "name": "冬眠", "type": "trick", "implemented": True, "instance_id": "hi1"})

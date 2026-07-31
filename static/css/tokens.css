@@ -34,16 +34,24 @@
     --ok: #6a9e88;
     --ok-dim: rgba(106, 158, 136, 0.18);
 
-    /* Card type accents */
-    --card-kill: #c45a5a;
-    --card-dodge: #6a9eb8;
-    --card-heal: #6a9e88;
-    --card-visitor: #b89a5a;
-    --card-trick: #8a7ab0;
-    --card-equip: #7a9a78;
-    --card-ascend: #c9a45a;
-    --card-realm: #5a8a9e;
-    --card-field: #9a7a6a;
+    /* Card type accents — muted; rank pip carries the strong color cue */
+    --card-kill: #a87878;
+    --card-dodge: #7a9aab;
+    --card-heal: #7a9a88;
+    --card-visitor: #a89870;
+    --card-trick: #8a82a0;
+    --card-equip: #7a9080;
+    --card-ascend: #a89870;
+    --card-realm: #6a8a98;
+    --card-field: #908070;
+
+    /* Visual tier rank colors (浅标) */
+    --rank-1: #d8e0e8;
+    --rank-2: #6aaa7a;
+    --rank-3: #5a8ec8;
+    --rank-4: #9a72c0;
+    --rank-5: #d09048;
+    --rank-6: #c05050;
 
     /* Type */
     --font-ui: 'IBM Plex Sans', 'Segoe UI', sans-serif;

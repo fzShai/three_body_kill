@@ -543,6 +543,9 @@ body.shell-page.table-page::before { opacity: 0.28; }
     transform-origin: bottom center;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
+.card.card-face {
+    position: relative;
+}
 .hand .card:first-child { margin-left: 0; }
 .hand .card:hover,
 .hand .card.selected { z-index: 5; }
@@ -550,11 +553,21 @@ body.shell-page.table-page::before { opacity: 0.28; }
 
 .card-face .card-top {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
+    gap: 6px;
     padding: 5px 7px 3px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    background: linear-gradient(90deg, var(--card-accent, var(--accent-ice-dim)), transparent 70%);
+    background: transparent;
+}
+.card-face .card-rank-pip {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 0;
+    background: var(--rank-color, var(--ink-muted));
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+    opacity: 0.92;
 }
 .card-face .card-meta {
     font-family: var(--font-mono);
@@ -579,7 +592,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
     justify-content: center;
     border: 1px solid var(--line);
     background:
-        radial-gradient(ellipse at 50% 30%, rgba(122, 158, 176, 0.12), transparent 65%),
+        radial-gradient(ellipse at 50% 30%, rgba(122, 158, 176, 0.08), transparent 65%),
         rgba(4, 8, 14, 0.55);
 }
 .card-face .card-glyph {
@@ -588,7 +601,7 @@ body.shell-page.table-page::before { opacity: 0.28; }
     font-weight: 600;
     color: var(--card-accent, var(--accent-ice));
     letter-spacing: 0.08em;
-    opacity: 0.9;
+    opacity: 0.75;
 }
 .card-face .ctype {
     font-size: 9px;
@@ -607,21 +620,107 @@ body.shell-page.table-page::before { opacity: 0.28; }
     overflow: hidden;
 }
 
-.card-kind-kill { --card-accent: var(--card-kill); border-color: rgba(196, 90, 90, 0.45) !important; }
-.card-kind-dodge { --card-accent: var(--card-dodge); border-color: rgba(106, 158, 184, 0.45) !important; }
-.card-kind-heal { --card-accent: var(--card-heal); border-color: rgba(106, 158, 136, 0.45) !important; }
-.card-kind-visitor { --card-accent: var(--card-visitor); border-color: rgba(184, 154, 90, 0.45) !important; }
-.card-kind-trick { --card-accent: var(--card-trick); border-color: rgba(138, 122, 176, 0.45) !important; }
-.card-kind-equipment { --card-accent: var(--card-equip); border-color: rgba(122, 154, 120, 0.45) !important; }
-.card-kind-ascend { --card-accent: var(--card-ascend); border-color: rgba(201, 164, 90, 0.5) !important; }
-.card-kind-realm { --card-accent: var(--card-realm); border-color: rgba(90, 138, 158, 0.45) !important; }
-.card-kind-field { --card-accent: var(--card-field); border-color: rgba(154, 122, 106, 0.45) !important; }
+/* Type: muted accent only (glyph), not full-card color */
+.card-kind-kill { --card-accent: var(--card-kill); }
+.card-kind-dodge { --card-accent: var(--card-dodge); }
+.card-kind-heal { --card-accent: var(--card-heal); }
+.card-kind-visitor { --card-accent: var(--card-visitor); }
+.card-kind-trick { --card-accent: var(--card-trick); }
+.card-kind-equipment { --card-accent: var(--card-equip); }
+.card-kind-ascend { --card-accent: var(--card-ascend); }
+.card-kind-realm { --card-accent: var(--card-realm); }
+.card-kind-field { --card-accent: var(--card-field); }
 
-.card-kind-kill .cname { color: #e8a0a0; }
-.card-kind-dodge .cname { color: #a8d0e4; }
-.card-kind-heal .cname { color: #a8d4c0; }
-.card-kind-visitor .cname { color: #e0c888; }
-.card-kind-ascend .cname { color: #e8c888; }
+/* Rank color shallow mark */
+.card-rank-1 { --rank-color: var(--rank-1); }
+.card-rank-2 { --rank-color: var(--rank-2); }
+.card-rank-3 { --rank-color: var(--rank-3); }
+.card-rank-4 { --rank-color: var(--rank-4); }
+.card-rank-5 { --rank-color: var(--rank-5); }
+.card-rank-6 { --rank-color: var(--rank-6); }
+
+/* Band 1–2: industrial rough */
+.card-band-low {
+    background:
+        repeating-linear-gradient(
+            -32deg,
+            rgba(255, 255, 255, 0.012) 0 1px,
+            transparent 1px 5px
+        ),
+        linear-gradient(180deg, rgba(16, 20, 26, 0.98) 0%, rgba(8, 10, 14, 0.98) 100%) !important;
+    border-color: rgba(120, 130, 140, 0.38) !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 6px 14px rgba(0, 0, 0, 0.4);
+}
+.card-band-low .card-art {
+    border-color: rgba(130, 140, 150, 0.28);
+    background:
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.12) 3px 4px),
+        rgba(6, 8, 12, 0.7);
+}
+.card-band-low .cname {
+    color: #c8d0d8;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Band 3–4: sci-fi gloss / panel */
+.card-band-mid {
+    background:
+        linear-gradient(135deg, rgba(40, 70, 100, 0.22) 0%, transparent 42%),
+        linear-gradient(180deg, rgba(14, 24, 38, 0.98) 0%, rgba(6, 12, 22, 0.98) 100%) !important;
+    border-color: rgba(122, 168, 210, 0.32) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(180, 220, 255, 0.12),
+        0 8px 18px rgba(0, 0, 0, 0.38);
+}
+.card-band-mid::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(160, 210, 255, 0.45), transparent);
+    pointer-events: none;
+    z-index: 2;
+}
+.card-band-mid .card-art {
+    border-color: rgba(120, 170, 210, 0.28);
+    background:
+        linear-gradient(145deg, rgba(90, 150, 210, 0.12), transparent 55%),
+        rgba(4, 10, 18, 0.6);
+}
+.card-band-mid .cname {
+    color: #c8dff0;
+}
+
+/* Band 5–6: pure / high */
+.card-band-high {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 55%),
+        linear-gradient(180deg, rgba(12, 16, 24, 0.96) 0%, rgba(5, 8, 14, 0.99) 100%) !important;
+    border-color: rgba(210, 220, 235, 0.22) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 10px 22px rgba(0, 0, 0, 0.42);
+}
+.card-band-high .card-art {
+    border-color: rgba(200, 210, 230, 0.16);
+    background:
+        radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.05), transparent 60%),
+        rgba(3, 6, 12, 0.55);
+}
+.card-band-high .cname {
+    color: #eef2f8;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+.card-band-high .ctext {
+    color: rgba(220, 228, 240, 0.55);
+}
+.card-band-high .card-rank-pip {
+    box-shadow: 0 0 6px color-mix(in srgb, var(--rank-color) 45%, transparent);
+}
 
 .card-back {
     background:

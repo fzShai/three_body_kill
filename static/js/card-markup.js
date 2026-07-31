@@ -45,6 +45,26 @@
     return c.type || 'unknown';
   }
 
+  function clampRank(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return 1;
+    return Math.max(1, Math.min(6, Math.round(v)));
+  }
+
+  /** Prefer server visual_tier; kill/dodge fall back to tier. */
+  function cardVisualTier(c) {
+    if (!c) return 1;
+    if (c.visual_tier != null && c.visual_tier !== '') return clampRank(c.visual_tier);
+    if (c.subtype === 'kill' || c.subtype === 'dodge') return clampRank(c.tier || 1);
+    return 1;
+  }
+
+  function cardBand(rank) {
+    if (rank <= 2) return 'low';
+    if (rank <= 4) return 'mid';
+    return 'high';
+  }
+
   function cardTypeLabel(c) {
     if (!c) return '';
     if (c.subtype === 'kill') return `${c.tier || '?'}阶杀`;
@@ -59,17 +79,10 @@
     return c.type || '牌';
   }
 
-  function cardTopMeta(c) {
+  function cardTopMeta(c, rank) {
     const kind = cardKind(c);
-    if (kind === 'kill' || kind === 'dodge') return `${c.tier || '?'}阶`;
-    if (kind === 'heal') return `+${c.heal || 2}`;
-    if (kind === 'equipment') return SLOT_LABEL[c.slot] || '装备';
-    if (kind === 'ascend') return '飞升';
-    if (kind === 'visitor') return '基本';
-    if (kind === 'trick') return '锦囊';
-    if (kind === 'realm') return '虚境';
-    if (kind === 'field') return '场地';
-    return cardTypeLabel(c) || '牌';
+    if (kind === 'kill' || kind === 'dodge') return `${c.tier || rank}阶`;
+    return `科${rank}`;
   }
 
   function cardArtGlyph(c) {
@@ -94,6 +107,8 @@
       </div>`;
     }
     const kind = cardKind(c);
+    const rank = cardVisualTier(c);
+    const band = cardBand(rank);
     const selected = opts.selected ? ' selected' : '';
     const dim = opts.dim ? ' dim' : '';
     const compact = opts.compact ? ' card-compact' : '';
@@ -103,7 +118,7 @@
     const cid = escHtml(c?.id || '');
     const name = escHtml(c?.name || '?');
     const typeLabel = escHtml(cardTypeLabel(c));
-    const top = escHtml(cardTopMeta(c));
+    const top = escHtml(cardTopMeta(c, rank));
     const text = escHtml(c?.text || '');
     const glyph = escHtml(cardArtGlyph(c));
     const styleBits = [];
@@ -115,16 +130,20 @@
       styleBits.push(`--fan-lift:${lift.toFixed(1)}px`);
     }
     const style = styleBits.length ? ` style="${styleBits.join(';')}"` : '';
+    const topBar = `<div class="card-top">
+        <span class="card-rank-pip" title="${top}" aria-hidden="true"></span>
+        <span class="card-meta">${top}</span>
+      </div>`;
     const body = opts.compact
-      ? `<div class="card-top"><span class="card-meta">${top}</span></div>
+      ? `${topBar}
          <div class="cname">${name}</div>
          <div class="ctype">${typeLabel}</div>`
-      : `<div class="card-top"><span class="card-meta">${top}</span></div>
+      : `${topBar}
          <div class="cname">${name}</div>
          <div class="card-art" aria-hidden="true"><span class="card-glyph">${glyph}</span></div>
          <div class="ctype">${typeLabel}</div>
          <div class="ctext">${text}</div>`;
-    return `<div class="card card-face card-lift card-kind-${kind}${selected}${dim}${compact}${extra}" data-id="${iid}" data-subtype="${subtype}" data-card-id="${cid}" data-kind="${kind}"${style}>
+    return `<div class="card card-face card-lift card-kind-${kind} card-rank-${rank} card-band-${band}${selected}${dim}${compact}${extra}" data-id="${iid}" data-subtype="${subtype}" data-card-id="${cid}" data-kind="${kind}" data-rank="${rank}"${style}>
       ${body}
     </div>`;
   }
@@ -133,6 +152,7 @@
   global.TBK.cardMarkup = cardMarkup;
   global.TBK.cardKind = cardKind;
   global.TBK.cardTypeLabel = cardTypeLabel;
+  global.TBK.cardVisualTier = cardVisualTier;
   global.TBK.TEMP_ASCEND_IDS = TEMP_ASCEND_IDS;
   global.TBK.SLOT_LABEL = SLOT_LABEL;
 })(typeof window !== 'undefined' ? window : globalThis);

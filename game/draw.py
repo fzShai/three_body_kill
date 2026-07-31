@@ -8,6 +8,45 @@ from typing import Any
 from game.catalog import load_armors, load_card_defs, load_pools, load_realms, load_ships
 from game.stats import resolve_kill_tier
 
+BUCKET_KEYS = frozenset({"ship_bucket", "armor_bucket", "realm_bucket"})
+
+
+def clamp_tier(n: Any, default: int = 1) -> int:
+    try:
+        return max(1, min(6, int(n)))
+    except (TypeError, ValueError):
+        return default
+
+
+def build_unlock_tech_map(pools: dict[str, Any]) -> dict[str, int]:
+    """card_id / bucket_key → lowest tech level that includes its earliest pool entry."""
+    caps = pools.get("tech_pool_max") or {}
+    # Sorted (max_entry, tech) ascending by entry ceiling
+    ceilings: list[tuple[int, int]] = []
+    for tech in range(1, 7):
+        ceilings.append((int(caps.get(str(tech), 22)), tech))
+    ceilings.sort(key=lambda x: x[0])
+
+    def tech_for_entry(entry_no: int) -> int:
+        for max_entry, tech in ceilings:
+            if entry_no <= max_entry:
+                return tech
+        return 6
+
+    entry_map = pools.get("entry_map") or {}
+    min_entry_by_id: dict[str, int] = {}
+    for entry_str, card_id in entry_map.items():
+        try:
+            entry_no = int(entry_str)
+        except (TypeError, ValueError):
+            continue
+        cid = str(card_id)
+        prev = min_entry_by_id.get(cid)
+        if prev is None or entry_no < prev:
+            min_entry_by_id[cid] = entry_no
+
+    return {cid: tech_for_entry(entry_no) for cid, entry_no in min_entry_by_id.items()}
+
 
 class DrawSystem:
     def __init__(self) -> None:
@@ -17,6 +56,7 @@ class DrawSystem:
         self.armors = load_armors()
         self.realms = load_realms()
         self._uid = 0
+        self.unlock_tech = build_unlock_tech_map(self.pools)
 
     def casio(self, lo: int, hi: int) -> int:
         return random.randint(lo, hi)
@@ -29,10 +69,27 @@ class DrawSystem:
         caps = self.pools.get("tech_pool_max", {})
         return int(caps.get(str(max(1, min(6, tech_level))), 22))
 
+    def resolve_visual_tier(self, card: dict[str, Any], *, bucket_key: str | None = None) -> int:
+        """Kill/dodge → tier; others → unlock tech from pool (bucket fallback)."""
+        subtype = card.get("subtype")
+        if subtype in {"kill", "dodge"}:
+            return clamp_tier(card.get("tier"), 1)
+        cid = str(card.get("id") or card.get("ship_id") or card.get("armor_id") or card.get("realm_id") or "")
+        if cid and cid in self.unlock_tech:
+            return self.unlock_tech[cid]
+        if bucket_key and bucket_key in self.unlock_tech:
+            return self.unlock_tech[bucket_key]
+        return 1
+
+    def stamp_visual_tier(self, card: dict[str, Any], *, bucket_key: str | None = None) -> dict[str, Any]:
+        card["visual_tier"] = self.resolve_visual_tier(card, bucket_key=bucket_key)
+        return card
+
     def materialize_entry(self, entry_no: int, tech_level: int) -> dict[str, Any]:
         entry_map = self.pools.get("entry_map", {})
         key = entry_map.get(str(entry_no), "peach")
         base = dict(self.card_defs.get(key) or self.card_defs["peach"])
+        bucket_key: str | None = key if key in BUCKET_KEYS else None
 
         if key == "ship_bucket" and self.ships:
             ship = random.choice(self.ships)
@@ -88,6 +145,7 @@ class DrawSystem:
 
         base["instance_id"] = self._next_instance_id(str(base["id"]))
         base["pool_entry"] = entry_no
+        self.stamp_visual_tier(base, bucket_key=bucket_key)
         return base
 
     def draw_one(self, tech_level: int) -> dict[str, Any]:

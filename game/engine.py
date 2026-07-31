@@ -172,12 +172,16 @@ class GameSession:
     def _card_pub(self, card: dict[str, Any] | None) -> dict[str, Any] | None:
         if not card:
             return None
+        visual = card.get("visual_tier")
+        if visual is None and hasattr(self, "draw_sys"):
+            visual = self.draw_sys.resolve_visual_tier(card)
         return {
             "id": card.get("id"),
             "name": card.get("name"),
             "type": card.get("type"),
             "subtype": card.get("subtype"),
             "tier": card.get("tier"),
+            "visual_tier": visual,
             "slot": card.get("slot"),
             "instance_id": card.get("instance_id"),
             "text": card.get("text"),
@@ -261,6 +265,9 @@ class GameSession:
                 "type": card.get("type"),
                 "subtype": card.get("subtype"),
                 "tier": card.get("tier"),
+                "visual_tier": card.get("visual_tier")
+                if card.get("visual_tier") is not None
+                else (self.draw_sys.resolve_visual_tier(card) if hasattr(self, "draw_sys") else None),
             }
         self.stage = {
             "kind": kind,
@@ -407,6 +414,7 @@ class GameSession:
                 "type": "basic",
                 "subtype": "kill",
                 "tier": 3,
+                "visual_tier": 3,
                 "instance_id": f"quantum-kill-{self.seq}-{name}",
                 "implemented": True,
                 "text": "量子号补给：三阶杀。",
@@ -2551,6 +2559,9 @@ class GameSession:
     def snapshot_for(self, viewer: str, *, with_events: bool = True) -> dict[str, Any]:
         me = self.players.get(viewer)
         private_hand = deepcopy(me["hand"]) if me else []
+        for c in private_hand:
+            if isinstance(c, dict) and c.get("visual_tier") is None:
+                self.draw_sys.stamp_visual_tier(c)
         private_role = None
         if me:
             private_role = {

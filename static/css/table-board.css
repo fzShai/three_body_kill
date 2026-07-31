@@ -728,28 +728,6 @@ body.shell-page.table-page::before { opacity: 0.28; }
     white-space: pre-wrap;
 }
 
-/* Onboarding */
-.guide-banner {
-    position: fixed;
-    left: 50%;
-    bottom: 96px;
-    transform: translateX(-50%);
-    z-index: 70;
-    max-width: min(520px, calc(100vw - 24px));
-    padding: 12px 14px;
-    background: rgba(8, 14, 22, 0.94);
-    border: 1px solid var(--line-strong);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    font-size: 13px;
-    color: var(--ink);
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-}
-.guide-banner p { margin: 0; line-height: 1.45; color: var(--ink-dim); }
-.guide-banner strong { color: var(--accent-ice-bright); font-weight: 600; }
-.guide-banner .guide-actions { display: flex; gap: 8px; flex-shrink: 0; }
-
 .sfx-toggle {
     font-family: var(--font-mono);
     font-size: 11px;

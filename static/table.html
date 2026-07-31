@@ -86,13 +86,6 @@
 
     <div class="inspect-panel" id="inspectPanel" hidden></div>
     <div class="card-tip" id="cardTip" hidden></div>
-    <div class="guide-banner" id="guideBanner" hidden>
-        <p><strong>操作提示</strong>：点选手牌 → 需要时再点座位选目标 → 点「出牌」。弃牌阶段可多选后弃置。规则见 <a href="/codex" style="color:var(--accent-ice-bright)">图鉴</a>。</p>
-        <div class="guide-actions">
-            <button class="btn btn-outline btn-compact" id="guideDismiss" type="button">知道了</button>
-        </div>
-    </div>
-
     <script src="/static/app.js?v=20260730j"></script>
     <script src="/static/js/card-markup.js?v=20260731a"></script>
     <script src="/static/js/fx-audio.js?v=20260731a"></script>
@@ -139,20 +132,6 @@
                 syncSfxToggle();
                 if (TBK.sfx.isEnabled()) TBK.sfx.play('play');
             });
-
-            function maybeShowGuide() {
-                try {
-                    if (localStorage.getItem('tbk_guide_v1') === '1') return;
-                } catch (e) { return; }
-                const banner = document.getElementById('guideBanner');
-                if (banner) banner.hidden = false;
-            }
-            document.getElementById('guideDismiss')?.addEventListener('click', () => {
-                const banner = document.getElementById('guideBanner');
-                if (banner) banner.hidden = true;
-                try { localStorage.setItem('tbk_guide_v1', '1'); } catch (e) { /* ignore */ }
-            });
-            maybeShowGuide();
 
             function showCardTip(el, card) {
                 if (!cardTip || !card) return;

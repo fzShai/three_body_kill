@@ -350,6 +350,34 @@ body.table-ended .ended-banner {
     filter: saturate(0.55) brightness(0.85) contrast(1.05);
 }
 
+/* High-tier (5–6): soft pip / aura breathe */
+@keyframes card-high-pip-breathe {
+    0%, 100% { opacity: 0.82; filter: brightness(0.95); }
+    50% { opacity: 1; filter: brightness(1.15); }
+}
+@keyframes card-high-aura-breathe {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.7; }
+}
+
+.card-band-high .card-rank-pip {
+    animation: card-high-pip-breathe 3.5s ease-in-out infinite;
+}
+.card-band-high::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 0;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--rank-color) 28%, transparent);
+    opacity: 0.4;
+    animation: card-high-aura-breathe 3.5s ease-in-out infinite;
+}
+.card-rank-6.card-band-high::after {
+    box-shadow: 0 0 22px color-mix(in srgb, var(--rank-6) 38%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .motion-enter,
     .panel.radar-once,
@@ -373,9 +401,14 @@ body.table-ended .ended-banner {
     .seat-panel.fx-dying,
     .hand .card.card-enter,
     .fx-float,
-    .fx-toast {
+    .fx-toast,
+    .card-band-high .card-rank-pip,
+    .card-band-high::after {
         animation: none !important;
         transition: none !important;
+    }
+    .card-band-high::after {
+        opacity: 0.45;
     }
     .portrait.holo-signal::after {
         opacity: 0;

@@ -60,6 +60,10 @@ def _clear_prompt_to_turn(session: GameSession) -> None:
         who = str(session.prompt.get("to"))
         if ptype == "wander_draw":
             session.apply_action(who, {"action": "wander_pass"})
+        elif ptype == "hold_sword":
+            session.apply_action(who, {"action": "hold_sword_pass"})
+        elif ptype == "choice" and session.prompt.get("card_id") == "hold_sword":
+            session.apply_action(who, {"action": "choose", "choice": "reset"})
         else:
             session.prompt = None
             session.phase = "turn"
@@ -285,6 +289,7 @@ def main() -> None:
     eqg = GameSession.create("EQUIP", ["rita", "sam"])
     _blank_skills(eqg, "rita", "sam")
     rita = eqg.players["rita"]
+    eqg.players["sam"]["hand"] = []  # 避免开局摸到钢印打断临时飞升
     eqg.turn_index = eqg.player_order.index("rita")
     eqg.phase = "turn"
     eqg.turn_phase = "play"
@@ -587,43 +592,132 @@ def main() -> None:
     assert len(fr.players["friss"]["hand"]) == hand_before - 2 + 4
     assert any("土著" in line and "古筝" in line for line in fr.log)
 
-    # 罗辑执剑人：视野暴露不可被杀；对暴露目标杀不可闪
+    # 罗辑【执剑】：无效锦囊 → 用牌者选真实伤害；跨阶杀同名计数；重置后再发动
+    from game.skills import logical_card_name
+
     lj = GameSession.create("LUOJI", ["luo", "foe"])
     _as_role(lj, "luo", "luo_ji")
     _blank_skills(lj, "foe")
+    lj.players["luo"]["hand"] = []
+    lj.players["foe"]["hand"] = []
     lj.turn_index = lj.player_order.index("foe")
     lj.phase = "turn"
     lj.turn_phase = "play"
-    lj.players["luo"]["vision_exposed"] = True
-    kill_lj = {
+    lj.players["luo"]["hold_sword_used"] = False
+    # 先用一张不同阶杀计入次数
+    lj.card_name_use_counts["kill"] = 0
+    kill_a = {
         "id": "kill_low",
         "name": "1阶杀",
         "type": "basic",
         "subtype": "kill",
         "tier": 1,
-        "instance_id": "kill-lj",
+        "instance_id": "kill-a",
     }
-    _give(lj.players["foe"], kill_lj)
-    ok, msg = lj.apply_action("foe", {"action": "play_card", "instance_id": "kill-lj", "target": "luo"})
-    assert not ok and "执剑人" in msg
-    lj.players["luo"]["vision_exposed"] = False
-    lj.players["foe"]["vision_exposed"] = True
-    lj.turn_index = lj.player_order.index("luo")
-    kill_lj2 = {**kill_lj, "instance_id": "kill-lj2"}
-    _give(lj.players["luo"], kill_lj2)
-    dodge_lj = {
-        "id": "dodge_low",
-        "name": "1阶闪",
+    kill_b = {
+        "id": "kill_high",
+        "name": "3阶杀",
         "type": "basic",
-        "subtype": "dodge",
-        "tier": 1,
-        "instance_id": "dodge-lj",
+        "subtype": "kill",
+        "tier": 3,
+        "instance_id": "kill-b",
     }
-    _give(lj.players["foe"], dodge_lj)
-    hp_before = lj.players["foe"]["hp"]
-    ok, msg = lj.apply_action("luo", {"action": "play_card", "instance_id": "kill-lj2", "target": "foe"})
+    assert logical_card_name(kill_a) == logical_card_name(kill_b) == "kill"
+    _give(lj.players["foe"], kill_a)
+    ok, msg = lj.apply_action("foe", {"action": "play_card", "instance_id": "kill-a", "target": "luo"})
     assert ok, msg
-    assert lj.players["foe"]["hp"] < hp_before
+    # 先闪响应，再伤害前执剑
+    assert lj.prompt and lj.prompt.get("type") == "respond_dodge" and lj.prompt.get("to") == "luo"
+    ok, msg = lj.apply_action("luo", {"action": "respond_pass"})
+    assert ok, msg
+    assert lj.prompt and lj.prompt.get("type") == "hold_sword" and lj.prompt.get("to") == "luo"
+    assert lj.prompt.get("use_count") == 1
+    hp_luo = lj.players["luo"]["hp"]
+    ok, msg = lj.apply_action("luo", {"action": "hold_sword_pass"})
+    assert ok, msg
+    assert lj.players["luo"]["hp"] < hp_luo
+    assert lj.card_name_use_counts.get("kill") == 1
+
+    # 锦囊：执剑无效 + 用牌者选伤害
+    lj.phase = "turn"
+    lj.turn_phase = "play"
+    lj.turn_index = lj.player_order.index("foe")
+    lj.prompt = None
+    lj.players["luo"]["hold_sword_used"] = False
+    foe_hp = lj.players["foe"]["hp"]
+    ball = {
+        "id": "ball_lightning",
+        "name": "球状闪电",
+        "type": "trick",
+        "implemented": True,
+        "instance_id": "ball-hs",
+    }
+    _give(lj.players["foe"], ball)
+    ok, msg = lj.apply_action("foe", {"action": "play_card", "instance_id": "ball-hs", "target": "luo"})
+    assert ok, msg
+    assert lj.prompt and lj.prompt.get("type") == "hold_sword"
+    n_ball = lj.prompt.get("use_count")
+    ok, msg = lj.apply_action("luo", {"action": "hold_sword_accept"})
+    assert ok, msg
+    assert lj.players["luo"]["hold_sword_used"] is True
+    assert lj.prompt and lj.prompt.get("type") == "choice" and lj.prompt.get("card_id") == "hold_sword"
+    assert lj.prompt.get("to") == "foe"
+    ok, msg = lj.apply_action("foe", {"action": "choose", "choice": "true_dmg"})
+    assert ok, msg
+    assert lj.players["foe"]["hp"] == foe_hp - n_ball
+    assert lj.players["luo"]["hold_sword_used"] is True
+
+    # 重置后续可再发动
+    lj.phase = "turn"
+    lj.turn_phase = "play"
+    lj.turn_index = lj.player_order.index("foe")
+    lj.players["luo"]["hold_sword_used"] = False
+    ball2 = {**ball, "instance_id": "ball-hs2"}
+    _give(lj.players["foe"], ball2)
+    ok, msg = lj.apply_action("foe", {"action": "play_card", "instance_id": "ball-hs2", "target": "luo"})
+    assert ok, msg
+    assert lj.prompt and lj.prompt.get("type") == "hold_sword"
+    ok, msg = lj.apply_action("luo", {"action": "hold_sword_accept"})
+    assert ok, msg
+    ok, msg = lj.apply_action("foe", {"action": "choose", "choice": "reset"})
+    assert ok, msg
+    assert lj.players["luo"]["hold_sword_used"] is False
+
+    # 濒死桃被无效：先续濒死，再后半段（三人局避免出局即终局）
+    lj2 = GameSession.create("LUOJI2", ["luo", "vic", "spec"])
+    _as_role(lj2, "luo", "luo_ji")
+    _blank_skills(lj2, "vic", "spec")
+    for n in ("luo", "vic", "spec"):
+        lj2.players[n]["hand"] = []
+    lj2.phase = "dying"
+    lj2.dying = {"victim": "vic", "source": "luo"}
+    lj2.players["vic"]["hp"] = 0
+    lj2.players["luo"]["hold_sword_used"] = False
+    peach = {
+        "id": "peach",
+        "name": "桃",
+        "type": "basic",
+        "subtype": "heal",
+        "heal": 2,
+        "instance_id": "peach-dying-hs",
+    }
+    _give(lj2.players["vic"], peach)
+    ok, msg = lj2.apply_action("vic", {"action": "play_card", "instance_id": "peach-dying-hs"})
+    assert ok, msg
+    assert lj2.prompt and lj2.prompt.get("type") == "hold_sword"
+    ok, msg = lj2.apply_action("luo", {"action": "hold_sword_accept"})
+    assert ok, msg
+    assert lj2.dying and lj2.dying.get("victim") == "vic"
+    assert lj2.phase == "dying"
+    assert lj2._hold_sword_sequel
+    # 无桃则出局，随后打开后半段
+    ok, msg = lj2.apply_action("vic", {"action": "dying_pass"})
+    assert ok, msg
+    assert not lj2.players["vic"]["alive"]
+    assert lj2.prompt and lj2.prompt.get("card_id") == "hold_sword" and lj2.prompt.get("to") == "vic"
+    ok, msg = lj2.apply_action("vic", {"action": "choose", "choice": "reset"})
+    assert ok, msg
+    assert lj2.players["luo"]["hold_sword_used"] is False
 
     # you.actions：终极规律号主动技由 snapshot 下发
     law = GameSession.create("LAW", ["law", "bot"])

@@ -6,8 +6,8 @@
     <title>三体杀 - 桌面</title>
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
-    <link rel="stylesheet" href="/static/css/motion.css?v=20260731f" />
-    <link rel="stylesheet" href="/static/css/table-board.css?v=20260731f" />
+    <link rel="stylesheet" href="/static/css/motion.css?v=20260802a" />
+    <link rel="stylesheet" href="/static/css/table-board.css?v=20260802a" />
 </head>
 <body class="shell-page table-page">
     <div class="table-shell">
@@ -87,7 +87,7 @@
     <div class="inspect-panel" id="inspectPanel" hidden></div>
     <div class="card-tip" id="cardTip" hidden></div>
     <script src="/static/app.js?v=20260730j"></script>
-    <script src="/static/js/card-markup.js?v=20260731f"></script>
+    <script src="/static/js/card-markup.js?v=20260802a"></script>
     <script src="/static/js/fx-audio.js?v=20260731a"></script>
     <script src="/static/js/fx-queue.js?v=20260731a"></script>
     <script>
@@ -762,6 +762,11 @@
                     hint.textContent = `请先选 ${confirmCardNeed} 张手牌，再点「${confirmMeta.accept_label}」`;
                 } else if (myConfirm) {
                     hint.textContent = snap.stage?.text || '请选择确认或放弃';
+                } else if (myChoice && prompt.card_id === 'hold_sword') {
+                    const n = prompt.use_count ?? prompt.meta?.damage;
+                    hint.textContent = n != null
+                        ? `【执剑】后续：重置技能，或承受 ${n} 点真实伤害`
+                        : (snap.stage?.text || '请选择执剑后续');
                 } else if (mySoap) {
                     hint.textContent = '香皂：点击座位选择回复目标';
                 } else if (isDying) {

@@ -150,15 +150,24 @@
       styleBits.push(`--fan-lift:${lift.toFixed(1)}px`);
     }
     const style = styleBits.length ? ` style="${styleBits.join(';')}"` : '';
+    const corners = band === 'high'
+      ? (rank >= 6
+        ? `<span class="card-corner card-corner-tl" aria-hidden="true"></span>
+           <span class="card-corner card-corner-tr" aria-hidden="true"></span>
+           <span class="card-corner card-corner-bl" aria-hidden="true"></span>
+           <span class="card-corner card-corner-br" aria-hidden="true"></span>`
+        : `<span class="card-corner card-corner-tl" aria-hidden="true"></span>
+           <span class="card-corner card-corner-br" aria-hidden="true"></span>`)
+      : '';
     const topBar = `<div class="card-top">
         <span class="card-rank-pip" title="${top}" aria-hidden="true"></span>
         <span class="card-meta">${top}</span>
       </div>`;
     const body = opts.compact
-      ? `${topBar}
+      ? `${corners}${topBar}
          <div class="cname">${name}</div>
          <div class="ctype">${typeLabel}</div>`
-      : `${topBar}
+      : `${corners}${topBar}
          <div class="cname">${name}</div>
          <div class="card-art" aria-hidden="true"><span class="card-glyph">${glyph}</span></div>
          <div class="ctype">${typeLabel}</div>

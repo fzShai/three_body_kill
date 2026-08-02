@@ -644,31 +644,36 @@ body.shell-page.table-page::before { opacity: 0.28; }
 .card-rank-5 { --rank-color: var(--rank-5); }
 .card-rank-6 { --rank-color: var(--rank-6); }
 
-/* Band 1–2: industrial rough */
+/* Band 1–2: industrial rough — slightly dirtier so high reads cleaner */
 .card-band-low {
     background:
         repeating-linear-gradient(
             -32deg,
-            rgba(255, 255, 255, 0.012) 0 1px,
-            transparent 1px 5px
+            rgba(255, 255, 255, 0.02) 0 1px,
+            transparent 1px 4px
         ),
-        linear-gradient(180deg, rgba(16, 20, 26, 0.98) 0%, rgba(8, 10, 14, 0.98) 100%) !important;
-    border-color: rgba(120, 130, 140, 0.38) !important;
+        repeating-linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0.08) 0 1px,
+            transparent 1px 7px
+        ),
+        linear-gradient(180deg, rgba(14, 18, 22, 0.98) 0%, rgba(6, 8, 12, 0.99) 100%) !important;
+    border-color: rgba(100, 110, 120, 0.48) !important;
     box-shadow:
         inset 3px 0 0 var(--rank-color, transparent),
-        inset 0 0 0 1px rgba(0, 0, 0, 0.35),
-        0 6px 14px rgba(0, 0, 0, 0.4);
+        inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+        0 5px 12px rgba(0, 0, 0, 0.45);
 }
 .card-band-low .card-art {
-    border-color: rgba(130, 140, 150, 0.28);
+    border-color: rgba(110, 120, 130, 0.35);
     background:
-        repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.12) 3px 4px),
-        rgba(6, 8, 12, 0.7);
+        repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 0, 0, 0.16) 2px 3px),
+        rgba(4, 6, 10, 0.78);
 }
 .card-band-low .cname {
-    color: #c8d0d8;
+    color: #b8c0c8;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
 }
 
 /* Band 3–4: sci-fi gloss / panel */
@@ -703,34 +708,157 @@ body.shell-page.table-page::before { opacity: 0.28; }
     color: #c8dff0;
 }
 
-/* Band 5–6: pure / high */
+/* Band 5–6: quiet luxury — double frame, empty glow, corners */
 .card-band-high {
     background:
-        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 55%),
-        linear-gradient(180deg, rgba(12, 16, 24, 0.96) 0%, rgba(5, 8, 14, 0.99) 100%) !important;
-    border-color: rgba(210, 220, 235, 0.22) !important;
+        linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 28%),
+        radial-gradient(ellipse 90% 55% at 50% -5%, rgba(255, 255, 255, 0.08), transparent 58%),
+        linear-gradient(180deg, rgba(14, 18, 28, 0.97) 0%, rgba(4, 6, 12, 0.99) 100%) !important;
+    border: 1px solid rgba(230, 236, 245, 0.42) !important;
+}
+.card.card-face.card-band-high {
     box-shadow:
-        inset 3px 0 0 var(--rank-color, transparent),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-        0 10px 22px rgba(0, 0, 0, 0.42);
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+        inset 0 0 0 3px rgba(6, 10, 16, 0.85),
+        0 12px 28px rgba(0, 0, 0, 0.5);
 }
-.card-band-high .card-art {
-    border-color: rgba(200, 210, 230, 0.16);
-    background:
-        radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.05), transparent 60%),
-        rgba(3, 6, 12, 0.55);
+.card-band-high::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--rank-color) 85%, transparent),
+        color-mix(in srgb, var(--rank-color) 35%, transparent) 55%,
+        color-mix(in srgb, var(--rank-color) 55%, transparent)
+    );
+    pointer-events: none;
+    z-index: 2;
 }
-.card-band-high .cname {
-    color: #eef2f8;
-    font-weight: 500;
-    letter-spacing: 0.04em;
+.card-band-high .card-top {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
 }
-.card-band-high .ctext {
-    color: rgba(220, 228, 240, 0.55);
+.card-band-high .card-meta {
+    color: rgba(235, 240, 248, 0.72);
+    letter-spacing: 0.1em;
 }
 .card-band-high .card-rank-pip {
-    box-shadow: 0 0 6px color-mix(in srgb, var(--rank-color) 45%, transparent);
+    width: 9px;
+    height: 9px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.35),
+        0 0 10px color-mix(in srgb, var(--rank-color) 55%, transparent);
 }
+.card-band-high .card-art {
+    border: 1px solid rgba(230, 236, 245, 0.22);
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.11) 0%, transparent 58%),
+        linear-gradient(180deg, rgba(10, 14, 22, 0.4), rgba(2, 4, 10, 0.75));
+    box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.03);
+}
+.card-band-high .card-glyph {
+    opacity: 0.55;
+    color: rgba(235, 240, 248, 0.75);
+}
+.card-band-high .cname {
+    color: #f4f7fc;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+}
+.card-band-high .ctype {
+    color: rgba(210, 220, 235, 0.45);
+}
+.card-band-high .ctext {
+    color: rgba(220, 228, 240, 0.5);
+}
+
+/* Corner ornaments (high band) */
+.card-corner {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0.7;
+}
+.card-corner::before,
+.card-corner::after {
+    content: '';
+    position: absolute;
+    background: color-mix(in srgb, var(--rank-color) 65%, rgba(230, 236, 245, 0.5));
+}
+.card-corner-tl { top: 4px; left: 4px; }
+.card-corner-tl::before { top: 0; left: 0; width: 10px; height: 1px; }
+.card-corner-tl::after { top: 0; left: 0; width: 1px; height: 10px; }
+.card-corner-tr { top: 4px; right: 4px; }
+.card-corner-tr::before { top: 0; right: 0; width: 10px; height: 1px; }
+.card-corner-tr::after { top: 0; right: 0; width: 1px; height: 10px; }
+.card-corner-bl { bottom: 4px; left: 4px; }
+.card-corner-bl::before { bottom: 0; left: 0; width: 10px; height: 1px; }
+.card-corner-bl::after { bottom: 0; left: 0; width: 1px; height: 10px; }
+.card-corner-br { bottom: 4px; right: 4px; }
+.card-corner-br::before { bottom: 0; right: 0; width: 10px; height: 1px; }
+.card-corner-br::after { bottom: 0; right: 0; width: 1px; height: 10px; }
+
+/* Rank 5: orange quiet luxury */
+.card.card-face.card-rank-5.card-band-high {
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+        inset 0 0 0 3px rgba(6, 10, 16, 0.85),
+        0 14px 32px rgba(0, 0, 0, 0.52),
+        0 0 16px color-mix(in srgb, var(--rank-5) 12%, transparent);
+}
+.card-rank-5.card-band-high .card-corner {
+    opacity: 0.75;
+}
+
+/* Rank 6: crimson hush — brighter center, fuller corners, soft red bloom */
+.card.card-face.card-rank-6.card-band-high {
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 236, 236, 0.14),
+        inset 0 0 0 3px rgba(8, 6, 10, 0.88),
+        0 14px 34px rgba(0, 0, 0, 0.55),
+        0 0 22px color-mix(in srgb, var(--rank-6) 22%, transparent);
+}
+.card-rank-6.card-band-high .card-meta {
+    color: rgba(248, 236, 236, 0.78);
+}
+.card-rank-6.card-band-high .card-art {
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(255, 245, 245, 0.16) 0%, transparent 55%),
+        linear-gradient(180deg, rgba(12, 10, 16, 0.45), rgba(4, 2, 8, 0.8));
+    border-color: rgba(255, 220, 220, 0.22);
+}
+.card-rank-6.card-band-high .card-corner {
+    width: 12px;
+    height: 12px;
+    opacity: 0.9;
+}
+.card-rank-6.card-band-high .card-corner-tl::before,
+.card-rank-6.card-band-high .card-corner-tr::before,
+.card-rank-6.card-band-high .card-corner-bl::before,
+.card-rank-6.card-band-high .card-corner-br::before { width: 12px; }
+.card-rank-6.card-band-high .card-corner-tl::after,
+.card-rank-6.card-band-high .card-corner-tr::after,
+.card-rank-6.card-band-high .card-corner-bl::after,
+.card-rank-6.card-band-high .card-corner-br::after { height: 12px; }
+
+.card-compact.card-band-high .card-corner {
+    width: 7px;
+    height: 7px;
+}
+.card-compact.card-band-high .card-corner-tl::before,
+.card-compact.card-band-high .card-corner-tr::before,
+.card-compact.card-band-high .card-corner-bl::before,
+.card-compact.card-band-high .card-corner-br::before { width: 7px; }
+.card-compact.card-band-high .card-corner-tl::after,
+.card-compact.card-band-high .card-corner-tr::after,
+.card-compact.card-band-high .card-corner-bl::after,
+.card-compact.card-band-high .card-corner-br::after { height: 7px; }
 
 .card-back {
     background:

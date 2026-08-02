@@ -10,7 +10,7 @@ SKILL_STARSHIP = "starship"
 SKILL_WANDER = "wander"
 SKILL_NATIVE = "native"
 SKILL_COHESION = "cohesion"
-SKILL_SWORD_HOLDER = "sword_holder"
+SKILL_HOLD_SWORD = "hold_sword"
 SKILL_WALLFACER = "wallfacer"
 SKILL_RED_SHORE = "red_shore"
 SKILL_LEADER = "leader"
@@ -19,9 +19,34 @@ LOCKED_SKILLS = frozenset(
     {
         SKILL_STARSHIP,
         SKILL_NATIVE,
-        SKILL_SWORD_HOLDER,
     }
 )
+
+
+def logical_card_name(card: dict[str, Any]) -> str:
+    """Normalize card identity for【执剑】同名计数（杀/闪跨阶合并）。"""
+    subtype = card.get("subtype")
+    cid = str(card.get("id") or "")
+    if subtype == "kill" or cid.startswith("kill"):
+        return "kill"
+    if subtype == "dodge" or cid.startswith("dodge"):
+        return "dodge"
+    if subtype == "heal" or cid == "peach":
+        return "peach"
+    if subtype == "visitor" or cid == "visitor":
+        return "visitor"
+    if cid:
+        return cid
+    return str(card.get("name") or "card")
+
+
+def logical_card_label(key: str) -> str:
+    return {
+        "kill": "杀",
+        "dodge": "闪",
+        "peach": "桃",
+        "visitor": "天外来客",
+    }.get(key, key)
 
 
 def role_skills(player: dict[str, Any]) -> list[dict[str, Any]]:
